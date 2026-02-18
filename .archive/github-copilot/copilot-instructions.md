@@ -29,15 +29,23 @@ This is a **TanStack Start** application (React + TypeScript) that uses a file-b
 - Components in `src/components/` with default exports
 - Use TanStack Router's `Link` component for navigation, not `<a>` tags
 - TypeScript strict mode enabled with path aliases (`@/*` → `./src/*`)
+- **Mobile-First Components**: All components must be designed mobile-first with responsive scaling
 
 ### 4. Styling Conventions (Tailwind v4)
-Concise summary; full details live in `/.github/copilot-styling.md` (auto-applies to style & component files):
+Concise summary; full details live in `/.github/instructions/copilot-styling.instructions.md` (auto-applies to style & component files):
 - Central config in `tailwind.config.ts`; global import & layers in `src/styles.css`.
 - Use inline utilities first, extract to component class after ≥3 uses.
 - Keep class strings static; avoid dynamic concatenation of utility fragments.
-- Reusable classes: `.btn-primary`, planned variants via additive classes (e.g. `.btn-danger`).
-- Tokens mirrored as CSS vars in `:root`; prefer semantic names.
-- See `copilot-styling.md` for card example, variant strategy, and extraction workflow.
+- Reusable classes: fitness dashboard components with semantic names
+- Design tokens as CSS vars in `:root`; modern fitness dashboard theme
+- See styling instructions for complete design language, component patterns, mobile-first principles, and extraction workflow.
+
+### 5. Mobile-First Development Approach
+All components must be designed mobile-first with responsive scaling:
+- Start with mobile layouts and scale up using responsive breakpoints
+- Ensure touch-friendly interfaces with adequate target sizes
+- Progressive enhancement from mobile to desktop experiences
+- Complete responsive design patterns and Tailwind classes detailed in styling instructions
 
 ## Development Workflow
 

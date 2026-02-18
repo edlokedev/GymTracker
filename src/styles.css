@@ -1,30 +1,222 @@
 @import "tailwindcss";
+@import "./styles/calendar.css";
+@source "../node_modules/@ilamy/calendar/dist/**/*.js";
 
 /* Minimal base overrides (avoid advanced theme() usage to satisfy raw CSS linters) */
 @layer base {
   :root {
+    /* Primary Brand - Updated per CAL-001 */
     --color-brand: #2563eb;
     --color-brand-accent: #f59e0b;
     --color-brand-muted: #64748b;
+
+    /* Dashboard Surfaces */
+    --color-surface-primary: #ffffff;
+    --color-surface-secondary: #f8fafc;
+    --color-surface-elevated: #f1f5f9;
+
+    /* Data Visualization */
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    --color-info: #3b82f6;
+
+    /* Text Hierarchy */
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #475569;
+    --color-text-muted: #64748b;
+
+    /* Borders & Dividers */
+    --color-border: #e2e8f0;
+    --color-border-muted: #f1f5f9;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --gradient-surface: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
   }
-  html { font-feature-settings: "liga" 1, "kern" 1; }
-  body { margin: 0; background-color: #0a0a0a; color: #f5f5f5; font-family: system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing: antialiased; }
-  h1,h2,h3,h4,h5,h6 { font-weight:600; line-height:1.1; }
-  p { line-height:1.65; }
+
+  /* Dark mode variants */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-surface-primary: #0f172a;
+      --color-surface-secondary: #1e293b;
+      --color-surface-elevated: #334155;
+      --color-text-primary: #f8fafc;
+      --color-text-secondary: #cbd5e1;
+      --color-text-muted: #64748b;
+      --color-border: #334155;
+      --color-border-muted: #1e293b;
+      --gradient-surface: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+    }
+  }
+
+  html {
+    font-feature-settings: "liga" 1, "kern" 1;
+  }
+
+  body {
+    margin: 0;
+    background-color: #0a0a0a;
+    color: #f5f5f5;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  p {
+    line-height: 1.65;
+  }
 }
 
 @layer components {
   .btn-primary {
     /* Mirrors a composition of Tailwind utilities; kept explicit for clarity */
-    display:inline-flex; align-items:center; gap:.5rem; border-radius:.5rem; background:var(--color-brand); color:#fff; font-size:.875rem; font-weight:500; padding:.5rem 1rem; line-height:1.25rem; transition:background-color .15s ease,box-shadow .15s ease; text-decoration:none; cursor:pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    border-radius: .5rem;
+    background: var(--color-brand);
+    color: #fff;
+    font-size: .875rem;
+    font-weight: 500;
+    padding: .5rem 1rem;
+    line-height: 1.25rem;
+    transition: background-color .15s ease, box-shadow .15s ease;
+    text-decoration: none;
+    cursor: pointer;
   }
-  .btn-primary:hover { background:#1d4ed8; }
-  .btn-primary:focus-visible { outline:2px solid #1d4ed8; outline-offset:2px; }
-  .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  .btn-primary:focus-visible {
+    outline: 2px solid #1d4ed8;
+    outline-offset: 2px;
+  }
+
+  .btn-primary:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+  }
+
+  /* Fitness Dashboard Components - CAL-001 */
+  .fitness-card {
+    background: var(--gradient-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.2s ease;
+  }
+
+  .fitness-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .workout-stat {
+    background: var(--color-surface-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: all 0.15s ease;
+  }
+
+  .workout-stat:hover {
+    background: var(--color-surface-elevated);
+    border-color: var(--color-brand);
+  }
+
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Modal Responsive Patterns - Mobile First */
+  .modal-container {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: end;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .modal-container {
+      align-items: center;
+      padding: 2rem;
+    }
+  }
+
+  .modal-content {
+    background: var(--color-surface-primary);
+    border-radius: 1rem 1rem 0 0;
+    max-height: 85vh;
+    width: 100%;
+    max-width: 28rem;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @media (min-width: 640px) {
+    .modal-content {
+      border-radius: 1rem;
+      max-width: 32rem;
+      animation: fadeIn 0.3s ease-out;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
 }
 
 @layer utilities {
-  .focus-ring { box-shadow:0 0 0 3px rgba(37,99,235,.4); }
+  .focus-ring {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .4);
+  }
 }
 
-code { font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace; }
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}

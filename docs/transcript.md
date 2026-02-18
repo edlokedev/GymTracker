@@ -1,0 +1,3 @@
+it should be a gym tracker app that can allow users to log their workout sets, weights, reps dependent on the workout.
+Ideally they should be able to see a list of exercises, and these exercises are categorized by their type or muscle groups.
+They should be able to see and track their progress over time. They should be able to log into the app too to see their workouts and past workouts and the last time they work out.

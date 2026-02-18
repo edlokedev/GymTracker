@@ -16,6 +16,19 @@ const config = defineConfig({
     }),
     viteReact(),
   ],
+  // Explicitly load environment variables for server-side code
+  define: {
+    'process.env.BETTER_AUTH_SECRET': JSON.stringify(process.env.BETTER_AUTH_SECRET),
+  },
+  // Bundle dependencies during SSR to ensure consistent ESM/CJS interop
+  // and allow Vite to resolve extensionless imports in these packages
+  ssr: {
+    noExternal: ['@ilamy/calendar', 'rrule'],
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+  }
 })
 
 export default config
