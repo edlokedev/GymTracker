@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../../../lib/auth'
-import type { ProgressState } from '../../../lib/types/progress'
+import { useAuth } from '@/lib/auth'
+import type { ProgressState } from '@/lib/types/progress'
 import dayjs from 'dayjs'
 
 // Temporary basic component - will be enhanced in Component Development phase
@@ -25,10 +25,10 @@ export default function ProgressDashboard() {
 
   useEffect(() => {
     if (!user?.id) return
-    
+
     const fetchProgressData = async () => {
       setState(prev => ({ ...prev, isLoading: true, error: null }))
-      
+
       try {
         const params = new URLSearchParams({
           userId: user.id,
@@ -43,23 +43,23 @@ export default function ProgressDashboard() {
 
         const response = await fetch(`/api/progress?${params}`)
         if (!response.ok) throw new Error('Failed to fetch progress data')
-        
+
         const result = await response.json()
-        
+
         if (result.success) {
-          setState(prev => ({ 
-            ...prev, 
-            data: result.data.progress, 
-            isLoading: false 
+          setState(prev => ({
+            ...prev,
+            data: result.data.progress,
+            isLoading: false
           }))
         } else {
           throw new Error(result.error || 'Unknown error')
         }
       } catch (error: any) {
-        setState(prev => ({ 
-          ...prev, 
-          error: error.message, 
-          isLoading: false 
+        setState(prev => ({
+          ...prev,
+          error: error.message,
+          isLoading: false
         }))
       }
     }
@@ -122,7 +122,7 @@ export default function ProgressDashboard() {
             {state.data.length}
           </p>
         </div>
-        
+
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Total Workouts
@@ -131,7 +131,7 @@ export default function ProgressDashboard() {
             {state.data.reduce((sum, exercise) => sum + exercise.statistics.totalWorkouts, 0)}
           </p>
         </div>
-        
+
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Personal Records
@@ -180,7 +180,7 @@ export default function ProgressDashboard() {
                   )}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Workouts:</span>
@@ -202,13 +202,12 @@ export default function ProgressDashboard() {
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Improvement:</span>
-                  <span className={`ml-2 font-medium ${
-                    exercise.statistics.improvementPercentage > 0 
-                      ? 'text-green-600 dark:text-green-400' 
+                  <span className={`ml-2 font-medium ${exercise.statistics.improvementPercentage > 0
+                      ? 'text-green-600 dark:text-green-400'
                       : exercise.statistics.improvementPercentage < 0
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-gray-900 dark:text-white'
-                  }`}>
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
                     {exercise.statistics.improvementPercentage > 0 ? '+' : ''}{exercise.statistics.improvementPercentage.toFixed(1)}%
                   </span>
                 </div>

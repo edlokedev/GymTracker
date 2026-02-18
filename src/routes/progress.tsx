@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import ProgressDashboard from './progress/_components/ProgressDashboard'
+import ProgressDashboard from '@/components/ProgressDashboard'
 
 export const Route = createFileRoute('/progress')({
   component: ProgressPage,
@@ -17,7 +17,7 @@ function ProgressPage() {
             Monitor your fitness improvements and track personal records over time
           </p>
         </div>
-        
+
         <ProgressDashboard />
       </div>
     </div>

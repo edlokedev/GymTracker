@@ -23,7 +23,7 @@ const config = defineConfig({
   // Bundle dependencies during SSR to ensure consistent ESM/CJS interop
   // and allow Vite to resolve extensionless imports in these packages
   ssr: {
-    noExternal: ['@ilamy/calendar', 'rrule'],
+    noExternal: ['@ilamy/calendar', 'rrule', 'tslib'],
   },
   test: {
     environment: 'jsdom',
