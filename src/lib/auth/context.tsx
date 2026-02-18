@@ -35,23 +35,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true)
 
-      // MOCK USER FOR TESTING
-      setUser({
-        id: 'user_2t4Y7X9ZpW8v3K1mN5nQ6jR0sL',
-        email: 'test@example.com',
-        name: 'Test User',
-        emailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-
-      /* 
       // Use Better Auth client to check session
       const session = await authClient.getSession()
       if (session.data) {
         setUser(session.data.user)
       }
-      */
     } catch (error) {
       console.error('Auth check failed:', error)
     } finally {
