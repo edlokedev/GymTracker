@@ -1,12 +1,55 @@
+# Dependencies
 node_modules
-.DS_Store
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+
+# Production
 dist
 dist-ssr
-*.local
-count.txt
-.env
-.nitro
-.tanstack
+build
 .output
+.nitro
 .vinxi
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs
+*.njsproj
+*.sln
+*.sw?
+
+# TanStack
+.tanstack
+
+# Application specific
+server.log
 todos.json
+count.txt
+
+# Database (keep migrations, ignore local db files)
+*.db
+*.sqlite
+*.sqlite3
