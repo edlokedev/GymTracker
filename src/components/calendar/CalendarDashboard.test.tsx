@@ -24,11 +24,6 @@ global.ResizeObserver = class ResizeObserver {
     disconnect() { }
 }
 
-// Mock IlamyCalendar
-vi.mock('@ilamy/calendar', () => ({
-    IlamyCalendar: () => <div data-testid="mock-calendar">Calendar Component</div>
-}))
-
 // Mock useCalendarData to simulate data state and avoid real hook logic
 vi.mock('./useCalendarData', () => ({
     useCalendarData: () => ({
@@ -49,13 +44,20 @@ vi.mock('./useCalendarData', () => ({
                 currentStreak: 0,
                 lastWorkoutDate: null,
                 workoutsThisMonth: 0
-            }
+            },
+            isModalOpen: false,
+            selectedDate: null,
+            selectedWorkout: null,
+            calendarView: 'rolling'
         },
         actions: {
             refreshData: vi.fn(),
             navigateMonth: vi.fn(),
             setCurrentDate: vi.fn(),
-            setCalendarView: vi.fn()
+            setCalendarView: vi.fn(),
+            openWorkoutModal: vi.fn(),
+            closeWorkoutModal: vi.fn(),
+            selectDate: vi.fn()
         },
         workoutEvents: []
     })

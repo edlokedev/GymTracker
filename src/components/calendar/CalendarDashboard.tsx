@@ -1,14 +1,13 @@
-import { IlamyCalendar, type CalendarEvent } from '@ilamy/calendar'
-import dayjs from 'dayjs'
 import { useAuth } from '../../lib/auth/context'
 import { useCalendarData } from './useCalendarData'
 import { WorkoutSummaryStats } from './WorkoutSummaryStats'
 import { WorkoutDetailModal } from './WorkoutDetailModal'
+import { RollingCalendarGrid } from './RollingCalendarGrid'
 import { formatDisplayDate, isToday } from '../../lib/utils/calendar'
 
 export const CalendarDashboard: React.FC = () => {
   const { user } = useAuth()
-  const { state, actions, workoutEvents } = useCalendarData(user?.id || '')
+  const { state, actions } = useCalendarData(user?.id || '')
 
   if (!user) {
     return (
@@ -40,12 +39,7 @@ export const CalendarDashboard: React.FC = () => {
     )
   }
 
-  const handleCellClick = (info: any) => {
-    // Info from IlamyCalendar has a date property which could be Dayjs or Date
-    const date = info.date && typeof info.date.toDate === 'function'
-      ? info.date.toDate()
-      : new Date(info.date)
-
+  const handleDayClick = (date: Date) => {
     const workoutDay = state.workoutData.find(day =>
       new Date(day.date).toDateString() === date.toDateString()
     )
@@ -54,28 +48,6 @@ export const CalendarDashboard: React.FC = () => {
       actions.openWorkoutModal(date)
     }
   }
-
-  const handleEventClick = (event: CalendarEvent) => {
-    if (event.start) {
-      // event.start is a Dayjs object per library types
-      const date = typeof (event.start as any).toDate === 'function'
-        ? (event.start as any).toDate()
-        : new Date(event.start as any)
-      actions.openWorkoutModal(date)
-    }
-  }
-
-  // Transform workoutEvents to CalendarEvent format with Dayjs objects
-  const calendarEvents: CalendarEvent[] = workoutEvents.map(event => ({
-    id: event.id,
-    title: event.title,
-    start: dayjs(event.start),
-    end: dayjs(event.end),
-    allDay: event.allDay,
-    backgroundColor: event.color || '#3b82f6',
-    color: '#fff',
-    data: event.data
-  }))
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
@@ -153,16 +125,12 @@ export const CalendarDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Calendar Component */}
+          {/* Rolling Calendar Grid */}
           <div className="fitness-card p-2 sm:p-4">
-            <IlamyCalendar
-              events={calendarEvents}
-              initialDate={state.currentDate}
-              initialView="month"
-              onEventClick={handleEventClick}
-              onCellClick={handleCellClick}
-              onDateChange={(date) => actions.setCurrentDate(date.toDate())}
-              onViewChange={(view) => actions.setCalendarView(view)}
+            <RollingCalendarGrid
+              workoutData={state.workoutData}
+              dateRange={state.dateRange}
+              onDayClick={handleDayClick}
             />
           </div>
 
