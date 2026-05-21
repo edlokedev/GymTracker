@@ -46,8 +46,10 @@ pnpm-debug.log*
 
 # Application specific
 server.log
+server.err.log
 todos.json
 count.txt
+public/images/
 
 # Database (keep migrations, ignore local db files)
 *.db
@@ -57,3 +59,7 @@ count.txt
 # Local Claude Code state (per-machine settings, not project config)
 .claude/
 
+graphify-out/
+
+# Vercel build output
+.vercel/

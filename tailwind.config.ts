@@ -4,10 +4,7 @@ import defaultTheme from 'tailwindcss/defaultTheme'
 // Tailwind v4 uses the @tailwindcss/vite plugin; this config provides theme extensions
 // and content globs for future tooling that may still read them.
 export default {
-  content: [
-    './index.html',
-    './src/**/*.{js,ts,jsx,tsx}',
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {

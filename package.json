@@ -9,6 +9,7 @@
 		"serve": "vite preview",
 		"supabase:seed-exercises": "tsx src/lib/supabase/seed/seed-exercises.ts",
 		"test": "vitest run",
+		"smoke": "tsx scripts/smoke.ts",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"lint": "biome check .",

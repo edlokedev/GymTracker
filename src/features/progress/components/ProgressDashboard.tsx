@@ -1,0 +1,295 @@
+import { useAuth } from '@/lib/auth'
+import { DATE_PRESETS } from '@/lib/types/progress'
+import { formatExerciseName } from '@/lib/utils/text'
+import { useProgressDashboard } from '../useProgressDashboard'
+
+type ProgressDashboardState = ReturnType<typeof useProgressDashboard>['state']
+type ProgressDashboardActions = ReturnType<typeof useProgressDashboard>['actions']
+
+export default function ProgressDashboard() {
+  const { user } = useAuth()
+  const { state, summary, chartPoints, actions } = useProgressDashboard({
+    userId: user?.id,
+  })
+
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-600 dark:text-gray-300">
+          Please log in to view your progress data.
+        </p>
+      </div>
+    )
+  }
+
+  if (state.isLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-4 text-gray-600 dark:text-gray-300">Loading your progress...</p>
+      </div>
+    )
+  }
+
+  if (state.error) {
+    return (
+      <div className="text-center py-12">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 max-w-md mx-auto">
+          <p className="text-red-800 dark:text-red-300">
+            Error loading progress data: {state.error}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <ProgressControls state={state} chartPointsCount={chartPoints.length} actions={actions} />
+
+      {state.data.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 max-w-md mx-auto">
+            <p className="text-yellow-800 dark:text-yellow-300">
+              No workout data found for the selected period. Start logging workouts to see your
+              progress!
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Exercises Tracked
+              </h3>
+              <p className="text-3xl font-bold text-blue-600">{summary.exercisesTracked}</p>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Total Workouts
+              </h3>
+              <p className="text-3xl font-bold text-green-600">{summary.totalWorkouts}</p>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Personal Records
+              </h3>
+              <p className="text-3xl font-bold text-purple-600">{summary.personalRecords}</p>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Exercise Progress Summary
+              </h2>
+            </div>
+            <div className="p-6">
+              {state.data.map((exercise) => (
+                <div key={exercise.exerciseId} className="mb-6 last:mb-0">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                      {formatExerciseName(exercise.exerciseName)}
+                    </h3>
+                    <div className="flex space-x-2">
+                      {exercise.trends.volume === 'up' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                          Improving
+                        </span>
+                      )}
+                      {exercise.trends.volume === 'down' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
+                          Declining
+                        </span>
+                      )}
+                      {exercise.trends.volume === 'stable' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300">
+                          Stable
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Workouts:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                        {exercise.statistics.totalWorkouts}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Total Volume:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                        {exercise.statistics.totalVolume.toLocaleString()} kg
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Avg Weight:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                        {exercise.statistics.averageWeight?.toFixed(1) || 'N/A'} kg
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Improvement:</span>
+                      <span
+                        className={`ml-2 font-medium ${
+                          exercise.statistics.improvementPercentage > 0
+                            ? 'text-green-600 dark:text-green-400'
+                            : exercise.statistics.improvementPercentage < 0
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-gray-900 dark:text-white'
+                        }`}
+                      >
+                        {exercise.statistics.improvementPercentage > 0 ? '+' : ''}
+                        {exercise.statistics.improvementPercentage.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ProgressControls({
+  state,
+  chartPointsCount,
+  actions,
+}: {
+  state: ProgressDashboardState
+  chartPointsCount: number
+  actions: ProgressDashboardActions
+}) {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            htmlFor="progress-metric"
+          >
+            Metric
+          </label>
+          <select
+            id="progress-metric"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            value={state.filters.metric}
+            onChange={(event) =>
+              actions.setMetric(event.target.value as ProgressDashboardState['filters']['metric'])
+            }
+          >
+            <option value="volume">Volume</option>
+            <option value="weight">Weight</option>
+            <option value="reps">Reps</option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            htmlFor="progress-start-date"
+          >
+            Start Date
+          </label>
+          <input
+            id="progress-start-date"
+            type="date"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            value={state.filters.dateRange.start}
+            onChange={(event) =>
+              actions.setDateRange({
+                ...state.filters.dateRange,
+                start: event.target.value,
+              })
+            }
+          />
+        </div>
+
+        <div>
+          <label
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            htmlFor="progress-end-date"
+          >
+            End Date
+          </label>
+          <input
+            id="progress-end-date"
+            type="date"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            value={state.filters.dateRange.end}
+            onChange={(event) =>
+              actions.setDateRange({
+                ...state.filters.dateRange,
+                end: event.target.value,
+              })
+            }
+          />
+        </div>
+
+        <div>
+          <label
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            htmlFor="progress-chart-type"
+          >
+            Chart Type
+          </label>
+          <select
+            id="progress-chart-type"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            value={state.selectedChart}
+            onChange={(event) =>
+              actions.setSelectedChart(
+                event.target.value as ProgressDashboardState['selectedChart'],
+              )
+            }
+          >
+            <option value="line">Line</option>
+            <option value="bar">Bar</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {DATE_PRESETS.map((preset) => (
+          <button
+            key={preset.value}
+            type="button"
+            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            onClick={() => actions.setDatePreset(preset.value)}
+          >
+            {preset.label}
+          </button>
+        ))}
+
+        <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={state.showTrendLines}
+            onChange={(event) => actions.setShowTrendLines(event.target.checked)}
+          />
+          Trend lines
+        </label>
+
+        <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={state.highlightPRs}
+            onChange={(event) => actions.setHighlightPRs(event.target.checked)}
+          />
+          Highlight PRs
+        </label>
+
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {chartPointsCount} chart points ready
+        </span>
+      </div>
+    </div>
+  )
+}

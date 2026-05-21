@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS exercises (
   secondary_muscles TEXT, -- JSON array of secondary muscle groups
   instructions TEXT, -- JSON array of step-by-step instructions
   images TEXT, -- JSON array of image paths
+  gif_path TEXT, -- Local animated exercise media path
+  preview_image_path TEXT, -- Local preview image path
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES exercise_categories(id) ON DELETE CASCADE

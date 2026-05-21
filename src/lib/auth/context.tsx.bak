@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import type React from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { authClient } from './client'
 
 // Simple user interface for OAuth
@@ -16,8 +17,18 @@ interface AuthContextType {
   user: AuthUser | null
   isAuthenticated: boolean
   isLoading: boolean
-  signIn: (provider?: string) => Promise<void>
+  signIn: (provider?: 'google') => Promise<void>
   signOut: () => Promise<void>
+}
+
+type SocialSignInResult = {
+  data?: {
+    url?: string
+    redirect?: boolean
+  } | null
+  error?: {
+    message?: string
+  } | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -26,12 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Initialize auth state
-  useEffect(() => {
-    checkAuthState()
-  }, [])
-
-  const checkAuthState = async () => {
+  const checkAuthState = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -45,14 +51,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const signIn = async (provider: string = 'google') => {
-    // Use Better Auth client for sign in
-    await authClient.signIn.social({
-      provider: provider as any,
-      callbackURL: '/' // Redirect to home after sign in
-    })
+  // Initialize auth state
+  useEffect(() => {
+    checkAuthState()
+  }, [checkAuthState])
+
+  const signIn = async (provider: 'google' = 'google') => {
+    const result = (await authClient.signIn.social({
+      provider,
+      callbackURL: '/', // Redirect to home after sign in
+    })) as SocialSignInResult
+
+    if (result.error) {
+      throw new Error(result.error.message || 'Google sign-in failed')
+    }
+
+    if (result.data?.url) {
+      window.location.assign(result.data.url)
+    }
   }
 
   const signOut = async () => {

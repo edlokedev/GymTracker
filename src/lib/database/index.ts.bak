@@ -1,5 +1,5 @@
 // Database initialization utility
-import { DatabaseManager } from './db';
+import { DatabaseManager } from './db'
 
 /**
  * Initialize the database with schema and seed data
@@ -7,21 +7,20 @@ import { DatabaseManager } from './db';
  */
 export async function initializeDatabase(): Promise<void> {
   try {
-    console.log('🚀 Initializing database...');
-    
+    console.log('🚀 Initializing database...')
+
     // Get database instance (automatically runs migrations)
-    DatabaseManager.getInstance();
-    console.log('✅ Database schema initialized');
-    
+    DatabaseManager.getInstance()
+    console.log('✅ Database schema initialized')
+
     // Run seeding (only seeds if data doesn't exist)
-    await DatabaseManager.runSeeds();
-    console.log('✅ Database seeding completed');
-    
-    console.log('🎉 Database initialization complete!');
-    
+    await DatabaseManager.runSeeds()
+    console.log('✅ Database seeding completed')
+
+    console.log('🎉 Database initialization complete!')
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
-    throw error;
+    console.error('❌ Database initialization failed:', error)
+    throw error
   }
 }
 
@@ -31,25 +30,24 @@ export async function initializeDatabase(): Promise<void> {
  */
 export async function resetDatabase(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Database reset is not allowed in production');
+    throw new Error('Database reset is not allowed in production')
   }
-  
+
   try {
-    console.log('🔄 Resetting database...');
-    
+    console.log('🔄 Resetting database...')
+
     // Clear all data
-    DatabaseManager.reset();
-    console.log('✅ Database cleared');
-    
+    DatabaseManager.reset()
+    console.log('✅ Database cleared')
+
     // Re-seed data
-    await DatabaseManager.runSeeds();
-    console.log('✅ Database re-seeded');
-    
-    console.log('🎉 Database reset complete!');
-    
+    await DatabaseManager.runSeeds()
+    console.log('✅ Database re-seeded')
+
+    console.log('🎉 Database reset complete!')
   } catch (error) {
-    console.error('❌ Database reset failed:', error);
-    throw error;
+    console.error('❌ Database reset failed:', error)
+    throw error
   }
 }
 
@@ -57,50 +55,49 @@ export async function resetDatabase(): Promise<void> {
  * Check database health
  */
 export function checkDatabaseHealth(): {
-  connected: boolean;
-  path: string | null;
-  integrity: boolean;
+  connected: boolean
+  path: string | null
+  integrity: boolean
 } {
   try {
-    const path = DatabaseManager.getPath();
-    const integrity = DatabaseManager.checkIntegrity();
-    
+    const path = DatabaseManager.getPath()
+    const integrity = DatabaseManager.checkIntegrity()
+
     return {
       connected: true,
       path,
-      integrity
-    };
-  } catch (error) {
+      integrity,
+    }
+  } catch (_error) {
     return {
       connected: false,
       path: null,
-      integrity: false
-    };
+      integrity: false,
+    }
   }
 }
 
-// Export commonly used query modules for convenience
-export { 
-  exerciseQueries, 
-  categoryQueries,
-  workoutQueries,
-  workoutSetQueries,
-  userQueries 
-} from './queries';
-
 export type {
-  User,
+  CreateUserInput,
   Exercise,
-  ExerciseWithParsedFields,
   ExerciseCategory,
+  ExerciseSearchParams,
+  ExerciseWithParsedFields,
+  PaginatedResult,
+  User,
+  UserPreferences,
   WorkoutSession,
+  WorkoutSessionInput,
   WorkoutSessionWithSets,
   WorkoutSet,
-  WorkoutWithDetails,
-  ExerciseSearchParams,
-  WorkoutSessionInput,
   WorkoutSetInput,
-  CreateUserInput,
-  UserPreferences,
-  PaginatedResult
-} from '../types/database';
+  WorkoutWithDetails,
+} from '../types/database'
+// Export commonly used query modules for convenience
+export {
+  categoryQueries,
+  exerciseQueries,
+  userQueries,
+  workoutQueries,
+  workoutSetQueries,
+} from './queries'

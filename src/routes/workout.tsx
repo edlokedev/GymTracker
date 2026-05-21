@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import WorkoutSessionManager from '../components/WorkoutSessionManager'
+import WorkoutSessionManager from '@/features/workout-session/components/WorkoutSessionManager'
 import { useAuth } from '../lib/auth'
 import type { WorkoutSession } from '../lib/types/database'
 

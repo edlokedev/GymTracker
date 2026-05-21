@@ -1,0 +1,91 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import SetEntry from './SetEntry'
+
+describe('SetEntry', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('renders inline validation instead of alerting for invalid input', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    const onSave = vi.fn()
+
+    render(
+      <SetEntry exerciseId="bench-press" workoutId="session-1" setNumber={1} onSave={onSave} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Set' }))
+
+    expect(alertSpy).not.toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Please enter a valid number of reps.')
+  })
+
+  it('submits parsed set data for valid input', async () => {
+    const onSave = vi.fn(async () => ({
+      id: 'set-1',
+      workout_id: 'session-1',
+      exercise_id: 'bench-press',
+      set_number: 1,
+      reps: 8,
+      weight: 100,
+      created_at: new Date('2026-05-01T10:00:00.000Z'),
+      updated_at: new Date('2026-05-01T10:00:00.000Z'),
+    }))
+
+    render(
+      <SetEntry exerciseId="bench-press" workoutId="session-1" setNumber={1} onSave={onSave} />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Reps *'), {
+      target: { value: '8' },
+    })
+    fireEvent.change(screen.getByLabelText('Weight (kg)'), {
+      target: { value: '100' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Set' }))
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith({
+        workout_id: 'session-1',
+        exercise_id: 'bench-press',
+        set_order: 1,
+        reps: 8,
+        weight: 100,
+        rest_time: undefined,
+        notes: undefined,
+      }),
+    )
+    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument())
+  })
+
+  it('can copy the previous set for fast repeated entry', () => {
+    render(
+      <SetEntry
+        exerciseId="bench-press"
+        workoutId="session-1"
+        setNumber={2}
+        previousSet={{
+          id: 'set-1',
+          workout_id: 'session-1',
+          exercise_id: 'bench-press',
+          set_number: 1,
+          reps: 8,
+          weight: 100,
+          rest_time: 90,
+          created_at: new Date('2026-05-01T10:00:00.000Z'),
+          updated_at: new Date('2026-05-01T10:00:00.000Z'),
+        }}
+        onSave={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /same as last set/i }))
+
+    expect(screen.getByLabelText('Reps *')).toHaveValue(8)
+    expect(screen.getByLabelText('Weight (kg)')).toHaveValue(100)
+    expect(screen.getByLabelText('Rest Time (seconds)')).toHaveValue(90)
+  })
+})

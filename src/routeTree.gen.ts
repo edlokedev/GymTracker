@@ -13,10 +13,9 @@ import { createServerRootRoute } from '@tanstack/react-start/server'
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkoutRouteImport } from './routes/workout'
 import { Route as ProgressRouteImport } from './routes/progress'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as ExercisesRouteImport } from './routes/exercises'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DemoStartServerFuncsRouteImport } from './routes/demo.start.server-funcs'
-import { Route as DemoStartApiRequestRouteImport } from './routes/demo.start.api-request'
 import { ServerRoute as AuthCallbackServerRouteImport } from './routes/auth.callback'
 import { ServerRoute as ApiWorkoutSetsServerRouteImport } from './routes/api.workout-sets'
 import { ServerRoute as ApiWorkoutSessionsServerRouteImport } from './routes/api.workout-sessions'
@@ -25,7 +24,6 @@ import { ServerRoute as ApiProgressServerRouteImport } from './routes/api.progre
 import { ServerRoute as ApiMuscleGroupsServerRouteImport } from './routes/api.muscle-groups'
 import { ServerRoute as ApiExerciseCategoriesServerRouteImport } from './routes/api.exercise-categories'
 import { ServerRoute as ApiEquipmentTypesServerRouteImport } from './routes/api.equipment-types'
-import { ServerRoute as ApiDemoNamesServerRouteImport } from './routes/api.demo-names'
 import { ServerRoute as ApiCalendarDataServerRouteImport } from './routes/api.calendar-data'
 import { ServerRoute as ApiExercisesSearchServerRouteImport } from './routes/api.exercises.search'
 import { ServerRoute as ApiAuthSplatServerRouteImport } from './routes/api/auth/$'
@@ -42,6 +40,11 @@ const ProgressRoute = ProgressRouteImport.update({
   path: '/progress',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ExercisesRoute = ExercisesRouteImport.update({
   id: '/exercises',
   path: '/exercises',
@@ -50,16 +53,6 @@ const ExercisesRoute = ExercisesRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
-  id: '/demo/start/server-funcs',
-  path: '/demo/start/server-funcs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoStartApiRequestRoute = DemoStartApiRequestRouteImport.update({
-  id: '/demo/start/api-request',
-  path: '/demo/start/api-request',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthCallbackServerRoute = AuthCallbackServerRouteImport.update({
@@ -104,11 +97,6 @@ const ApiEquipmentTypesServerRoute = ApiEquipmentTypesServerRouteImport.update({
   path: '/api/equipment-types',
   getParentRoute: () => rootServerRouteImport,
 } as any)
-const ApiDemoNamesServerRoute = ApiDemoNamesServerRouteImport.update({
-  id: '/api/demo-names',
-  path: '/api/demo-names',
-  getParentRoute: () => rootServerRouteImport,
-} as any)
 const ApiCalendarDataServerRoute = ApiCalendarDataServerRouteImport.update({
   id: '/api/calendar-data',
   path: '/api/calendar-data',
@@ -129,66 +117,42 @@ const ApiAuthSplatServerRoute = ApiAuthSplatServerRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/exercises': typeof ExercisesRoute
+  '/history': typeof HistoryRoute
   '/progress': typeof ProgressRoute
   '/workout': typeof WorkoutRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/exercises': typeof ExercisesRoute
+  '/history': typeof HistoryRoute
   '/progress': typeof ProgressRoute
   '/workout': typeof WorkoutRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/exercises': typeof ExercisesRoute
+  '/history': typeof HistoryRoute
   '/progress': typeof ProgressRoute
   '/workout': typeof WorkoutRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/exercises'
-    | '/progress'
-    | '/workout'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
+  fullPaths: '/' | '/exercises' | '/history' | '/progress' | '/workout'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/exercises'
-    | '/progress'
-    | '/workout'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
-  id:
-    | '__root__'
-    | '/'
-    | '/exercises'
-    | '/progress'
-    | '/workout'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
+  to: '/' | '/exercises' | '/history' | '/progress' | '/workout'
+  id: '__root__' | '/' | '/exercises' | '/history' | '/progress' | '/workout'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ExercisesRoute: typeof ExercisesRoute
+  HistoryRoute: typeof HistoryRoute
   ProgressRoute: typeof ProgressRoute
   WorkoutRoute: typeof WorkoutRoute
-  DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
-  DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
 }
 export interface FileServerRoutesByFullPath {
   '/api/calendar-data': typeof ApiCalendarDataServerRoute
-  '/api/demo-names': typeof ApiDemoNamesServerRoute
   '/api/equipment-types': typeof ApiEquipmentTypesServerRoute
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
@@ -202,7 +166,6 @@ export interface FileServerRoutesByFullPath {
 }
 export interface FileServerRoutesByTo {
   '/api/calendar-data': typeof ApiCalendarDataServerRoute
-  '/api/demo-names': typeof ApiDemoNamesServerRoute
   '/api/equipment-types': typeof ApiEquipmentTypesServerRoute
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
@@ -217,7 +180,6 @@ export interface FileServerRoutesByTo {
 export interface FileServerRoutesById {
   __root__: typeof rootServerRouteImport
   '/api/calendar-data': typeof ApiCalendarDataServerRoute
-  '/api/demo-names': typeof ApiDemoNamesServerRoute
   '/api/equipment-types': typeof ApiEquipmentTypesServerRoute
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
@@ -233,7 +195,6 @@ export interface FileServerRouteTypes {
   fileServerRoutesByFullPath: FileServerRoutesByFullPath
   fullPaths:
     | '/api/calendar-data'
-    | '/api/demo-names'
     | '/api/equipment-types'
     | '/api/exercise-categories'
     | '/api/muscle-groups'
@@ -247,7 +208,6 @@ export interface FileServerRouteTypes {
   fileServerRoutesByTo: FileServerRoutesByTo
   to:
     | '/api/calendar-data'
-    | '/api/demo-names'
     | '/api/equipment-types'
     | '/api/exercise-categories'
     | '/api/muscle-groups'
@@ -261,7 +221,6 @@ export interface FileServerRouteTypes {
   id:
     | '__root__'
     | '/api/calendar-data'
-    | '/api/demo-names'
     | '/api/equipment-types'
     | '/api/exercise-categories'
     | '/api/muscle-groups'
@@ -276,7 +235,6 @@ export interface FileServerRouteTypes {
 }
 export interface RootServerRouteChildren {
   ApiCalendarDataServerRoute: typeof ApiCalendarDataServerRoute
-  ApiDemoNamesServerRoute: typeof ApiDemoNamesServerRoute
   ApiEquipmentTypesServerRoute: typeof ApiEquipmentTypesServerRoute
   ApiExerciseCategoriesServerRoute: typeof ApiExerciseCategoriesServerRoute
   ApiMuscleGroupsServerRoute: typeof ApiMuscleGroupsServerRoute
@@ -305,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgressRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/exercises': {
       id: '/exercises'
       path: '/exercises'
@@ -317,20 +282,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/start/server-funcs': {
-      id: '/demo/start/server-funcs'
-      path: '/demo/start/server-funcs'
-      fullPath: '/demo/start/server-funcs'
-      preLoaderRoute: typeof DemoStartServerFuncsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/start/api-request': {
-      id: '/demo/start/api-request'
-      path: '/demo/start/api-request'
-      fullPath: '/demo/start/api-request'
-      preLoaderRoute: typeof DemoStartApiRequestRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -393,13 +344,6 @@ declare module '@tanstack/react-start/server' {
       preLoaderRoute: typeof ApiEquipmentTypesServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
-    '/api/demo-names': {
-      id: '/api/demo-names'
-      path: '/api/demo-names'
-      fullPath: '/api/demo-names'
-      preLoaderRoute: typeof ApiDemoNamesServerRouteImport
-      parentRoute: typeof rootServerRouteImport
-    }
     '/api/calendar-data': {
       id: '/api/calendar-data'
       path: '/api/calendar-data'
@@ -427,17 +371,15 @@ declare module '@tanstack/react-start/server' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ExercisesRoute: ExercisesRoute,
+  HistoryRoute: HistoryRoute,
   ProgressRoute: ProgressRoute,
   WorkoutRoute: WorkoutRoute,
-  DemoStartApiRequestRoute: DemoStartApiRequestRoute,
-  DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 const rootServerRouteChildren: RootServerRouteChildren = {
   ApiCalendarDataServerRoute: ApiCalendarDataServerRoute,
-  ApiDemoNamesServerRoute: ApiDemoNamesServerRoute,
   ApiEquipmentTypesServerRoute: ApiEquipmentTypesServerRoute,
   ApiExerciseCategoriesServerRoute: ApiExerciseCategoriesServerRoute,
   ApiMuscleGroupsServerRoute: ApiMuscleGroupsServerRoute,

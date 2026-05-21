@@ -1,0 +1,157 @@
+import type { ExerciseWithParsedFields } from '@/lib/types/database'
+import { toTitleCase } from '@/lib/utils/text'
+
+export interface ExerciseCategory {
+  id: string
+  name: string
+  description?: string
+  exercise_count: number
+}
+
+export interface ExerciseLibrarySearch {
+  category_id: string[]
+  equipment: string[]
+  muscle_group: string[]
+  query: string
+}
+
+export interface ExerciseLibraryFilters {
+  categoryIds: string[]
+  equipment: string[]
+  muscleGroups: string[]
+  query: string
+}
+
+export interface ExerciseSearchResult {
+  success?: boolean
+  data: ExerciseWithParsedFields[]
+  total: number
+  page: number
+  totalPages: number
+  hasMore?: boolean
+  limit?: number
+}
+
+export interface ExerciseFacetCatalog {
+  categories: ExerciseCategory[]
+  equipmentTypes: string[]
+  muscleGroups: string[]
+}
+
+export type ActiveExerciseFilterType = 'category' | 'equipment' | 'muscle' | 'query'
+
+export interface ActiveExerciseFilterChip {
+  type: ActiveExerciseFilterType
+  prefix: string
+  label: string
+  value?: string
+}
+
+export const emptyExerciseLibrarySearch: ExerciseLibrarySearch = {
+  category_id: [],
+  equipment: [],
+  muscle_group: [],
+  query: '',
+}
+
+export function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
+}
+
+export function filtersFromRouteSearch(search: ExerciseLibrarySearch): ExerciseLibraryFilters {
+  return {
+    categoryIds: uniqueValues(search.category_id),
+    equipment: uniqueValues(search.equipment),
+    muscleGroups: uniqueValues(search.muscle_group),
+    query: search.query || '',
+  }
+}
+
+export function routeSearchFromFilters(filters: ExerciseLibraryFilters): ExerciseLibrarySearch {
+  return {
+    category_id: uniqueValues(filters.categoryIds),
+    equipment: uniqueValues(filters.equipment),
+    muscle_group: uniqueValues(filters.muscleGroups),
+    query: filters.query.trim(),
+  }
+}
+
+export function routeSearchKey(search: ExerciseLibrarySearch): string {
+  return JSON.stringify({
+    category_id: uniqueValues(search.category_id).sort(),
+    equipment: uniqueValues(search.equipment).sort(),
+    muscle_group: uniqueValues(search.muscle_group).sort(),
+    query: search.query || '',
+  })
+}
+
+export function routeSearchToNavigateSearch(search: ExerciseLibrarySearch): {
+  category_id?: string[]
+  equipment?: string[]
+  muscle_group?: string[]
+  query?: string
+} {
+  return {
+    category_id: search.category_id.length > 0 ? search.category_id : undefined,
+    equipment: search.equipment.length > 0 ? search.equipment : undefined,
+    muscle_group: search.muscle_group.length > 0 ? search.muscle_group : undefined,
+    query: search.query || undefined,
+  }
+}
+
+export function toggleFilterValue(values: string[], value: string): string[] {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
+}
+
+export function getActiveFilterCount(filters: ExerciseLibraryFilters): number {
+  return (
+    filters.categoryIds.length +
+    filters.equipment.length +
+    filters.muscleGroups.length +
+    (filters.query.trim() ? 1 : 0)
+  )
+}
+
+export function buildActiveFilterChips(
+  filters: ExerciseLibraryFilters,
+  categoryLabelById: Map<string, string>,
+): ActiveExerciseFilterChip[] {
+  const chips: ActiveExerciseFilterChip[] = []
+
+  if (filters.query.trim()) {
+    chips.push({
+      type: 'query',
+      prefix: 'Search',
+      label: filters.query.trim(),
+    })
+  }
+
+  filters.categoryIds.forEach((categoryId) => {
+    chips.push({
+      type: 'category',
+      prefix: 'Category',
+      label: categoryLabelById.get(categoryId) || categoryId,
+      value: categoryId,
+    })
+  })
+
+  filters.muscleGroups.forEach((muscle) => {
+    chips.push({
+      type: 'muscle',
+      prefix: 'Muscle',
+      label: toTitleCase(muscle),
+      value: muscle,
+    })
+  })
+
+  filters.equipment.forEach((equipment) => {
+    chips.push({
+      type: 'equipment',
+      prefix: 'Equipment',
+      label: toTitleCase(equipment),
+      value: equipment,
+    })
+  })
+
+  return chips
+}

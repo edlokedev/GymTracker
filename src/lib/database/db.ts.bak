@@ -1,206 +1,216 @@
-import Database from 'better-sqlite3';
-import { join, dirname } from 'path';
-import { readFileSync, existsSync, mkdirSync } from 'fs';
-import { homedir } from 'os';
-import { fileURLToPath } from 'url';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import Database from 'better-sqlite3'
 
 // ESM __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export interface DatabaseConfig {
-  path: string;
-  verbose?: boolean;
-  readonly?: boolean;
-  fileMustExist?: boolean;
+  path: string
+  verbose?: boolean
+  readonly?: boolean
+  fileMustExist?: boolean
 }
 
 class DatabaseManager {
-  private static instance: Database.Database | null = null;
-  private static config: DatabaseConfig | null = null;
+  private static instance: Database.Database | null = null
+  private static config: DatabaseConfig | null = null
 
   static configure(config: Partial<DatabaseConfig> = {}): void {
-    const platform = process.platform;
-    let defaultDbDir: string;
+    const platform = process.platform
+    let defaultDbDir: string
 
     // Platform-specific database location
     switch (platform) {
       case 'win32':
-        defaultDbDir = join(process.env.APPDATA || homedir(), 'GymTracker');
-        break;
+        defaultDbDir = join(process.env.APPDATA || homedir(), 'GymTracker')
+        break
       case 'darwin':
-        defaultDbDir = join(homedir(), 'Library', 'Application Support', 'GymTracker');
-        break;
+        defaultDbDir = join(homedir(), 'Library', 'Application Support', 'GymTracker')
+        break
       default:
-        defaultDbDir = join(homedir(), '.local', 'share', 'GymTracker');
+        defaultDbDir = join(homedir(), '.local', 'share', 'GymTracker')
+    }
+
+    if (process.env.DB_DIR) {
+      defaultDbDir = process.env.DB_DIR
     }
 
     // Ensure directory exists
     if (!existsSync(defaultDbDir)) {
-      mkdirSync(defaultDbDir, { recursive: true, mode: 0o755 });
+      mkdirSync(defaultDbDir, { recursive: true, mode: 0o755 })
     }
 
-    this.config = {
+    DatabaseManager.config = {
       path: join(defaultDbDir, 'gymtracker.db'),
       verbose: process.env.NODE_ENV === 'development',
       readonly: false,
       fileMustExist: false,
       ...config,
-    };
+    }
   }
 
   static getInstance(): Database.Database {
-    if (!this.instance) {
-      if (!this.config) {
-        this.configure();
+    if (!DatabaseManager.instance) {
+      if (!DatabaseManager.config) {
+        DatabaseManager.configure()
       }
 
-      if (!this.config) {
-        throw new Error('Database configuration failed');
+      if (!DatabaseManager.config) {
+        throw new Error('Database configuration failed')
       }
 
       try {
-        this.instance = new Database(this.config.path, {
-          verbose: this.config.verbose ? console.log : undefined,
-          readonly: this.config.readonly,
-          fileMustExist: this.config.fileMustExist,
-        });
+        DatabaseManager.instance = new Database(DatabaseManager.config.path, {
+          verbose: DatabaseManager.config.verbose ? console.log : undefined,
+          readonly: DatabaseManager.config.readonly,
+          fileMustExist: DatabaseManager.config.fileMustExist,
+        })
 
         // Configure database settings
-        this.instance.pragma('foreign_keys = ON');
-        this.instance.pragma('journal_mode = WAL');
-        this.instance.pragma('synchronous = NORMAL');
-        this.instance.pragma('cache_size = 10000');
+        DatabaseManager.instance.pragma('foreign_keys = ON')
+        DatabaseManager.instance.pragma('journal_mode = WAL')
+        DatabaseManager.instance.pragma('synchronous = NORMAL')
+        DatabaseManager.instance.pragma('cache_size = 10000')
 
-        console.log(`Database connected: ${this.config.path}`);
+        console.log(`Database connected: ${DatabaseManager.config.path}`)
 
         // Run initial setup
-        this.runMigrations();
-        
-        // Run seeding automatically after successful migration
-        this.runSeeds().catch(error => {
-          console.error('Initial seeding failed:', error);
-        });
+        DatabaseManager.runMigrations()
+
+        // Run seeding automatically after successful migration unless tests opt out.
+        if (process.env.GYMTRACKER_SKIP_AUTO_SEED !== '1') {
+          DatabaseManager.runSeeds().catch((error) => {
+            console.error('Initial seeding failed:', error)
+          })
+        }
       } catch (error) {
-        console.error('Failed to connect to database:', error);
-        throw new Error(`Database connection failed: ${error}`);
+        console.error('Failed to connect to database:', error)
+        throw new Error(`Database connection failed: ${error}`)
       }
     }
 
-    return this.instance;
+    return DatabaseManager.instance
   }
 
   private static runMigrations(): void {
-    if (!this.instance) {
-      throw new Error('Database instance not available');
+    if (!DatabaseManager.instance) {
+      throw new Error('Database instance not available')
     }
 
     try {
       // Read and execute schema
-      const schemaPath = join(__dirname, 'schema.sql');
+      const schemaPath = join(__dirname, 'schema.sql')
       if (existsSync(schemaPath)) {
-        const schema = readFileSync(schemaPath, 'utf-8');
-        this.instance.exec(schema);
-        console.log('Database schema initialized');
+        const schema = readFileSync(schemaPath, 'utf-8')
+        DatabaseManager.instance.exec(schema)
+        console.log('Database schema initialized')
       } else {
-        console.warn('Schema file not found, skipping initialization');
+        console.warn('Schema file not found, skipping initialization')
       }
     } catch (error) {
-      console.error('Migration failed:', error);
-      throw new Error(`Migration failed: ${error}`);
+      console.error('Migration failed:', error)
+      throw new Error(`Migration failed: ${error}`)
     }
   }
 
   static async runSeeds(): Promise<void> {
-    const db = this.getInstance();
+    const db = DatabaseManager.getInstance()
 
     try {
       // Import and run user seeder first (needed for foreign key constraints)
-      const { UserSeeder } = await import('./seeders/users');
+      const { UserSeeder } = await import('./seeders/users')
 
       // Check if user data already exists
-      const userCount = db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number };
+      const userCount = db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number }
 
       if (userCount.count === 0) {
-        console.log('Seeding user data...');
-        await UserSeeder.seedMockUsers();
+        console.log('Seeding user data...')
+        await UserSeeder.seedMockUsers()
       } else {
-        console.log(`User data already exists (${userCount.count} users)`);
+        console.log(`User data already exists (${userCount.count} users)`)
       }
 
       // Import and run exercise seeder
-      const { ExerciseSeeder } = await import('./seeders/exercises');
+      const { ExerciseSeeder } = await import('./seeders/exercises')
 
       // Check if exercise data already exists
-      const exerciseCount = db.prepare('SELECT COUNT(*) as count FROM exercises').get() as { count: number };
+      const exerciseCount = db.prepare('SELECT COUNT(*) as count FROM exercises').get() as {
+        count: number
+      }
 
       if (exerciseCount.count === 0) {
-        console.log('Seeding exercise data...');
-        await ExerciseSeeder.seedAll();
+        console.log('Seeding exercise data...')
+        await ExerciseSeeder.seedAll()
       } else {
-        console.log(`Exercise data already exists (${exerciseCount.count} exercises)`);
+        console.log(`Exercise data already exists (${exerciseCount.count} exercises)`)
       }
     } catch (error) {
-      console.error('Seeding failed:', error);
-      throw new Error(`Seeding failed: ${error}`);
+      console.error('Seeding failed:', error)
+      throw new Error(`Seeding failed: ${error}`)
     }
   }
 
   static close(): void {
-    if (this.instance) {
-      this.instance.close();
-      this.instance = null;
-      console.log('Database connection closed');
+    if (DatabaseManager.instance) {
+      DatabaseManager.instance.close()
+      DatabaseManager.instance = null
+      console.log('Database connection closed')
     }
   }
 
   static getPath(): string | null {
-    return this.config?.path || null;
+    return DatabaseManager.config?.path || null
   }
 
   // Development helper methods
   static reset(): void {
-    if (this.instance) {
-      this.instance.exec(`
+    if (DatabaseManager.instance) {
+      DatabaseManager.instance.exec(`
         DELETE FROM workout_sets;
         DELETE FROM workout_sessions;
         DELETE FROM exercises;
         DELETE FROM exercise_categories;
-      `);
-      console.log('Database reset complete');
+      `)
+      console.log('Database reset complete')
     }
   }
 
   static vacuum(): void {
-    if (this.instance) {
-      this.instance.exec('VACUUM;');
-      console.log('Database vacuumed');
+    if (DatabaseManager.instance) {
+      DatabaseManager.instance.exec('VACUUM;')
+      console.log('Database vacuumed')
     }
   }
 
   static checkIntegrity(): boolean {
-    if (!this.instance) return false;
+    if (!DatabaseManager.instance) return false
 
     try {
-      const result = this.instance.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
-      return result.integrity_check === 'ok';
+      const result = DatabaseManager.instance.prepare('PRAGMA integrity_check').get() as {
+        integrity_check: string
+      }
+      return result.integrity_check === 'ok'
     } catch {
-      return false;
+      return false
     }
   }
 }
 
 // Export singleton instance
-export const db = DatabaseManager.getInstance();
-export { DatabaseManager };
+export const db = DatabaseManager.getInstance()
+export { DatabaseManager }
 
 // Graceful shutdown handling
-process.on('exit', () => DatabaseManager.close());
+process.on('exit', () => DatabaseManager.close())
 process.on('SIGINT', () => {
-  DatabaseManager.close();
-  process.exit(0);
-});
+  DatabaseManager.close()
+  process.exit(0)
+})
 process.on('SIGTERM', () => {
-  DatabaseManager.close();
-  process.exit(0);
-});
+  DatabaseManager.close()
+  process.exit(0)
+})

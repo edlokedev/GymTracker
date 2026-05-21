@@ -1,0 +1,188 @@
+import { basename } from 'node:path'
+import { toTitleCase } from '../utils/text'
+
+export const EXERCISE_DATASET_REPO = 'hasaneyldrm/exercises-dataset'
+export const EXERCISE_DATASET_BRANCH = 'main'
+export const EXERCISE_DATASET_BASE_URL = `https://raw.githubusercontent.com/${EXERCISE_DATASET_REPO}/${EXERCISE_DATASET_BRANCH}`
+export const EXERCISE_DATASET_JSON_URL = `${EXERCISE_DATASET_BASE_URL}/data/exercises.json`
+
+export interface UpstreamExerciseDatasetExercise {
+  id: string
+  name: string
+  category: string
+  body_part?: string
+  equipment: string
+  instructions?: {
+    en?: string
+    tr?: string
+  }
+  muscle_group?: string
+  secondary_muscles?: string[]
+  target?: string
+  image?: string
+  gif_url?: string
+  created_at?: string
+}
+
+export interface NormalizedExerciseCategory {
+  id: string
+  name: string
+  description: string
+}
+
+export interface NormalizedExerciseSeed {
+  id: string
+  name: string
+  category_id: string
+  equipment: string | null
+  primary_muscles: string[]
+  secondary_muscles: string[]
+  instructions: string[]
+  gif_path: string | null
+  preview_image_path: string | null
+}
+
+export interface ExerciseDatasetManifest {
+  source_repo: string
+  source_json_url: string
+  synced_at: string
+  upstream_exercise_count: number
+  normalized_exercise_count: number
+  category_count: number
+  skipped_records: number
+  media_downloaded: number
+  media_failed: number
+  warnings: string[]
+}
+
+export interface NormalizedExerciseDataset {
+  categories: NormalizedExerciseCategory[]
+  exercises: NormalizedExerciseSeed[]
+  warnings: string[]
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+export function slugifyCategoryId(value: string): string {
+  return normalizeWhitespace(value)
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function normalizeMuscleName(value: string): string {
+  return normalizeWhitespace(value).toLowerCase()
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const value of values) {
+    if (!value) continue
+    const normalized = normalizeMuscleName(value)
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    result.push(normalized)
+  }
+
+  return result
+}
+
+export function splitInstructionText(instructions: string | undefined): string[] {
+  if (!instructions) return []
+
+  const normalized = normalizeWhitespace(instructions)
+  if (!normalized) return []
+
+  const parts = normalized
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  return parts.length > 0 ? parts : [normalized]
+}
+
+function toLocalMediaPath(
+  sourcePath: string | undefined,
+  folder: 'gifs' | 'previews',
+): string | null {
+  if (!sourcePath) return null
+  const filename = basename(sourcePath.trim())
+  return filename ? `${folder}/${filename}` : null
+}
+
+export function normalizeExerciseRecord(exercise: UpstreamExerciseDatasetExercise): {
+  category: NormalizedExerciseCategory
+  exercise: NormalizedExerciseSeed
+} | null {
+  if (!exercise.id || !exercise.name) {
+    return null
+  }
+
+  const categoryName = exercise.body_part || exercise.category
+  if (!categoryName) {
+    return null
+  }
+
+  const categoryId = slugifyCategoryId(categoryName)
+  if (!categoryId) {
+    return null
+  }
+
+  const primaryMuscles = uniqueStrings([exercise.target])
+  const secondaryMuscles = uniqueStrings([
+    exercise.muscle_group,
+    ...(exercise.secondary_muscles || []),
+  ]).filter((muscle) => !primaryMuscles.includes(muscle))
+
+  return {
+    category: {
+      id: categoryId,
+      name: toTitleCase(categoryName),
+      description: `${toTitleCase(categoryName)} exercises from the synced exercise dataset`,
+    },
+    exercise: {
+      id: exercise.id,
+      name: normalizeWhitespace(exercise.name),
+      category_id: categoryId,
+      equipment: exercise.equipment ? normalizeMuscleName(exercise.equipment) : null,
+      primary_muscles: primaryMuscles,
+      secondary_muscles: secondaryMuscles,
+      instructions: splitInstructionText(exercise.instructions?.en),
+      gif_path: toLocalMediaPath(exercise.gif_url, 'gifs'),
+      preview_image_path: toLocalMediaPath(exercise.image, 'previews'),
+    },
+  }
+}
+
+export function buildNormalizedExerciseDataset(
+  upstreamExercises: UpstreamExerciseDatasetExercise[],
+): NormalizedExerciseDataset {
+  const categories = new Map<string, NormalizedExerciseCategory>()
+  const exercises: NormalizedExerciseSeed[] = []
+  const warnings: string[] = []
+
+  for (const rawExercise of upstreamExercises) {
+    const normalized = normalizeExerciseRecord(rawExercise)
+
+    if (!normalized) {
+      warnings.push(
+        `Skipped malformed exercise record: ${JSON.stringify({ id: rawExercise?.id, name: rawExercise?.name })}`,
+      )
+      continue
+    }
+
+    categories.set(normalized.category.id, normalized.category)
+    exercises.push(normalized.exercise)
+  }
+
+  return {
+    categories: Array.from(categories.values()).sort((a, b) => a.name.localeCompare(b.name)),
+    exercises: exercises.sort((a, b) => a.name.localeCompare(b.name)),
+    warnings,
+  }
+}

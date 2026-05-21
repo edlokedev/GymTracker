@@ -58,7 +58,6 @@
       "!src/routeTree.gen.ts",
       "!src/lib/database/data/*.json",
       "!graphify-out",
-      "!src/graphify-out",
       "!**/graphify-out/cache"
     ]
   }

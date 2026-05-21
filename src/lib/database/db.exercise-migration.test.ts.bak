@@ -1,0 +1,81 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+describe('exercise dataset migration reset', () => {
+  const tempDirs: string[] = []
+  const openManagers: Array<{ close: () => void }> = []
+
+  afterEach(async () => {
+    for (const manager of openManagers.splice(0)) {
+      manager.close()
+    }
+
+    vi.resetModules()
+
+    for (const dir of tempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('rebuilds the exercise schema and preserves users while clearing workouts', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'gymtracker-exercise-db-'))
+    tempDirs.push(tempDir)
+
+    process.env.DB_DIR = tempDir
+    process.env.NODE_ENV = 'test'
+
+    const databaseModule = await import('./db')
+    const { DatabaseManager, db } = databaseModule
+    openManagers.push(DatabaseManager)
+    await DatabaseManager.runSeeds()
+
+    const userCountBefore = (
+      db.prepare('SELECT COUNT(*) as count FROM user').get() as {
+        count: number
+      }
+    ).count
+    const exerciseId = (db.prepare('SELECT id FROM exercises LIMIT 1').get() as { id: string }).id
+    const userId = (db.prepare('SELECT id FROM user LIMIT 1').get() as { id: string }).id
+
+    db.prepare(`
+      INSERT INTO workout_sessions (id, user_id, name, date, start_time)
+      VALUES (?, ?, ?, ?, ?)
+    `).run('session-1', userId, 'Migration Test', '2026-04-22', '2026-04-22T10:00:00.000Z')
+
+    db.prepare(`
+      INSERT INTO workout_sets (id, workout_id, exercise_id, set_number, reps, weight)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run('set-1', 'session-1', exerciseId, 1, 10, 50)
+
+    DatabaseManager.reset()
+    await DatabaseManager.runSeeds()
+
+    const userCountAfter = (
+      db.prepare('SELECT COUNT(*) as count FROM user').get() as {
+        count: number
+      }
+    ).count
+    const workoutCount = (
+      db.prepare('SELECT COUNT(*) as count FROM workout_sessions').get() as {
+        count: number
+      }
+    ).count
+    const exerciseCount = (
+      db.prepare('SELECT COUNT(*) as count FROM exercises').get() as {
+        count: number
+      }
+    ).count
+    const columns = db.prepare(`PRAGMA table_info(exercises)`).all() as Array<{
+      name: string
+    }>
+    const columnNames = new Set(columns.map((column) => column.name))
+
+    expect(userCountAfter).toBe(userCountBefore)
+    expect(workoutCount).toBe(0)
+    expect(exerciseCount).toBeGreaterThan(0)
+    expect(columnNames.has('gif_path')).toBe(true)
+    expect(columnNames.has('preview_image_path')).toBe(true)
+  })
+})
