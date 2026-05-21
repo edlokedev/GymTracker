@@ -1,0 +1,4 @@
+# Supabase CLI runtime artifacts — not for source control.
+.branches
+.temp
+.env

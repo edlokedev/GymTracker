@@ -1,28 +1,35 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
-import { exerciseQueries } from '../lib/database/index'
+import { exerciseCatalogQueries } from '../lib/supabase/queries/exercise-catalog'
+import { getSupabaseServerClient } from '../lib/supabase/server'
 
 export const ServerRoute = createServerFileRoute('/api/equipment-types').methods({
-  GET: async () => {
+  GET: async ({ request }: { request: Request }) => {
     try {
-      const equipment = exerciseQueries.getEquipmentTypes()
-      
-      return new Response(JSON.stringify({
-        success: true,
-        data: equipment
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      })
+      const { supabase } = getSupabaseServerClient(request)
+      const equipment = await exerciseCatalogQueries.listEquipmentTypes(supabase)
 
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: equipment,
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
     } catch (error) {
       console.error('Equipment types fetch error:', error)
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Failed to fetch equipment types',
-        data: []
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to fetch equipment types',
+          data: [],
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
     }
-  }
+  },
 })

@@ -1,9 +1,9 @@
-import { useAuth } from '../../lib/auth/context'
-import { useCalendarData } from './useCalendarData'
-import { WorkoutSummaryStats } from './WorkoutSummaryStats'
-import { WorkoutDetailModal } from './WorkoutDetailModal'
-import { RollingCalendarGrid } from './RollingCalendarGrid'
+import { useAuth } from '../../lib/auth'
 import { formatDisplayDate, isToday } from '../../lib/utils/calendar'
+import { RollingCalendarGrid } from './RollingCalendarGrid'
+import { useCalendarData } from './useCalendarData'
+import { WorkoutDetailModal } from './WorkoutDetailModal'
+import { WorkoutSummaryStats } from './WorkoutSummaryStats'
 
 export const CalendarDashboard: React.FC = () => {
   const { user } = useAuth()
@@ -25,13 +25,8 @@ export const CalendarDashboard: React.FC = () => {
     return (
       <div className="text-center py-12">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 max-w-md mx-auto">
-          <p className="text-red-800 dark:text-red-300">
-            Error loading calendar: {state.error}
-          </p>
-          <button
-            onClick={actions.refreshData}
-            className="mt-3 btn-primary"
-          >
+          <p className="text-red-800 dark:text-red-300">Error loading calendar: {state.error}</p>
+          <button onClick={actions.refreshData} className="mt-3 btn-primary">
             Try Again
           </button>
         </div>
@@ -40,8 +35,8 @@ export const CalendarDashboard: React.FC = () => {
   }
 
   const handleDayClick = (date: Date) => {
-    const workoutDay = state.workoutData.find(day =>
-      new Date(day.date).toDateString() === date.toDateString()
+    const workoutDay = state.workoutData.find(
+      (day) => new Date(day.date).toDateString() === date.toDateString(),
     )
 
     if (workoutDay && workoutDay.hasWorkout) {
@@ -54,9 +49,7 @@ export const CalendarDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold gradient-text">
-            Workout Calendar
-          </h1>
+          <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Workout Calendar</h1>
           <p className="text-sm sm:text-base" style={{ color: 'var(--color-text-secondary)' }}>
             Track your fitness journey with a rolling 30-day view
           </p>
@@ -72,10 +65,7 @@ export const CalendarDashboard: React.FC = () => {
       </div>
 
       {/* Summary Stats */}
-      <WorkoutSummaryStats
-        stats={state.summaryStats}
-        isLoading={state.isLoading}
-      />
+      <WorkoutSummaryStats stats={state.summaryStats} isLoading={state.isLoading} />
 
       {/* Calendar */}
       <div className="relative rounded-2xl shadow-md border border-gray-200/60 dark:border-gray-700/70 bg-gradient-to-br from-white via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-blue-950/20 dark:to-indigo-950/30 overflow-hidden">
@@ -96,7 +86,7 @@ export const CalendarDashboard: React.FC = () => {
                 style={{
                   background: 'var(--color-surface-primary)',
                   borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-secondary)'
+                  color: 'var(--color-text-secondary)',
                 }}
               >
                 ← Previous
@@ -117,7 +107,7 @@ export const CalendarDashboard: React.FC = () => {
                 style={{
                   background: 'var(--color-surface-primary)',
                   borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-secondary)'
+                  color: 'var(--color-text-secondary)',
                 }}
               >
                 Next →
@@ -136,28 +126,56 @@ export const CalendarDashboard: React.FC = () => {
 
           {/* Legend */}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm">
-            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full border shadow-sm" style={{
-              backgroundColor: 'color-mix(in srgb, var(--color-info) 10%, var(--color-surface-primary))',
-              borderColor: 'var(--color-info)',
-              color: 'var(--color-info)'
-            }}>
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'linear-gradient(135deg, var(--color-info) 0%, var(--color-brand) 100%)' }} />
+            <div
+              className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full border shadow-sm"
+              style={{
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-info) 10%, var(--color-surface-primary))',
+                borderColor: 'var(--color-info)',
+                color: 'var(--color-info)',
+              }}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{
+                  background:
+                    'linear-gradient(135deg, var(--color-info) 0%, var(--color-brand) 100%)',
+                }}
+              />
               <span>Light Workout</span>
             </div>
-            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full border shadow-sm" style={{
-              backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary))',
-              borderColor: 'var(--color-warning)',
-              color: 'var(--color-warning)'
-            }}>
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'linear-gradient(135deg, var(--color-warning) 0%, #ea580c 100%)' }} />
+            <div
+              className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full border shadow-sm"
+              style={{
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-primary))',
+                borderColor: 'var(--color-warning)',
+                color: 'var(--color-warning)',
+              }}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{
+                  background: 'linear-gradient(135deg, var(--color-warning) 0%, #ea580c 100%)',
+                }}
+              />
               <span>Moderate Workout</span>
             </div>
-            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full border shadow-sm" style={{
-              backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, var(--color-surface-primary))',
-              borderColor: 'var(--color-danger)',
-              color: 'var(--color-danger)'
-            }}>
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'linear-gradient(135deg, var(--color-danger) 0%, #dc2626 100%)' }} />
+            <div
+              className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full border shadow-sm"
+              style={{
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-danger) 10%, var(--color-surface-primary))',
+                borderColor: 'var(--color-danger)',
+                color: 'var(--color-danger)',
+              }}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{
+                  background: 'linear-gradient(135deg, var(--color-danger) 0%, #dc2626 100%)',
+                }}
+              />
               <span>Intense Workout</span>
             </div>
           </div>

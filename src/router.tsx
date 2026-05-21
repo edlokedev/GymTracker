@@ -46,8 +46,13 @@ function stringifySearch(search: Record<string, unknown>): string {
   return searchString ? `?${searchString}` : ''
 }
 
-// Create a new router instance
-export const getRouter = () => {
+// Create a new router instance.
+//
+// TanStack Start 1.131+ generates a virtual server entry that imports
+// `createRouter` from this file by name. We export both `createRouter` (the
+// name TanStack Start expects) and `getRouter` (the legacy name still used by
+// existing call sites) so the rename is non-breaking.
+export const createRouter = () => {
   return createTanstackRouter({
     routeTree,
     scrollRestoration: true,
@@ -56,6 +61,8 @@ export const getRouter = () => {
     stringifySearch,
   })
 }
+
+export const getRouter = createRouter
 
 // Register the router instance for type safety
 declare module '@tanstack/react-router' {

@@ -53,3 +53,7 @@ count.txt
 *.db
 *.sqlite
 *.sqlite3
+
+# Local Claude Code state (per-machine settings, not project config)
+.claude/
+

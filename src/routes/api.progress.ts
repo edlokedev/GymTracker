@@ -1,64 +1,51 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
-import { getProgressQueries } from '../lib/database/queries'
-import { db } from '../lib/database/db'
-import type { ProgressRequest, ProgressResponse } from '../lib/types/progress'
 import dayjs from 'dayjs'
+import { getProgressData } from '../lib/supabase/queries/progress'
+import { mergeHeaders } from '../lib/supabase/response'
+import { getAuthenticatedUser } from '../lib/supabase/server'
+import type { ProgressResponse } from '../lib/types/progress'
+
+const JSON_HEADER = { 'Content-Type': 'application/json' }
 
 export const ServerRoute = createServerFileRoute('/api/progress').methods({
   GET: async ({ request }: { request: Request }) => {
+    const { user, supabase, responseHeaders } = await getAuthenticatedUser(request)
+    if (!user) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     try {
       const url = new URL(request.url)
       const searchParams = url.searchParams
 
-      // Parse query parameters
-      const userId = searchParams.get('userId')
       const exerciseIds = searchParams.get('exercises')?.split(',').filter(Boolean) || []
-      const startDate = searchParams.get('startDate') || dayjs().subtract(90, 'day').format('YYYY-MM-DD')
+      const startDate =
+        searchParams.get('startDate') || dayjs().subtract(90, 'day').format('YYYY-MM-DD')
       const endDate = searchParams.get('endDate') || dayjs().format('YYYY-MM-DD')
-      const metric = searchParams.get('metric') as 'weight' | 'reps' | 'volume' || 'volume'
+      const metric = (searchParams.get('metric') as 'weight' | 'reps' | 'volume') || 'volume'
       const limit = parseInt(searchParams.get('limit') || '1000')
 
-      // Validate required parameters
-      if (!userId) {
-        return new Response(
-          JSON.stringify({ 
-            success: false,
-            error: 'userId is required' 
-          }),
-          { 
-            status: 400, 
-            headers: { 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-
-      // Validate date range
       if (dayjs(startDate).isAfter(dayjs(endDate))) {
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             success: false,
-            error: 'Start date cannot be after end date' 
+            error: 'Start date cannot be after end date',
           }),
-          { 
-            status: 400, 
-            headers: { 'Content-Type': 'application/json' } 
-          }
+          { status: 400, headers: mergeHeaders(responseHeaders, JSON_HEADER) },
         )
       }
 
-      // Build progress request
-      const progressRequest: ProgressRequest = {
-        userId,
+      const progressData = await getProgressData(supabase, {
+        userId: user.id,
         exerciseIds: exerciseIds.length > 0 ? exerciseIds : undefined,
         startDate,
         endDate,
         metric,
-        limit
-      }
-
-      // Get progress data
-      const progressQueries = getProgressQueries(db)
-      const progressData = progressQueries.getProgressData(progressRequest)
+        limit,
+      })
 
       const response: ProgressResponse = {
         success: true,
@@ -67,28 +54,24 @@ export const ServerRoute = createServerFileRoute('/api/progress').methods({
           totalExercises: progressData.length,
           dateRange: {
             start: startDate,
-            end: endDate
-          }
-        }
+            end: endDate,
+          },
+        },
       }
 
       return new Response(JSON.stringify(response), {
-        headers: { 'Content-Type': 'application/json' }
+        headers: mergeHeaders(responseHeaders, JSON_HEADER),
       })
-
     } catch (error: any) {
       console.error('Progress API error:', error)
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           success: false,
           error: 'Failed to fetch progress data',
-          details: error.message 
+          details: error?.message,
         }),
-        { 
-          status: 500, 
-          headers: { 'Content-Type': 'application/json' } 
-        }
+        { status: 500, headers: mergeHeaders(responseHeaders, JSON_HEADER) },
       )
     }
-  }
+  },
 })
