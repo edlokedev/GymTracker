@@ -136,14 +136,33 @@ export const ServerRoute = createServerFileRoute('/api/workout-sets').methods({
     try {
       const url = new URL(request.url)
       const setId = url.searchParams.get('id')
+      const workoutId = url.searchParams.get('workoutId')
+      const exerciseId = url.searchParams.get('exerciseId')
 
-      if (!setId) {
-        return new Response(JSON.stringify({ error: 'Set ID is required' }), {
-          status: 400,
+      // Two delete modes:
+      //   * ?id=...                       — delete a single set
+      //   * ?workoutId=...&exerciseId=... — remove every set for that
+      //     exercise from the workout (used by the UI's "Remove Exercise"
+      //     button so the session can shed a whole row without iterating).
+      if (workoutId && exerciseId) {
+        const removed = await workoutSetQueries.deleteByExercise(supabase, workoutId, exerciseId)
+        return new Response(JSON.stringify({ success: true, deleted: removed }), {
           headers: mergeHeaders(responseHeaders, {
             'Content-Type': 'application/json',
           }),
         })
+      }
+
+      if (!setId) {
+        return new Response(
+          JSON.stringify({ error: 'Set ID (or workoutId+exerciseId) is required' }),
+          {
+            status: 400,
+            headers: mergeHeaders(responseHeaders, {
+              'Content-Type': 'application/json',
+            }),
+          },
+        )
       }
 
       const ok = await workoutSetQueries.delete(supabase, setId)

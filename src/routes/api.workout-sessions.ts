@@ -21,6 +21,42 @@ export const ServerRoute = createServerFileRoute('/api/workout-sessions').method
     if (!user) return unauthorizedResponse(responseHeaders)
 
     const url = new URL(request.url)
+    const sessionId = url.searchParams.get('id')
+    const includeDetails = url.searchParams.get('includeDetails') === 'true'
+
+    // Single-session lookup. With ?includeDetails=true the response also
+    // carries the workout's sets grouped by exercise (WorkoutWithDetails);
+    // without it, just the WorkoutSession row.
+    if (sessionId) {
+      try {
+        const data = includeDetails
+          ? await workoutSessionQueries.getWithDetails(supabase, sessionId)
+          : await workoutSessionQueries.getById(supabase, sessionId)
+        if (!data) {
+          return new Response(JSON.stringify({ error: 'Session not found' }), {
+            status: 404,
+            headers: mergeHeaders(responseHeaders, {
+              'Content-Type': 'application/json',
+            }),
+          })
+        }
+        return new Response(JSON.stringify({ success: true, data }), {
+          headers: mergeHeaders(responseHeaders, {
+            'Content-Type': 'application/json',
+          }),
+        })
+      } catch (error) {
+        console.error('Get workout session by id error:', error)
+        return new Response(JSON.stringify({ error: 'Failed to get workout session' }), {
+          status: 500,
+          headers: mergeHeaders(responseHeaders, {
+            'Content-Type': 'application/json',
+          }),
+        })
+      }
+    }
+
+    // Paginated list of the authenticated user's sessions.
     const limit = parseInt(url.searchParams.get('limit') || '20', 10)
     const offset = parseInt(url.searchParams.get('offset') || '0', 10)
 
@@ -133,6 +169,47 @@ export const ServerRoute = createServerFileRoute('/api/workout-sessions').method
     } catch (error) {
       console.error('Update workout session error:', error)
       return new Response(JSON.stringify({ error: 'Failed to update workout session' }), {
+        status: 500,
+        headers: mergeHeaders(responseHeaders, {
+          'Content-Type': 'application/json',
+        }),
+      })
+    }
+  },
+
+  DELETE: async ({ request }: { request: Request }) => {
+    const { user, supabase, responseHeaders } = await getAuthenticatedUser(request)
+    if (!user) return unauthorizedResponse(responseHeaders)
+
+    const url = new URL(request.url)
+    const sessionId = url.searchParams.get('id')
+    if (!sessionId) {
+      return new Response(JSON.stringify({ error: 'Session ID is required' }), {
+        status: 400,
+        headers: mergeHeaders(responseHeaders, {
+          'Content-Type': 'application/json',
+        }),
+      })
+    }
+
+    try {
+      const ok = await workoutSessionQueries.delete(supabase, sessionId)
+      if (!ok) {
+        return new Response(JSON.stringify({ error: 'Session not found' }), {
+          status: 404,
+          headers: mergeHeaders(responseHeaders, {
+            'Content-Type': 'application/json',
+          }),
+        })
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: mergeHeaders(responseHeaders, {
+          'Content-Type': 'application/json',
+        }),
+      })
+    } catch (error) {
+      console.error('Delete workout session error:', error)
+      return new Response(JSON.stringify({ error: 'Failed to delete workout session' }), {
         status: 500,
         headers: mergeHeaders(responseHeaders, {
           'Content-Type': 'application/json',

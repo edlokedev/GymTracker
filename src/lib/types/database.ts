@@ -122,8 +122,18 @@ export interface WorkoutWithDetails extends WorkoutSession {
       id: string
       name: string
       primary_muscles: string[]
+      secondary_muscles: string[]
+      instructions: string[]
       equipment: string
+      category_id: string
       category_name: string
+      force: 'push' | 'pull' | 'static' | null
+      level: 'beginner' | 'intermediate' | 'advanced' | 'expert' | null
+      mechanic: 'compound' | 'isolation' | null
+      gif_path: string | null
+      preview_image_path: string | null
+      created_at: Date
+      updated_at: Date
     }
     sets: WorkoutSet[]
   }[]

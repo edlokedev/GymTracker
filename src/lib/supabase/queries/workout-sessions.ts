@@ -12,7 +12,13 @@
 // `id` is generated server-side by `gen_random_uuid()`; never pass it on insert.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { PaginatedResult, WorkoutSession, WorkoutSessionInput } from '../../types/database'
+import type {
+  PaginatedResult,
+  WorkoutSession,
+  WorkoutSessionInput,
+  WorkoutSet,
+  WorkoutWithDetails,
+} from '../../types/database'
 import type { Database } from '../database.types'
 
 type SB = SupabaseClient<Database> | SupabaseClient<any, 'public', any>
@@ -167,6 +173,128 @@ export const workoutSessionQueries = {
     if (error) throw error
     if (!row) return null
     return mapSession(row as SessionRow)
+  },
+
+  // Fetch a single session plus every set on it, grouped by exercise and
+  // hydrated with exercise metadata (joined from `exercises` and the catalog
+  // category name). Returns null when the session doesn't exist or RLS hides
+  // it. The shape matches WorkoutWithDetails so the React workout view can
+  // render directly from it.
+  async getWithDetails(supabase: SB, id: string): Promise<WorkoutWithDetails | null> {
+    const sessionRow = await workoutSessionQueries.getById(supabase, id)
+    if (!sessionRow) return null
+
+    const { data: setsData, error: setsError } = await (supabase as any)
+      .from('workout_sets')
+      .select(
+        'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, created_at, updated_at',
+      )
+      .eq('workout_id', id)
+      .order('set_number', { ascending: true })
+      .order('created_at', { ascending: true })
+    if (setsError) throw setsError
+
+    const sets = (setsData ?? []) as Array<{
+      id: string
+      workout_id: string
+      exercise_id: string
+      set_number: number
+      weight: number | null
+      reps: number | null
+      rest_time: number | null
+      notes: string | null
+      created_at: string
+      updated_at: string
+    }>
+
+    const uniqueExerciseIds = Array.from(new Set(sets.map((s) => s.exercise_id)))
+
+    type ExerciseRow = {
+      id: string
+      name: string
+      category_id: string
+      force: 'push' | 'pull' | 'static' | null
+      level: 'beginner' | 'intermediate' | 'advanced' | 'expert' | null
+      mechanic: 'compound' | 'isolation' | null
+      equipment: string | null
+      primary_muscles: unknown
+      secondary_muscles: unknown
+      instructions: unknown
+      gif_path: string | null
+      preview_image_path: string | null
+      created_at: string
+      updated_at: string
+      exercise_categories: { name: string } | { name: string }[] | null
+    }
+
+    let exerciseRows: ExerciseRow[] = []
+    if (uniqueExerciseIds.length > 0) {
+      const { data, error } = await (supabase as any)
+        .from('exercises')
+        .select(
+          'id, name, category_id, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)',
+        )
+        .in('id', uniqueExerciseIds)
+      if (error) throw error
+      exerciseRows = (data ?? []) as ExerciseRow[]
+    }
+
+    const exerciseById = new Map<string, ExerciseRow>()
+    for (const row of exerciseRows) exerciseById.set(row.id, row)
+
+    const setsByExercise = new Map<string, typeof sets>()
+    for (const set of sets) {
+      const bucket = setsByExercise.get(set.exercise_id) ?? []
+      bucket.push(set)
+      setsByExercise.set(set.exercise_id, bucket)
+    }
+
+    const asStringArray = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+
+    const exercises = Array.from(setsByExercise.entries()).map(([exerciseId, exSets]) => {
+      const row = exerciseById.get(exerciseId)
+      const catName = Array.isArray(row?.exercise_categories)
+        ? (row?.exercise_categories[0]?.name ?? '')
+        : (row?.exercise_categories?.name ?? '')
+
+      return {
+        exercise: {
+          id: exerciseId,
+          name: row?.name ?? exerciseId,
+          primary_muscles: asStringArray(row?.primary_muscles),
+          secondary_muscles: asStringArray(row?.secondary_muscles),
+          instructions: asStringArray(row?.instructions),
+          equipment: row?.equipment ?? '',
+          category_id: row?.category_id ?? '',
+          category_name: catName,
+          force: row?.force ?? null,
+          level: row?.level ?? null,
+          mechanic: row?.mechanic ?? null,
+          gif_path: row?.gif_path ?? null,
+          preview_image_path: row?.preview_image_path ?? null,
+          created_at: row?.created_at ? new Date(row.created_at) : new Date(),
+          updated_at: row?.updated_at ? new Date(row.updated_at) : new Date(),
+        },
+        sets: exSets.map<WorkoutSet>((s) => ({
+          id: s.id,
+          workout_id: s.workout_id,
+          exercise_id: s.exercise_id,
+          set_number: s.set_number,
+          weight: s.weight ?? undefined,
+          reps: s.reps ?? undefined,
+          rest_time: s.rest_time ?? undefined,
+          notes: s.notes ?? undefined,
+          created_at: new Date(s.created_at),
+          updated_at: new Date(s.updated_at),
+        })),
+      }
+    })
+
+    return {
+      ...sessionRow,
+      exercises,
+    }
   },
 
   async delete(supabase: SB, id: string): Promise<boolean> {

@@ -137,4 +137,19 @@ export const workoutSetQueries = {
     if (error) throw error
     return Array.isArray(data) && data.length > 0
   },
+
+  // Remove every set for a given exercise from a given workout. Used by the
+  // workout UI's "Remove Exercise" button. RLS keeps the delete scoped to the
+  // user's own workouts.
+  async deleteByExercise(supabase: SB, workoutId: string, exerciseId: string): Promise<number> {
+    const { data, error } = await (supabase as any)
+      .from('workout_sets')
+      .delete()
+      .eq('workout_id', workoutId)
+      .eq('exercise_id', exerciseId)
+      .select('id')
+
+    if (error) throw error
+    return Array.isArray(data) ? data.length : 0
+  },
 }
