@@ -1,8 +1,0 @@
-process.env.GYMTRACKER_SKIP_AUTO_SEED = '1'
-
-const { resetExerciseDataset } = await import('./index')
-
-resetExerciseDataset().catch((error) => {
-  console.error('Exercise dataset reset failed:', error)
-  process.exit(1)
-})

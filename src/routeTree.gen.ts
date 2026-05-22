@@ -26,7 +26,6 @@ import { ServerRoute as ApiExerciseCategoriesServerRouteImport } from './routes/
 import { ServerRoute as ApiEquipmentTypesServerRouteImport } from './routes/api.equipment-types'
 import { ServerRoute as ApiCalendarDataServerRouteImport } from './routes/api.calendar-data'
 import { ServerRoute as ApiExercisesSearchServerRouteImport } from './routes/api.exercises.search'
-import { ServerRoute as ApiAuthSplatServerRouteImport } from './routes/api/auth/$'
 
 const rootServerRouteImport = createServerRootRoute()
 
@@ -108,11 +107,6 @@ const ApiExercisesSearchServerRoute =
     path: '/api/exercises/search',
     getParentRoute: () => rootServerRouteImport,
   } as any)
-const ApiAuthSplatServerRoute = ApiAuthSplatServerRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootServerRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -161,7 +155,6 @@ export interface FileServerRoutesByFullPath {
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
-  '/api/auth/$': typeof ApiAuthSplatServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
 }
 export interface FileServerRoutesByTo {
@@ -174,7 +167,6 @@ export interface FileServerRoutesByTo {
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
-  '/api/auth/$': typeof ApiAuthSplatServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
 }
 export interface FileServerRoutesById {
@@ -188,7 +180,6 @@ export interface FileServerRoutesById {
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
-  '/api/auth/$': typeof ApiAuthSplatServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
 }
 export interface FileServerRouteTypes {
@@ -203,7 +194,6 @@ export interface FileServerRouteTypes {
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/auth/callback'
-    | '/api/auth/$'
     | '/api/exercises/search'
   fileServerRoutesByTo: FileServerRoutesByTo
   to:
@@ -216,7 +206,6 @@ export interface FileServerRouteTypes {
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/auth/callback'
-    | '/api/auth/$'
     | '/api/exercises/search'
   id:
     | '__root__'
@@ -229,7 +218,6 @@ export interface FileServerRouteTypes {
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/auth/callback'
-    | '/api/auth/$'
     | '/api/exercises/search'
   fileServerRoutesById: FileServerRoutesById
 }
@@ -243,7 +231,6 @@ export interface RootServerRouteChildren {
   ApiWorkoutSessionsServerRoute: typeof ApiWorkoutSessionsServerRoute
   ApiWorkoutSetsServerRoute: typeof ApiWorkoutSetsServerRoute
   AuthCallbackServerRoute: typeof AuthCallbackServerRoute
-  ApiAuthSplatServerRoute: typeof ApiAuthSplatServerRoute
   ApiExercisesSearchServerRoute: typeof ApiExercisesSearchServerRoute
 }
 
@@ -358,13 +345,6 @@ declare module '@tanstack/react-start/server' {
       preLoaderRoute: typeof ApiExercisesSearchServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatServerRouteImport
-      parentRoute: typeof rootServerRouteImport
-    }
   }
 }
 
@@ -388,7 +368,6 @@ const rootServerRouteChildren: RootServerRouteChildren = {
   ApiWorkoutSessionsServerRoute: ApiWorkoutSessionsServerRoute,
   ApiWorkoutSetsServerRoute: ApiWorkoutSetsServerRoute,
   AuthCallbackServerRoute: AuthCallbackServerRoute,
-  ApiAuthSplatServerRoute: ApiAuthSplatServerRoute,
   ApiExercisesSearchServerRoute: ApiExercisesSearchServerRoute,
 }
 export const serverRouteTree = rootServerRouteImport
