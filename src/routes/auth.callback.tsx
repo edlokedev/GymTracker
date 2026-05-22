@@ -1,4 +1,5 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
+import { mergeSetCookies } from '../lib/api/cookies'
 import { getSupabaseServerClient } from '../lib/supabase/server'
 
 // OAuth callback for Supabase Auth.
@@ -11,26 +12,17 @@ import { getSupabaseServerClient } from '../lib/supabase/server'
 // `?next=` lets the caller pick a post-login landing path; we default to `/`.
 // The destination is restricted to same-origin paths (starts with `/` and not
 // `//`) so this route can't be abused as an open redirect.
+//
+// This route deliberately stays outside definePrivateRoute / definePublicRoute
+// because it returns 302 redirects, not JSON. Cookie merging is the only thing
+// it shares with the JSON routes, so it imports `mergeSetCookies` from the
+// shared module rather than reimplementing it inline.
 
 function sanitizeNext(raw: string | null): string {
   if (!raw) return '/'
   if (!raw.startsWith('/')) return '/'
   if (raw.startsWith('//')) return '/'
   return raw
-}
-
-function mergeSetCookies(target: Headers, source: Headers) {
-  // Headers#getSetCookie exists in modern runtimes (Node 20+, Vercel Edge,
-  // browsers). Fall back to the single `get('set-cookie')` for older shims.
-  const getter = (source as unknown as { getSetCookie?: () => string[] }).getSetCookie
-  if (typeof getter === 'function') {
-    for (const cookie of getter.call(source)) {
-      target.append('set-cookie', cookie)
-    }
-    return
-  }
-  const single = source.get('set-cookie')
-  if (single) target.append('set-cookie', single)
 }
 
 export const ServerRoute = createServerFileRoute('/auth/callback').methods({

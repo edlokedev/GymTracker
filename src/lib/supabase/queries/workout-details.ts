@@ -12,6 +12,7 @@
 // userId.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { assertPostgresOk } from '../../api/errors'
 import type { WorkoutSessionWithSets } from '../../types/calendar'
 import type { Database } from '../database.types'
 
@@ -55,7 +56,7 @@ export const workoutDetailsQueries = {
       .eq('date', date)
       .order('start_time', { ascending: true })
 
-    if (sessionsError) throw sessionsError
+    assertPostgresOk(sessionsError)
     const sessions = (sessionsData ?? []) as SessionRow[]
     if (sessions.length === 0) return []
 
@@ -67,7 +68,7 @@ export const workoutDetailsQueries = {
       .order('set_number', { ascending: true })
       .order('created_at', { ascending: true })
 
-    if (setsError) throw setsError
+    assertPostgresOk(setsError)
     const sets = (setsData ?? []) as SetRow[]
 
     // Resolve exercise names for every exercise referenced by these sets.
@@ -81,7 +82,7 @@ export const workoutDetailsQueries = {
         .from('exercises')
         .select('id, name')
         .in('id', uniqueExerciseIds)
-      if (exError) throw exError
+      assertPostgresOk(exError)
       for (const row of (exData ?? []) as { id: string; name: string }[]) {
         exerciseNameById.set(row.id, row.name)
       }

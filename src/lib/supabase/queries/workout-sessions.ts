@@ -12,6 +12,7 @@
 // `id` is generated server-side by `gen_random_uuid()`; never pass it on insert.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { assertPostgresOk } from '../../api/errors'
 import type {
   PaginatedResult,
   WorkoutSession,
@@ -72,7 +73,7 @@ export const workoutSessionQueries = {
       .order('start_time', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (error) throw error
+    assertPostgresOk(error)
 
     const rows = ((data ?? []) as SessionRow[]).map(mapSession)
     const total = count ?? 0
@@ -93,7 +94,7 @@ export const workoutSessionQueries = {
       .eq('id', id)
       .maybeSingle()
 
-    if (error) throw error
+    assertPostgresOk(error)
     if (!data) return null
     return mapSession(data as SessionRow)
   },
@@ -124,7 +125,7 @@ export const workoutSessionQueries = {
       .select(SESSION_COLUMNS)
       .single()
 
-    if (error) throw error
+    assertPostgresOk(error)
     return mapSession(row as SessionRow)
   },
 
@@ -154,7 +155,7 @@ export const workoutSessionQueries = {
       .select(SESSION_COLUMNS)
       .maybeSingle()
 
-    if (error) throw error
+    assertPostgresOk(error)
     if (!row) return null
     return mapSession(row as SessionRow)
   },
@@ -170,7 +171,7 @@ export const workoutSessionQueries = {
       .select(SESSION_COLUMNS)
       .maybeSingle()
 
-    if (error) throw error
+    assertPostgresOk(error)
     if (!row) return null
     return mapSession(row as SessionRow)
   },
@@ -192,7 +193,7 @@ export const workoutSessionQueries = {
       .eq('workout_id', id)
       .order('set_number', { ascending: true })
       .order('created_at', { ascending: true })
-    if (setsError) throw setsError
+    assertPostgresOk(setsError)
 
     const sets = (setsData ?? []) as Array<{
       id: string
@@ -235,7 +236,7 @@ export const workoutSessionQueries = {
           'id, name, category_id, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)',
         )
         .in('id', uniqueExerciseIds)
-      if (error) throw error
+      assertPostgresOk(error)
       exerciseRows = (data ?? []) as ExerciseRow[]
     }
 
@@ -305,7 +306,7 @@ export const workoutSessionQueries = {
       .eq('id', id)
       .select('id')
 
-    if (error) throw error
+    assertPostgresOk(error)
     return Array.isArray(data) && data.length > 0
   },
 }

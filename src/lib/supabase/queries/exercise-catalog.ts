@@ -21,6 +21,7 @@
 //     for the first pass.
 
 import type { createServerClient } from '@supabase/ssr'
+import { assertPostgresOk } from '../../api/errors'
 import type { Database } from '../database.types'
 
 // Bind the param type to the exact client shape `getSupabaseServerClient`
@@ -132,7 +133,7 @@ export const exerciseCatalogQueries = {
       .select('id, name, description')
       .order('name', { ascending: true })
 
-    if (error) throw error
+    assertPostgresOk(error)
     if (!categories) return []
 
     // One count query per category. There are only a handful of categories so
@@ -169,7 +170,7 @@ export const exerciseCatalogQueries = {
         .not('equipment', 'is', null)
         .neq('equipment', '')
         .range(from, from + PAGE - 1)
-      if (error) throw error
+      assertPostgresOk(error)
       const rows = (data ?? []) as { equipment: string | null }[]
       for (const row of rows) if (row.equipment) unique.add(row.equipment)
       if (rows.length < PAGE) break
@@ -187,7 +188,7 @@ export const exerciseCatalogQueries = {
         .from('exercises')
         .select('primary_muscles, secondary_muscles')
         .range(from, from + PAGE - 1)
-      if (error) throw error
+      assertPostgresOk(error)
       const rows = (data ?? []) as {
         primary_muscles: unknown
         secondary_muscles: unknown
@@ -208,7 +209,7 @@ export const exerciseCatalogQueries = {
       .eq('id', id)
       .maybeSingle()
 
-    if (error) throw error
+    assertPostgresOk(error)
     if (!data) return null
     return mapExerciseRow(data as unknown as RawExerciseRow)
   },
@@ -246,7 +247,7 @@ export const exerciseCatalogQueries = {
     if (!needsJsAggregation) {
       const q = buildBase().range(offset, offset + limit - 1)
       const { data, error, count } = await q
-      if (error) throw error
+      assertPostgresOk(error)
       const rows = (data ?? []) as unknown as RawExerciseRow[]
       const total = count ?? 0
       return {
@@ -280,7 +281,7 @@ export const exerciseCatalogQueries = {
     const PAGE = 1000
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await buildSlowQuery().range(from, from + PAGE - 1)
-      if (error) throw error
+      assertPostgresOk(error)
       const rows = (data ?? []) as unknown as RawExerciseRow[]
       all.push(...rows.map(mapExerciseRow))
       if (rows.length < PAGE) break

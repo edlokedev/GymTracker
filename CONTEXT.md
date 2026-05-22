@@ -29,3 +29,11 @@ A logged effort for one exercise inside one workout session. It records set orde
 ### Row Level Security
 
 Database authorization boundary in Supabase Postgres. Private workout tables must enforce ownership with the authenticated user's id.
+
+### Route Contract
+
+Single source of truth for one HTTP route's request and response shape. Names the path, the allowed methods, and the schema of each method's query, body, and response. The server handler parses requests against it, the feature client types responses from it, and contract tests assert responses against it.
+
+### API Envelope
+
+Uniform JSON wrapper around every private and public API route's response. Success carries the route's data under a success flag; failure carries a single error message under a failure flag. Routes that return redirects are outside the envelope.

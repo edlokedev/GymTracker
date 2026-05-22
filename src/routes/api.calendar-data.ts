@@ -1,6 +1,6 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
+import { mergeHeaders } from '../lib/api/cookies'
 import { getCalendarAggregate, resolveCalendarRange } from '../lib/supabase/queries/calendar'
-import { mergeHeaders } from '../lib/supabase/response'
 import { getAuthenticatedUser } from '../lib/supabase/server'
 import type { CalendarDataResponse } from '../lib/types/calendar'
 

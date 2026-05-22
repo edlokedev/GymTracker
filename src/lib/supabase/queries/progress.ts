@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
+import { assertPostgresOk } from '../../api/errors'
 import type {
   ExerciseProgress,
   ProgressDataPoint,
@@ -75,7 +76,7 @@ export async function getProgressData(
     .limit(limit)
 
   const { data, error } = await query
-  if (error) throw error
+  assertPostgresOk(error)
 
   const rows: SetJoinRow[] = (data ?? []) as SetJoinRow[]
 

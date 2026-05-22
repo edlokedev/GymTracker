@@ -11,6 +11,7 @@
 // contracts stay stable.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { assertPostgresOk } from '../../api/errors'
 import type { WorkoutSet, WorkoutSetInput } from '../../types/database'
 import type { Database } from '../database.types'
 
@@ -55,7 +56,7 @@ export const workoutSetQueries = {
       .eq('id', id)
       .maybeSingle()
 
-    if (error) throw error
+    assertPostgresOk(error)
     if (!data) return null
     return mapSet(data as SetRow)
   },
@@ -70,7 +71,7 @@ export const workoutSetQueries = {
       .order('set_number', { ascending: true })
       .order('created_at', { ascending: true })
 
-    if (error) throw error
+    assertPostgresOk(error)
     return ((data ?? []) as SetRow[]).map(mapSet)
   },
 
@@ -95,7 +96,7 @@ export const workoutSetQueries = {
       .select(SET_COLUMNS)
       .single()
 
-    if (error) throw error
+    assertPostgresOk(error)
     return mapSet(row as SetRow)
   },
 
@@ -122,7 +123,7 @@ export const workoutSetQueries = {
       .select(SET_COLUMNS)
       .maybeSingle()
 
-    if (error) throw error
+    assertPostgresOk(error)
     if (!row) return null
     return mapSet(row as SetRow)
   },
@@ -134,7 +135,7 @@ export const workoutSetQueries = {
       .eq('id', id)
       .select('id')
 
-    if (error) throw error
+    assertPostgresOk(error)
     return Array.isArray(data) && data.length > 0
   },
 
@@ -149,7 +150,7 @@ export const workoutSetQueries = {
       .eq('exercise_id', exerciseId)
       .select('id')
 
-    if (error) throw error
+    assertPostgresOk(error)
     return Array.isArray(data) ? data.length : 0
   },
 }

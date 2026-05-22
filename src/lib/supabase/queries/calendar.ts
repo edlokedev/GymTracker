@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { assertPostgresOk } from '../../api/errors'
 import type { WorkoutCalendarData } from '../../types/calendar'
 import {
   calculateAverageWorkoutsPerWeek,
@@ -86,7 +87,7 @@ export async function getCalendarAggregate(
     .order('date', { ascending: false })
     .order('start_time', { ascending: false })
 
-  if (sessionsError) throw sessionsError
+  assertPostgresOk(sessionsError)
   const sessions: SessionRow[] = (sessionsData ?? []) as SessionRow[]
 
   // 2) Sets for those sessions, in one round-trip via `IN (...)`.
@@ -97,7 +98,7 @@ export async function getCalendarAggregate(
       .from('workout_sets')
       .select('workout_id, exercise_id, weight, reps')
       .in('workout_id', sessionIds)
-    if (setsError) throw setsError
+    assertPostgresOk(setsError)
     sets = (setsData ?? []) as SetRow[]
   }
 
@@ -191,7 +192,7 @@ export async function getCalendarAggregate(
     .eq('user_id', userId)
     .gte('date', yearStart)
     .order('date', { ascending: false })
-  if (yearError) throw yearError
+  assertPostgresOk(yearError)
 
   const workoutDates: string[] = (yearSessionsData ?? []).map((row: { date: string }) => row.date)
 
