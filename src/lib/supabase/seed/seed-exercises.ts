@@ -1,124 +1,218 @@
-// Seed Supabase catalog tables (exercise_categories + exercises) from the
-// bundled Free Exercise DB JSON. Image paths are converted to jsDelivr URLs so
-// the catalog never depends on Supabase Storage during the first migration.
+// Seed Supabase catalog tables from the upstream `hasaneyldrm/exercises-dataset`
+// repo. Image + GIF paths are rewritten to absolute jsDelivr URLs so the
+// catalog renders without depending on Supabase Storage.
 //
 // Run with:
-//   pnpm supabase:seed-exercises
+//   bun run supabase:seed-exercises
 // or:
 //   tsx src/lib/supabase/seed/seed-exercises.ts
 //
 // Requires SUPABASE_URL and SUPABASE_SECRET_KEY (sb_secret_…; legacy alias
-// SUPABASE_SERVICE_ROLE_KEY also accepted) in the environment. The secret key
-// bypasses RLS, so do not commit a real key.
+// SUPABASE_SERVICE_ROLE_KEY also accepted) in the environment. The secret
+// key bypasses RLS — do not commit a real key.
+//
+// The seed is destructive: it deletes every row in `exercises` and
+// `exercise_categories` before inserting the upstream dataset, so the catalog
+// always exactly mirrors the linked source.
 
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { basename } from 'node:path'
 import { getSupabaseServiceRoleClient } from '../server'
 
-const JSDELIVR_BASE = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/'
+const DATASET_REPO = 'hasaneyldrm/exercises-dataset'
+const DATASET_BRANCH = 'main'
+const DATASET_JSON_URL = `https://raw.githubusercontent.com/${DATASET_REPO}/${DATASET_BRANCH}/data/exercises.json`
+const JSDELIVR_BASE = `https://cdn.jsdelivr.net/gh/${DATASET_REPO}@${DATASET_BRANCH}`
 
-type FreeExerciseDBExercise = {
+interface UpstreamExercise {
   id: string
   name: string
-  category: string
+  category?: string
+  body_part?: string
+  equipment?: string
+  instructions?: { en?: string; tr?: string }
+  muscle_group?: string
+  secondary_muscles?: string[]
+  target?: string
+  image?: string
+  gif_url?: string
+  created_at?: string
+}
+
+interface NormalizedCategory {
+  id: string
+  name: string
+  description: string
+}
+
+interface NormalizedExerciseRow {
+  id: string
+  name: string
+  category_id: string
   force: string | null
   level: string | null
   mechanic: string | null
   equipment: string | null
-  primaryMuscles: string[]
-  secondaryMuscles: string[]
+  primary_muscles: string[]
+  secondary_muscles: string[]
   instructions: string[]
   images: string[]
+  gif_path: string | null
+  preview_image_path: string | null
 }
 
-const CATEGORIES = [
-  {
-    id: 'strength',
-    name: 'Strength',
-    description: 'Strength training exercises including weightlifting and resistance training',
-  },
-  {
-    id: 'cardio',
-    name: 'Cardio',
-    description: 'Cardiovascular exercises for endurance and heart health',
-  },
-  { id: 'stretching', name: 'Stretching', description: 'Flexibility and mobility exercises' },
-  { id: 'plyometrics', name: 'Plyometrics', description: 'Explosive power and jumping exercises' },
-  {
-    id: 'powerlifting',
-    name: 'Powerlifting',
-    description: 'Powerlifting focused exercises (squat, bench, deadlift variations)',
-  },
-  {
-    id: 'olympic-weightlifting',
-    name: 'Olympic Weightlifting',
-    description: 'Olympic lifting movements (snatch, clean & jerk, etc.)',
-  },
-  {
-    id: 'strongman',
-    name: 'Strongman',
-    description: 'Strongman training exercises with specialized equipment',
-  },
-]
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
 
-function mapCategory(raw: string): string {
-  const map: Record<string, string> = {
-    strength: 'strength',
-    cardio: 'cardio',
-    stretching: 'stretching',
-    plyometrics: 'plyometrics',
-    powerlifting: 'powerlifting',
-    'olympic weightlifting': 'olympic-weightlifting',
-    strongman: 'strongman',
+function slugifyCategoryId(value: string): string {
+  return normalizeWhitespace(value)
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function toTitleCase(value: string): string {
+  return normalizeWhitespace(value)
+    .toLowerCase()
+    .replace(
+      /(^|[^a-z0-9])([a-z])/g,
+      (_, prefix: string, letter: string) => prefix + letter.toUpperCase(),
+    )
+}
+
+function normalizeMuscle(value: string): string {
+  return normalizeWhitespace(value).toLowerCase()
+}
+
+function uniqueMuscles(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const value of values) {
+    if (!value) continue
+    const normalized = normalizeMuscle(value)
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    out.push(normalized)
   }
-  return map[raw] ?? 'strength'
+  return out
 }
 
-function toJsDelivrUrl(relativePath: string): string {
-  const trimmed = relativePath.replace(/^\/+/, '')
-  return `${JSDELIVR_BASE}${trimmed}`
+function splitInstructionText(text: string | undefined): string[] {
+  if (!text) return []
+  const normalized = normalizeWhitespace(text)
+  if (!normalized) return []
+  const parts = normalized
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  return parts.length > 0 ? parts : [normalized]
+}
+
+function toJsDelivrUrl(folder: 'videos' | 'images', sourcePath: string | undefined): string | null {
+  if (!sourcePath) return null
+  const filename = basename(sourcePath.trim())
+  if (!filename) return null
+  return `${JSDELIVR_BASE}/${folder}/${filename}`
+}
+
+function normalize(upstream: UpstreamExercise): {
+  category: NormalizedCategory
+  exercise: NormalizedExerciseRow
+} | null {
+  if (!upstream.id || !upstream.name) return null
+
+  const categoryName = upstream.body_part || upstream.category
+  if (!categoryName) return null
+
+  const categoryId = slugifyCategoryId(categoryName)
+  if (!categoryId) return null
+
+  const primaryMuscles = uniqueMuscles([upstream.target])
+  const secondaryMuscles = uniqueMuscles([
+    upstream.muscle_group,
+    ...(upstream.secondary_muscles ?? []),
+  ]).filter((m) => !primaryMuscles.includes(m))
+
+  return {
+    category: {
+      id: categoryId,
+      name: toTitleCase(categoryName),
+      description: `${toTitleCase(categoryName)} exercises from the synced exercise dataset`,
+    },
+    exercise: {
+      id: upstream.id,
+      name: normalizeWhitespace(upstream.name),
+      category_id: categoryId,
+      force: null,
+      level: null,
+      mechanic: null,
+      equipment: upstream.equipment ? normalizeMuscle(upstream.equipment) : null,
+      primary_muscles: primaryMuscles,
+      secondary_muscles: secondaryMuscles,
+      instructions: splitInstructionText(upstream.instructions?.en),
+      images: [],
+      gif_path: toJsDelivrUrl('videos', upstream.gif_url),
+      preview_image_path: toJsDelivrUrl('images', upstream.image),
+    },
+  }
 }
 
 async function main() {
   const supabase = getSupabaseServiceRoleClient()
 
-  const __filename = fileURLToPath(import.meta.url)
-  const __dirname = dirname(__filename)
-  const dataPath = join(__dirname, '../../database/data/exercises.json')
+  console.log(`Fetching ${DATASET_JSON_URL}…`)
+  const response = await fetch(DATASET_JSON_URL, {
+    headers: { Accept: 'application/json', 'User-Agent': 'GymTracker seed' },
+  })
+  if (!response.ok) {
+    throw new Error(`Upstream fetch failed: ${response.status} ${response.statusText}`)
+  }
+  const upstream = (await response.json()) as UpstreamExercise[]
+  console.log(`Got ${upstream.length} upstream rows`)
 
-  const raw = readFileSync(dataPath, 'utf-8')
-  const exercises: FreeExerciseDBExercise[] = JSON.parse(raw)
+  const categories = new Map<string, NormalizedCategory>()
+  const exercises: NormalizedExerciseRow[] = []
+  let skipped = 0
+  for (const raw of upstream) {
+    const result = normalize(raw)
+    if (!result) {
+      skipped++
+      continue
+    }
+    categories.set(result.category.id, result.category)
+    exercises.push(result.exercise)
+  }
+  console.log(
+    `Normalized: ${exercises.length} exercises, ${categories.size} categories (${skipped} skipped)`,
+  )
 
-  console.log(`Upserting ${CATEGORIES.length} categories…`)
+  // Destructive reset of catalog: rows from the legacy Free Exercise DB seed
+  // would otherwise linger alongside the new ones with mismatched ids.
+  console.log('Clearing existing catalog rows…')
+  const { error: delSetsErr } = await supabase.from('workout_sets').delete().gt('set_number', -1)
+  if (delSetsErr) throw delSetsErr
+  const { error: delExErr } = await supabase.from('exercises').delete().neq('id', '__sentinel__')
+  if (delExErr) throw delExErr
+  const { error: delCatErr } = await supabase
+    .from('exercise_categories')
+    .delete()
+    .neq('id', '__sentinel__')
+  if (delCatErr) throw delCatErr
+
+  console.log(`Upserting ${categories.size} categories…`)
   const { error: catErr } = await supabase
     .from('exercise_categories')
-    .upsert(CATEGORIES, { onConflict: 'id' })
+    .upsert(Array.from(categories.values()), { onConflict: 'id' })
   if (catErr) throw catErr
 
   console.log(`Upserting ${exercises.length} exercises…`)
-
-  const rows = exercises.map((ex) => ({
-    id: ex.id,
-    name: ex.name,
-    category_id: mapCategory(ex.category),
-    force: ex.force,
-    level: ex.level,
-    mechanic: ex.mechanic,
-    equipment: ex.equipment,
-    primary_muscles: ex.primaryMuscles ?? [],
-    secondary_muscles: ex.secondaryMuscles ?? [],
-    instructions: ex.instructions ?? [],
-    images: (ex.images ?? []).map(toJsDelivrUrl),
-  }))
-
-  // Supabase recommends chunking large upserts to keep request size bounded.
   const CHUNK = 500
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const slice = rows.slice(i, i + CHUNK)
+  for (let i = 0; i < exercises.length; i += CHUNK) {
+    const slice = exercises.slice(i, i + CHUNK)
     const { error } = await supabase.from('exercises').upsert(slice, { onConflict: 'id' })
     if (error) throw error
-    console.log(`  …${Math.min(i + CHUNK, rows.length)} / ${rows.length}`)
+    console.log(`  …${Math.min(i + CHUNK, exercises.length)} / ${exercises.length}`)
   }
 
   console.log('Catalog seed complete.')

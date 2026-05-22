@@ -1,6 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ExerciseWithParsedFields, WorkoutSession, WorkoutWithDetails } from '@/lib/types/database'
+import type {
+  ExerciseWithParsedFields,
+  WorkoutSession,
+  WorkoutWithDetails,
+} from '@/lib/types/database'
 import WorkoutSessionManager from './components/WorkoutSessionManager'
 
 const selectorExercise = vi.hoisted<() => ExerciseWithParsedFields>(() => () => ({

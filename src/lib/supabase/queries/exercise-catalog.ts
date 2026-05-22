@@ -41,7 +41,8 @@ export interface CatalogExercise {
   primary_muscles: string[]
   secondary_muscles: string[]
   instructions: string[]
-  images: string[]
+  gif_path: string | null
+  preview_image_path: string | null
   created_at: string
   updated_at: string
   category_name: string
@@ -86,7 +87,8 @@ type RawExerciseRow = {
   primary_muscles: unknown
   secondary_muscles: unknown
   instructions: unknown
-  images: unknown
+  gif_path: string | null
+  preview_image_path: string | null
   created_at: string
   updated_at: string
   exercise_categories: { name: string } | { name: string }[] | null
@@ -112,7 +114,8 @@ function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
     primary_muscles: asStringArray(row.primary_muscles),
     secondary_muscles: asStringArray(row.secondary_muscles),
     instructions: asStringArray(row.instructions),
-    images: asStringArray(row.images),
+    gif_path: row.gif_path,
+    preview_image_path: row.preview_image_path,
     created_at: row.created_at,
     updated_at: row.updated_at,
     category_name: cat?.name ?? '',
@@ -120,7 +123,7 @@ function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
 }
 
 const EXERCISE_SELECT =
-  'id, name, category_id, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, images, created_at, updated_at, exercise_categories!inner(name)'
+  'id, name, category_id, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)'
 
 export const exerciseCatalogQueries = {
   async listCategories(supabase: SB): Promise<CatalogCategoryWithCount[]> {

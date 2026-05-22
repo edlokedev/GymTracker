@@ -66,7 +66,9 @@ export interface Exercise {
   primary_muscles: string // JSON array as string
   secondary_muscles?: string // JSON array as string
   instructions?: string // JSON array as string
-  images?: string // JSON array as string
+  images?: string // JSON array as string (legacy Free Exercise DB column; unused)
+  gif_path?: string | null // absolute jsDelivr URL for the animated GIF
+  preview_image_path?: string | null // absolute jsDelivr URL for the still preview
   created_at: Date
   updated_at: Date
 }
@@ -102,7 +104,8 @@ export interface ExerciseWithParsedFields
   primary_muscles: string[]
   secondary_muscles: string[]
   instructions: string[]
-  images: string[]
+  // Media URLs come straight from the catalog (already absolute jsDelivr URLs).
+  // `gif_path` / `preview_image_path` are inherited from Exercise.
   category_name?: string // Joined from category table
 }
 
