@@ -70,6 +70,23 @@ export const workoutDetailsQueries = {
     if (setsError) throw setsError
     const sets = (setsData ?? []) as SetRow[]
 
+    // Resolve exercise names for every exercise referenced by these sets.
+    // Without this the workout-detail modal renders every row as
+    // "Unknown Exercise" because the formatter falls back when the
+    // joined name is missing.
+    const uniqueExerciseIds = Array.from(new Set(sets.map((s) => s.exercise_id)))
+    const exerciseNameById = new Map<string, string>()
+    if (uniqueExerciseIds.length > 0) {
+      const { data: exData, error: exError } = await (supabase as any)
+        .from('exercises')
+        .select('id, name')
+        .in('id', uniqueExerciseIds)
+      if (exError) throw exError
+      for (const row of (exData ?? []) as { id: string; name: string }[]) {
+        exerciseNameById.set(row.id, row.name)
+      }
+    }
+
     const setsByWorkoutId = new Map<string, SetRow[]>()
     for (const set of sets) {
       const bucket = setsByWorkoutId.get(set.workout_id)
@@ -97,7 +114,7 @@ export const workoutDetailsQueries = {
           weight: s.weight ?? 0,
           restTime: s.rest_time ?? undefined,
           notes: s.notes ?? undefined,
-          exerciseName: undefined,
+          exerciseName: exerciseNameById.get(s.exercise_id),
         })),
         totalVolume,
         exerciseCount,
