@@ -158,36 +158,45 @@ export const exerciseCatalogQueries = {
 
   async listEquipmentTypes(supabase: SB): Promise<string[]> {
     // Pull all non-null equipment values; dedupe + sort in JS. Postgres has no
-    // first-class DISTINCT through PostgREST, and the row count is small.
-    const { data, error } = await supabase
-      .from('exercises')
-      .select('equipment')
-      .not('equipment', 'is', null)
-      .neq('equipment', '')
-
-    if (error) throw error
-    if (!data) return []
-
+    // first-class DISTINCT through PostgREST, so we paginate to bypass the
+    // default 1000-row API cap on hosted Supabase projects.
     const unique = new Set<string>()
-    for (const row of data as { equipment: string | null }[]) {
-      if (row.equipment) unique.add(row.equipment)
+    const PAGE = 1000
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('equipment')
+        .not('equipment', 'is', null)
+        .neq('equipment', '')
+        .range(from, from + PAGE - 1)
+      if (error) throw error
+      const rows = (data ?? []) as { equipment: string | null }[]
+      for (const row of rows) if (row.equipment) unique.add(row.equipment)
+      if (rows.length < PAGE) break
     }
     return Array.from(unique).sort((a, b) => a.localeCompare(b))
   },
 
   async listMuscleGroups(supabase: SB): Promise<string[]> {
     // Aggregate jsonb arrays in JS — simpler than an RPC for the first pass.
-    const { data, error } = await supabase
-      .from('exercises')
-      .select('primary_muscles, secondary_muscles')
-
-    if (error) throw error
-    if (!data) return []
-
+    // Paginated for the same reason as listEquipmentTypes (1000-row cap).
     const unique = new Set<string>()
-    for (const row of data as { primary_muscles: unknown; secondary_muscles: unknown }[]) {
-      for (const m of asStringArray(row.primary_muscles)) unique.add(m)
-      for (const m of asStringArray(row.secondary_muscles)) unique.add(m)
+    const PAGE = 1000
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('primary_muscles, secondary_muscles')
+        .range(from, from + PAGE - 1)
+      if (error) throw error
+      const rows = (data ?? []) as {
+        primary_muscles: unknown
+        secondary_muscles: unknown
+      }[]
+      for (const row of rows) {
+        for (const m of asStringArray(row.primary_muscles)) unique.add(m)
+        for (const m of asStringArray(row.secondary_muscles)) unique.add(m)
+      }
+      if (rows.length < PAGE) break
     }
     return Array.from(unique).sort((a, b) => a.localeCompare(b))
   },
@@ -251,20 +260,31 @@ export const exerciseCatalogQueries = {
 
     // Slow path: pull the filtered set (without text search) and apply
     // text/muscle substring matching in JS to replicate SQLite semantics.
-    let q = supabase.from('exercises').select(EXERCISE_SELECT)
-    if (params.category_id) q = q.eq('category_id', params.category_id)
-    if (params.equipment) q = q.eq('equipment', params.equipment)
-    if (params.level) q = q.eq('level', params.level)
-    if (params.force) q = q.eq('force', params.force)
-    if (params.muscle_group) {
-      const needle = JSON.stringify([params.muscle_group])
-      q = q.or(`primary_muscles.cs.${needle},secondary_muscles.cs.${needle}`)
+    // Paginated to bypass the 1000-row API cap when a single facet matches
+    // more than 1000 rows (e.g. equipment=body weight returns 325 rows today
+    // but could grow).
+    const buildSlowQuery = () => {
+      let q = supabase.from('exercises').select(EXERCISE_SELECT)
+      if (params.category_id) q = q.eq('category_id', params.category_id)
+      if (params.equipment) q = q.eq('equipment', params.equipment)
+      if (params.level) q = q.eq('level', params.level)
+      if (params.force) q = q.eq('force', params.force)
+      if (params.muscle_group) {
+        const needle = JSON.stringify([params.muscle_group])
+        q = q.or(`primary_muscles.cs.${needle},secondary_muscles.cs.${needle}`)
+      }
+      return q.order('name', { ascending: true })
     }
-    q = q.order('name', { ascending: true })
 
-    const { data, error } = await q
-    if (error) throw error
-    const all = ((data ?? []) as unknown as RawExerciseRow[]).map(mapExerciseRow)
+    const all: CatalogExercise[] = []
+    const PAGE = 1000
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await buildSlowQuery().range(from, from + PAGE - 1)
+      if (error) throw error
+      const rows = (data ?? []) as unknown as RawExerciseRow[]
+      all.push(...rows.map(mapExerciseRow))
+      if (rows.length < PAGE) break
+    }
 
     const queryLc = params.query?.toLowerCase()
     const primaryLc = params.primary_muscle?.toLowerCase()
