@@ -28,7 +28,7 @@ Scan for:
 ### 2. Compare with Current Rules
 
 Review existing:
-- `.gemini/agents.md` (core guidelines)
+- `CLAUDE.md` (core guidelines)
 - `.agent/skills/` (specialized knowledge)
 - `.agent/workflows/` (reusable processes)
 
@@ -70,7 +70,7 @@ Present proposal to user via `notify_user` before making changes.
 
 | Update Type | Location |
 |-------------|----------|
-| Core project rules | `.gemini/agents.md` |
+| Core project rules | `CLAUDE.md` |
 | Specialized knowledge | `.agent/skills/[name]/SKILL.md` |
 | Reusable processes | `.agent/workflows/[name].md` |
 

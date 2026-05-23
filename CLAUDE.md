@@ -1,160 +1,110 @@
-# Claude Instructions - Gymmie
+# Gymmie — Agent Instructions
 
-This repo is the Gymmie fitness tracker. Follow these rules before changing code.
+## Style
 
-## Default Style
+Caveman mode on. Always. Drop articles, filler, pleasantries, hedging. Fragments OK. Abbrev: DB/auth/config/req/res/fn/impl. Technical terms exact. Code blocks unchanged.
 
-- Be concise and technical. No filler.
-- Prefer direct implementation after reading the codebase.
-- Do not revert user changes unless explicitly asked.
-- Use small, reviewable commits/slices for migrations and refactors.
-- If a task is ambiguous, inspect repo/docs first, then ask only the blocking question.
+- Direct impl after reading codebase.
+- No reverting user changes unless asked.
+- Small reviewable commits/slices.
+- Ambiguous task → inspect repo/docs first, ask only blocking question.
 
-## Required Context Workflow
+## Context Workflow
 
 1. Read this file.
 2. Read `CONTEXT.md` for domain language.
-3. For architecture, refactor, or codebase navigation, read `graphify-out/GRAPH_REPORT.md` before broad searching.
-4. Prefer `rg` / `rg --files` for source search.
-5. Use current framework/library docs when changing library-specific code:
-   - Context7 if available.
-   - Otherwise official docs only.
+3. Architecture/refactor/nav → read `graphify-out/GRAPH_REPORT.md` before raw search.
+4. Source search: `rg` / `rg --files`.
+5. Library-specific code → Context7 first, else official docs.
 
 ## Graphify
 
-This project has a graphify knowledge graph at `graphify-out/`.
+Graph at `graphify-out/`. Read `GRAPH_REPORT.md` for god nodes before spelunking.
+If `graphify-out/wiki/index.md` exists, use it first.
+After meaningful refactors: `graphify update .`
 
-Rules:
-- Before answering architecture or codebase questions, read `graphify-out/GRAPH_REPORT.md` for god nodes and community structure.
-- If `graphify-out/wiki/index.md` exists, navigate it before raw file spelunking.
-- After meaningful code refactors, refresh graphify when practical with:
+Key hubs: workout state mutations · API error taxonomy · calendar date utils · workout CRUD clients · exercise catalog seeding · exercise library filters · progress chart state · workout aggregates · API envelope reader · calendar dashboard · workout detail modal
 
-```bash
-graphify update .
-```
+## Architecture
 
-Current graph hubs to know:
-- Workout state mutations
-- API error taxonomy
-- Calendar date utilities
-- Workout CRUD clients
-- Exercise catalog seeding
-- Exercise library filters
-- Progress chart state
-- Workout aggregates and formatting
-- API envelope reader
-- Calendar dashboard
-- Workout detail modal
+- Stack: Vite + TanStack Start/Router + React 19 + Tailwind v4 (`@tailwindcss/vite`) + Bun
+- Target: Vercel + Supabase (Postgres + Supabase Auth + RLS)
+- Exercise media: jsDelivr URLs from public dataset
+- API responses: shared envelope unless route is redirect
+- Private routes: derive authed user server-side. Never trust `userId` from query/body.
 
-## Current Architecture
-
-- App name: `Gymmie`
-- Runtime/build: Vite + TanStack Start/Router + React 19.
-- Styling: Tailwind v4 via `@tailwindcss/vite`.
-- Backend migration direction: Vercel + Supabase.
-- Auth target: Supabase Auth.
-- Database target: Supabase Postgres.
-- Exercise media target: jsDelivr URLs from the public exercise dataset.
-- API responses should use the shared API envelope unless route is a redirect.
-- Private routes must derive the authenticated user server-side; do not trust `userId` from request query/body.
-
-Important docs:
-- `CONTEXT.md`
-- `docs/supabase-vercel-migration-plan.md`
-- `docs/adr/`
-- `graphify-out/GRAPH_REPORT.md`
+Docs: `CONTEXT.md` · `docs/supabase-vercel-migration-plan.md` · `docs/adr/` · `graphify-out/GRAPH_REPORT.md`
 
 ## Source Layout
 
-- `src/app/components` - app shell UI like header/error boundary.
-- `src/components/ui` - shared UI primitives.
-- `src/features/*` - feature-first UI/model/client code.
-- `src/lib/api` - API envelopes, route helpers, error handling.
-- `src/lib/supabase` - Supabase clients, generated types, seed/data helpers.
-- `src/routes` - TanStack route files and server/API route boundaries.
-- `supabase/migrations` - Postgres schema/RLS migrations.
-- `scripts` - smoke and operational scripts.
+- `src/app/components` — app shell (header, error boundary)
+- `src/components/ui` — shared UI primitives
+- `src/features/*` — feature-first UI/model/client
+- `src/lib/api` — envelopes, route helpers, error handling
+- `src/lib/supabase` — clients, generated types, seed helpers
+- `src/routes` — TanStack route files, server/API boundaries
+- `supabase/migrations` — Postgres schema + RLS
+- `scripts` — smoke + ops scripts
 
-## Styling Rules
+## Styling
 
-Use `.agent/skills/styling/SKILL.md` when touching UI.
+Read `.agent/skills/styling/SKILL.md` before touching UI.
 
-Key rules:
-- Mobile-first. Main usage is at the gym on mobile.
-- Touch targets should be at least `44px`.
-- Prefer Tailwind utilities directly in JSX for one-off styling.
-- Extract repeated patterns only when reused at least 3 times or clearly shared.
-- Keep class strings static; avoid dynamic Tailwind class construction.
-- Keep clickable things visually and behaviorally clickable, including `cursor: pointer`.
-- Preserve the modern gradient direction unless the user asks to remove it.
-- Avoid nested cards and oversized marketing-style layouts for dashboard/tool surfaces.
+- Mobile-first. Gym use on mobile.
+- Touch targets ≥ 44px.
+- Tailwind utilities inline; extract only when reused ≥3×.
+- Static class strings only — no dynamic Tailwind construction.
+- Clickable things look + behave clickable (`cursor-pointer`).
+- Preserve gradient direction unless asked to remove.
+- No nested cards or oversized marketing layouts on dashboard surfaces.
 
-## Deployment Direction
+## Deployment
 
-The current preferred path is Vercel + Supabase, not Zo Sites.
+Target: Vercel + Supabase. Not Zo Sites.
+Zo rejected: requires SQLite→Postgres rewrite, TanStack Start removal, Hono API, auth adaptation.
 
-Reason:
-- Zo requires a larger runtime rewrite: `better-sqlite3`/SQLite runtime changes, TanStack Start removal, Hono API, auth adaptation.
-- Vercel + Supabase moves the app toward durable production architecture instead of platform-specific compromises.
-
-Migration plan summary:
-1. Vercel runtime readiness.
-2. Supabase project baseline.
-3. Postgres schema migration.
-4. RLS policy migration.
-5. Supabase auth migration.
-6. Data access migration behind existing route contracts.
-7. Exercise catalog seed and jsDelivr media URLs.
-8. Verification and cutover.
+Migration phases: runtime readiness → Supabase baseline → Postgres schema → RLS → auth → data access → exercise seed + jsDelivr → verify + cutover.
 
 ## Commands
 
-Use Bun where possible.
-
 ```bash
-bun run dev
-bun run format
-bun run lint
-bun run test
-bun run build
-bun run smoke
+bun run dev | format | lint | test | build | smoke
 ```
 
-Before final handoff after code/config changes, run:
-
+Pre-handoff after code/config changes:
 1. `bun run format`
 2. `bun run lint`
 3. Focused tests for touched behavior
 4. `bun run build`
-5. `bun run smoke` when app routing/API behavior changed
+5. `bun run smoke` if routing/API changed
 
-If a check cannot run, say why.
+Can't run a check → say why.
 
-## Git Safety
+## Git
 
-- The user may have uncommitted changes. Check `git status --short --branch` first.
-- Do not use destructive git commands unless explicitly requested.
-- Keep migration work on a separate branch from `master`.
-- Commit in coherent slices.
+- Check `git status --short --branch` first.
+- No destructive git ops without explicit request.
+- Migration work on separate branch from `master`.
+- Coherent commit slices.
 
-## Data Rules
+## Data
 
-- Do not upload local dirty SQLite DB files as production data.
-- Do not seed mock users in production.
-- Exercise catalog seed should be explicit and repeatable.
-- Exercise images/GIFs should be served from jsDelivr, not committed into the app repo.
-- Local generated DB files stay ignored.
+- No dirty SQLite DB uploads to prod.
+- No mock users in prod.
+- Exercise seed: explicit + repeatable.
+- Exercise images/GIFs from jsDelivr, not committed.
+- Local DB files stay gitignored.
 
-## API and Auth Rules
+## API + Auth
 
-- Preserve route response shapes during migration unless intentionally changing a contract.
-- Use contract tests for route/request/response behavior where possible.
-- Private workout data must be scoped by authenticated user server-side.
-- Supabase RLS is the target authorization boundary for private tables.
+- Preserve route response shapes during migration unless contract change is intentional.
+- Contract tests for route/req/res behavior.
+- Private workout data scoped by authed user server-side.
+- Supabase RLS = auth boundary for private tables.
 
-## Testing Bias
+## Testing
 
-- For data/auth/routing changes, prefer focused tests before broad refactors.
-- For UI changes, test key workflows and mobile layout.
-- Use smoke tests for route/API regressions.
-- Existing lint warnings should be reported, not hidden.
+- Data/auth/routing changes → focused tests before broad refactors.
+- UI changes → key workflows + mobile layout.
+- Smoke tests for route/API regressions.
+- Report lint warnings, don't hide.
