@@ -49,11 +49,14 @@ function mockExerciseLibraryFetch() {
       }
       if (url.startsWith('/api/exercises/search')) {
         return Response.json({
-          data: [exercise],
-          total: 1,
-          page: 1,
-          totalPages: 1,
-          hasMore: false,
+          success: true,
+          data: {
+            items: [exercise],
+            total: 1,
+            page: 1,
+            totalPages: 1,
+            hasMore: false,
+          },
         })
       }
 

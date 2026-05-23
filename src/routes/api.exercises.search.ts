@@ -1,58 +1,42 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
+import { publicMethod } from '../lib/api/define-public-route'
 import { exerciseCatalogQueries } from '../lib/supabase/queries/exercise-catalog'
-import { getSupabaseServerClient } from '../lib/supabase/server'
+
+// Public catalog route. The handler returns `{ items, total, page, totalPages,
+// hasMore }` which the envelope wraps as `data`. We renamed the inner array
+// from `data` to `items` so consumers don't end up reading `result.data.data`.
 
 export const ServerRoute = createServerFileRoute('/api/exercises/search').methods({
-  GET: async ({ request }: { request: Request }) => {
-    try {
-      const url = new URL(request.url)
-      const query = url.searchParams.get('query') || undefined
-      const category_id = url.searchParams.get('category_id') || undefined
-      const equipment = url.searchParams.get('equipment') || undefined
-      const muscle_group = url.searchParams.get('muscle_group') || undefined
-      const level = url.searchParams.get('level') || undefined
-      const limit = parseInt(url.searchParams.get('limit') || '20')
-      const offset = parseInt(url.searchParams.get('offset') || '0')
+  GET: publicMethod(async ({ supabase, url }) => {
+    const query = url.searchParams.get('query') || undefined
+    const category_id = url.searchParams.get('category_id') || undefined
+    const equipment = url.searchParams.get('equipment') || undefined
+    const muscle_group = url.searchParams.get('muscle_group') || undefined
+    const level = url.searchParams.get('level') || undefined
+    const limit = parseInt(url.searchParams.get('limit') || '20')
+    const offset = parseInt(url.searchParams.get('offset') || '0')
 
-      const searchParams = {
-        query,
-        category_id,
-        equipment,
-        muscle_group,
-        level,
-        limit,
-        offset,
-      }
+    const result = await exerciseCatalogQueries.search(supabase, {
+      query,
+      category_id,
+      equipment,
+      muscle_group,
+      level,
+      limit,
+      offset,
+    })
 
-      const { supabase } = getSupabaseServerClient(request)
-      const result = await exerciseCatalogQueries.search(supabase, searchParams)
+    const items = result.data
+    const total = result.total
+    const totalPages = limit > 0 ? Math.ceil(total / limit) : 1
+    const page = limit > 0 ? Math.floor(offset / limit) + 1 : 1
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: result.data,
-          total: result.total,
-          page: Math.floor(offset / limit) + 1,
-          totalPages: Math.ceil(result.total / limit),
-        }),
-        {
-          headers: { 'Content-Type': 'application/json' },
-        },
-      )
-    } catch (error) {
-      console.error('Exercise search error:', error)
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Failed to search exercises',
-          data: [],
-          total: 0,
-        }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      )
+    return {
+      items,
+      total,
+      page,
+      totalPages,
+      hasMore: offset + items.length < total,
     }
-  },
+  }),
 })

@@ -5,31 +5,33 @@ import { useCalendarData } from './useCalendarData'
 
 const calendarResponse: CalendarDataResponse = {
   success: true,
-  data: [
-    {
-      date: '2026-05-10',
-      hasWorkout: true,
-      workoutCount: 1,
-      totalSets: 9,
+  data: {
+    workouts: [
+      {
+        date: '2026-05-10',
+        hasWorkout: true,
+        workoutCount: 1,
+        totalSets: 9,
+        totalVolume: 3200,
+        exerciseCount: 3,
+        sessionIds: ['session-1'],
+        intensity: 'moderate',
+        duration: 45,
+      },
+    ],
+    summary: {
+      totalWorkouts: 1,
       totalVolume: 3200,
-      exerciseCount: 3,
-      sessionIds: ['session-1'],
-      intensity: 'moderate',
-      duration: 45,
+      averageWorkoutsPerWeek: 0.3,
+      longestStreak: 1,
+      currentStreak: 1,
+      lastWorkoutDate: '2026-05-10',
+      workoutsThisMonth: 1,
     },
-  ],
-  summary: {
-    totalWorkouts: 1,
-    totalVolume: 3200,
-    averageWorkoutsPerWeek: 0.3,
-    longestStreak: 1,
-    currentStreak: 1,
-    lastWorkoutDate: '2026-05-10',
-    workoutsThisMonth: 1,
-  },
-  dateRange: {
-    start: '2026-04-15T00:00:00.000Z',
-    end: '2026-05-15T23:59:59.999Z',
+    dateRange: {
+      start: '2026-04-15T00:00:00.000Z',
+      end: '2026-05-15T23:59:59.999Z',
+    },
   },
 }
 

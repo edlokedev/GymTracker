@@ -47,17 +47,12 @@ function initialFiltersFromOptions(options: UseExerciseLibraryOptions): Exercise
 
 function toSearchResultState(
   result: ExerciseSearchResult,
-  pageSize: number,
+  _pageSize: number,
 ): Pick<ExerciseLibraryState, 'currentPage' | 'totalPages' | 'hasMore'> {
-  const dataLength = result.data?.length ?? 0
-
   return {
     currentPage: result.page,
     totalPages: result.totalPages,
-    hasMore:
-      typeof result.hasMore === 'boolean'
-        ? result.hasMore
-        : result.page < result.totalPages || dataLength >= pageSize,
+    hasMore: result.hasMore,
   }
 }
 
@@ -104,7 +99,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
           limit: pageSize,
           offset,
         })
-        const nextExercises = append ? [...exercisesRef.current, ...result.data] : result.data
+        const nextExercises = append ? [...exercisesRef.current, ...result.items] : result.items
         exercisesRef.current = nextExercises
 
         setState((prev) => ({

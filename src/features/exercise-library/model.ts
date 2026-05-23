@@ -22,14 +22,16 @@ export interface ExerciseLibraryFilters {
   query: string
 }
 
+// Inner payload returned by /api/exercises/search inside the envelope's
+// `data` field. The exercise array is `items` (not `data`) so consumers
+// don't end up with `result.data.data`. `hasMore` is computed server-side
+// from offset + items.length < total, so it's always present.
 export interface ExerciseSearchResult {
-  success?: boolean
-  data: ExerciseWithParsedFields[]
+  items: ExerciseWithParsedFields[]
   total: number
   page: number
   totalPages: number
-  hasMore?: boolean
-  limit?: number
+  hasMore: boolean
 }
 
 export interface ExerciseFacetCatalog {

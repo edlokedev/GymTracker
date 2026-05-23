@@ -44,11 +44,14 @@ describe('useExerciseLibrary', () => {
         expect(url).toContain('muscle_group=chest')
         expect(url).toContain('query=bench')
         return Response.json({
-          data: [makeExercise('bench-press', 'Bench Press')],
-          total: 1,
-          page: 1,
-          totalPages: 1,
-          hasMore: false,
+          success: true,
+          data: {
+            items: [makeExercise('bench-press', 'Bench Press')],
+            total: 1,
+            page: 1,
+            totalPages: 1,
+            hasMore: false,
+          },
         })
       }
 
@@ -89,31 +92,40 @@ describe('useExerciseLibrary', () => {
 
       if (offset === '0' && query === 'bench') {
         return Response.json({
-          data: [makeExercise('bench-press', 'Bench Press')],
-          total: 2,
-          page: 1,
-          totalPages: 2,
-          hasMore: true,
+          success: true,
+          data: {
+            items: [makeExercise('bench-press', 'Bench Press')],
+            total: 2,
+            page: 1,
+            totalPages: 2,
+            hasMore: true,
+          },
         })
       }
 
       if (offset === '1' && query === 'bench') {
         return Response.json({
-          data: [makeExercise('incline-bench', 'Incline Bench Press')],
-          total: 2,
-          page: 2,
-          totalPages: 2,
-          hasMore: false,
+          success: true,
+          data: {
+            items: [makeExercise('incline-bench', 'Incline Bench Press')],
+            total: 2,
+            page: 2,
+            totalPages: 2,
+            hasMore: false,
+          },
         })
       }
 
       if (offset === '0' && !query) {
         return Response.json({
-          data: [makeExercise('squat', 'Squat')],
-          total: 1,
-          page: 1,
-          totalPages: 1,
-          hasMore: false,
+          success: true,
+          data: {
+            items: [makeExercise('squat', 'Squat')],
+            total: 1,
+            page: 1,
+            totalPages: 1,
+            hasMore: false,
+          },
         })
       }
 

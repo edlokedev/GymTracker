@@ -1,4 +1,4 @@
-import { buildSearchParams, readApiData, readApiResult } from '@/lib/api'
+import { buildSearchParams, readApiData } from '@/lib/api'
 import type {
   ExerciseCategory,
   ExerciseFacetCatalog,
@@ -44,18 +44,20 @@ export async function searchExerciseLibrary(
 ): Promise<ExerciseSearchResult> {
   const params = filtersToApiSearchParams(filters, options)
   const response = await fetch(`/api/exercises/search?${params.toString()}`)
-  const result = (await readApiResult(
+  // The envelope's `data` field carries the search payload directly. The
+  // server is now the single source of truth for `hasMore`, so no client-side
+  // fallback is needed.
+  return await readApiData<ExerciseSearchResult>(
     response,
     `Failed to search exercises: ${response.status}`,
-  )) as ExerciseSearchResult
-  const data = result.data || []
-
-  return {
-    ...result,
-    data,
-    hasMore:
-      typeof result.hasMore === 'boolean'
-        ? result.hasMore
-        : result.page < result.totalPages || data.length >= options.limit,
-  }
+    {
+      fallbackData: {
+        items: [],
+        total: 0,
+        page: 1,
+        totalPages: 1,
+        hasMore: false,
+      },
+    },
+  )
 }

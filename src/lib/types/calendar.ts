@@ -17,22 +17,32 @@ export interface CalendarDataRequest {
   includeDetails?: boolean
 }
 
-export interface CalendarDataResponse {
-  success: boolean
-  data: WorkoutCalendarData[]
-  summary: {
-    totalWorkouts: number
-    totalVolume: number // in kg
-    averageWorkoutsPerWeek: number
-    longestStreak: number
-    currentStreak: number
-    lastWorkoutDate: string | null
-    workoutsThisMonth: number
-  }
+export interface CalendarSummary {
+  totalWorkouts: number
+  totalVolume: number // in kg
+  averageWorkoutsPerWeek: number
+  longestStreak: number
+  currentStreak: number
+  lastWorkoutDate: string | null
+  workoutsThisMonth: number
+}
+
+export interface CalendarDataPayload {
+  workouts: WorkoutCalendarData[]
+  summary: CalendarSummary
   dateRange: {
     start: string
     end: string
   }
+}
+
+// Envelope shape returned by /api/calendar-data. The summary and dateRange
+// now live INSIDE `data` so the uniform success envelope can emit them; what
+// used to be the top-level `data: WorkoutCalendarData[]` array is now
+// `data.workouts`.
+export interface CalendarDataResponse {
+  success: boolean
+  data: CalendarDataPayload
   error?: string
 }
 
