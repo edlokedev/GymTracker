@@ -1,11 +1,15 @@
-import { TanstackDevtools } from '@tanstack/react-devtools'
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
+import { lazy, Suspense } from 'react'
 
 import Header from '@/app/components/Header'
 import { AuthProvider, useAuth } from '../lib/auth'
 
 import appCss from '../styles.css?url'
+
+// Devtools are dev-only. Vite replaces `import.meta.env.DEV` with a literal
+// boolean at build time, so the production bundle never references the
+// devtools chunk and tree-shakes the import expression away.
+const DevtoolsPanel = import.meta.env.DEV ? lazy(() => import('@/app/devtools')) : null
 
 export const Route = createRootRoute({
   head: () => ({
@@ -43,17 +47,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <ConditionalHeader />
           {children}
         </AuthProvider>
-        <TanstackDevtools
-          config={{
-            position: 'bottom-left',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        {DevtoolsPanel && (
+          <Suspense fallback={null}>
+            <DevtoolsPanel />
+          </Suspense>
+        )}
         <Scripts />
       </body>
     </html>
