@@ -72,7 +72,7 @@ describe('useCalendarData', () => {
       toFake: ['Date'],
       now: new Date('2026-05-15T12:00:00.000Z'),
     })
-    const fetchMock = vi.fn(async () => Response.json(calendarResponse))
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => Response.json(calendarResponse))
     vi.stubGlobal('fetch', fetchMock)
 
     const { result } = renderHook(() => useCalendarData('user-1'))

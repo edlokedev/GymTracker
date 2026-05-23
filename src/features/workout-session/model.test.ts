@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ExerciseWithParsedFields, WorkoutSet, WorkoutWithDetails } from '@/lib/types/database'
+import { makeExerciseFixture } from './__fixtures__/exercise'
 import {
   addExerciseToWorkout,
   getNextSetNumber,
@@ -47,7 +48,7 @@ describe('workout session model', () => {
       updated_at: new Date('2026-05-01T10:00:00.000Z'),
       exercises: [
         {
-          exercise: {
+          exercise: makeExerciseFixture({
             id: 'bench-press',
             name: 'Bench Press',
             primary_muscles: ['chest'],
@@ -55,7 +56,7 @@ describe('workout session model', () => {
             category_name: 'Strength',
             gif_path: null,
             preview_image_path: null,
-          },
+          }),
           sets: [makeSet('set-1', 1, 100, 5)],
         },
       ],

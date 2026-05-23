@@ -85,7 +85,8 @@ const targets: SmokeTarget[] = [
       if (body.hasMore !== true) {
         throw new Error('Expected first exercise page to have more results')
       }
-      const placeholder = body.data.find((item) => {
+      const data = body.data as unknown[]
+      const placeholder = data.find((item) => {
         assertRecord(item)
         return typeof item.name === 'string' && /^Exercise \d+/.test(item.name)
       })
@@ -220,3 +221,5 @@ if (failures > 0) {
 }
 
 console.log(`Smoke passed: ${targets.length} target(s)`)
+
+export {}

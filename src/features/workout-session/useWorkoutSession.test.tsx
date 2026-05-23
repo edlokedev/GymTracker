@@ -6,6 +6,7 @@ import type {
   WorkoutSet,
   WorkoutWithDetails,
 } from '@/lib/types/database'
+import { makeExerciseFixture } from './__fixtures__/exercise'
 import { useWorkoutSession } from './useWorkoutSession'
 
 const makeSession = (overrides: Partial<WorkoutSession> = {}): WorkoutSession => ({
@@ -50,7 +51,7 @@ const makeWorkoutDetails = (): WorkoutWithDetails => ({
   ...makeSession(),
   exercises: [
     {
-      exercise: {
+      exercise: makeExerciseFixture({
         id: 'bench-press',
         name: 'Bench Press',
         primary_muscles: ['chest'],
@@ -58,7 +59,7 @@ const makeWorkoutDetails = (): WorkoutWithDetails => ({
         category_name: 'Strength',
         gif_path: null,
         preview_image_path: null,
-      },
+      }),
       sets: [makeSet('set-1', 1)],
     },
   ],

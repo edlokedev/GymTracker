@@ -48,7 +48,7 @@ export function WorkoutDashboardOverview({
       className={className}
       userLabel={user?.name || user?.email || 'Athlete'}
       history={history}
-      timeSinceLastWorkout={timeSinceLastWorkout}
+      timeSinceLastWorkout={timeSinceLastWorkout ?? ''}
       summaryStats={summaryStats}
       isSummaryLoading={isSummaryLoading}
     />
@@ -109,7 +109,7 @@ export default function WorkoutDashboard({
             className="mb-8"
             userLabel={user?.name || user?.email || 'Athlete'}
             history={history}
-            timeSinceLastWorkout={timeSinceLastWorkout}
+            timeSinceLastWorkout={timeSinceLastWorkout ?? ''}
           />
         )}
 

@@ -53,9 +53,12 @@ export function buildWorkoutSetInput({
     return invalid('invalid-weight')
   }
 
-  const restTimeNum = values.restTime ? Number.parseInt(values.restTime, 10) : undefined
-  if (values.restTime && (Number.isNaN(restTimeNum) || restTimeNum < 0)) {
-    return invalid('invalid-rest-time')
+  let restTimeNum: number | undefined
+  if (values.restTime) {
+    restTimeNum = Number.parseInt(values.restTime, 10)
+    if (Number.isNaN(restTimeNum) || restTimeNum < 0) {
+      return invalid('invalid-rest-time')
+    }
   }
 
   return {

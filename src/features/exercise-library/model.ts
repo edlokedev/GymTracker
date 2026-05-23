@@ -9,10 +9,10 @@ export interface ExerciseCategory {
 }
 
 export interface ExerciseLibrarySearch {
-  category_id: string[]
-  equipment: string[]
-  muscle_group: string[]
-  query: string
+  category_id?: string[]
+  equipment?: string[]
+  muscle_group?: string[]
+  query?: string
 }
 
 export interface ExerciseLibraryFilters {
@@ -62,9 +62,9 @@ export function uniqueValues(values: string[]): string[] {
 
 export function filtersFromRouteSearch(search: ExerciseLibrarySearch): ExerciseLibraryFilters {
   return {
-    categoryIds: uniqueValues(search.category_id),
-    equipment: uniqueValues(search.equipment),
-    muscleGroups: uniqueValues(search.muscle_group),
+    categoryIds: uniqueValues(search.category_id ?? []),
+    equipment: uniqueValues(search.equipment ?? []),
+    muscleGroups: uniqueValues(search.muscle_group ?? []),
     query: search.query || '',
   }
 }
@@ -80,23 +80,20 @@ export function routeSearchFromFilters(filters: ExerciseLibraryFilters): Exercis
 
 export function routeSearchKey(search: ExerciseLibrarySearch): string {
   return JSON.stringify({
-    category_id: uniqueValues(search.category_id).sort(),
-    equipment: uniqueValues(search.equipment).sort(),
-    muscle_group: uniqueValues(search.muscle_group).sort(),
+    category_id: uniqueValues(search.category_id ?? []).sort(),
+    equipment: uniqueValues(search.equipment ?? []).sort(),
+    muscle_group: uniqueValues(search.muscle_group ?? []).sort(),
     query: search.query || '',
   })
 }
 
-export function routeSearchToNavigateSearch(search: ExerciseLibrarySearch): {
-  category_id?: string[]
-  equipment?: string[]
-  muscle_group?: string[]
-  query?: string
-} {
+export function routeSearchToNavigateSearch(search: ExerciseLibrarySearch): ExerciseLibrarySearch {
   return {
-    category_id: search.category_id.length > 0 ? search.category_id : undefined,
-    equipment: search.equipment.length > 0 ? search.equipment : undefined,
-    muscle_group: search.muscle_group.length > 0 ? search.muscle_group : undefined,
+    category_id:
+      search.category_id && search.category_id.length > 0 ? search.category_id : undefined,
+    equipment: search.equipment && search.equipment.length > 0 ? search.equipment : undefined,
+    muscle_group:
+      search.muscle_group && search.muscle_group.length > 0 ? search.muscle_group : undefined,
     query: search.query || undefined,
   }
 }

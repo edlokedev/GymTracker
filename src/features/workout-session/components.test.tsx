@@ -5,6 +5,7 @@ import type {
   WorkoutSession,
   WorkoutWithDetails,
 } from '@/lib/types/database'
+import { makeExerciseFixture } from './__fixtures__/exercise'
 import WorkoutSessionManager from './components/WorkoutSessionManager'
 
 const selectorExercise = vi.hoisted<() => ExerciseWithParsedFields>(() => () => ({
@@ -53,7 +54,7 @@ const makeWorkoutDetails = (): WorkoutWithDetails => ({
   ...makeSession(),
   exercises: [
     {
-      exercise: {
+      exercise: makeExerciseFixture({
         id: 'bench-press',
         name: 'Bench Press',
         primary_muscles: ['chest'],
@@ -61,7 +62,7 @@ const makeWorkoutDetails = (): WorkoutWithDetails => ({
         category_name: 'Strength',
         gif_path: null,
         preview_image_path: null,
-      },
+      }),
       sets: [
         {
           id: 'set-1',

@@ -9,7 +9,7 @@ const authState = vi.hoisted(() => ({
     name: 'Ada Lovelace',
     email: 'ada@example.com',
     image: '/ada.png',
-  },
+  } as { name: string; email: string; image: string } | null,
   signOut: vi.fn(),
 }))
 
