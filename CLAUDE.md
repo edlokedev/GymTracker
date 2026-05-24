@@ -13,15 +13,20 @@ Caveman mode on. Always. Drop articles, filler, pleasantries, hedging. Fragments
 
 1. Read this file.
 2. Read `CONTEXT.md` for domain language.
-3. Architecture/refactor/nav → read `graphify-out/GRAPH_REPORT.md` before raw search.
-4. Source search: `rg` / `rg --files`.
-5. Library-specific code → Context7 first, else official docs.
+3. Code nav/understanding → `graphify-out/wiki/index.md` first, then `graphify-out/GRAPH_REPORT.md`. Raw `rg` only when graph doesn't resolve it.
+4. Library-specific code → Context7 first, else official docs.
 
 ## Graphify
 
-Graph at `graphify-out/`. Read `GRAPH_REPORT.md` for god nodes before spelunking.
-If `graphify-out/wiki/index.md` exists, use it first.
-After meaningful refactors: `graphify update .`
+Graph at `graphify-out/`. **Always use graph before raw search.**
+- `wiki/index.md` → entry point for file/feature lookup
+- `GRAPH_REPORT.md` → god nodes, communities, coupling hotspots
+
+Run `graphify update .` after:
+- New feature added or existing feature significantly restructured
+- Route/API shape changed
+- Auth or DB layer modified
+- ≥5 files touched in one task
 
 Key hubs: workout state mutations · API error taxonomy · calendar date utils · workout CRUD clients · exercise catalog seeding · exercise library filters · progress chart state · workout aggregates · API envelope reader · calendar dashboard · workout detail modal
 
@@ -65,24 +70,32 @@ Zo rejected: requires SQLite→Postgres rewrite, TanStack Start removal, Hono AP
 
 Migration phases: runtime readiness → Supabase baseline → Postgres schema → RLS → auth → data access → exercise seed + jsDelivr → verify + cutover.
 
+## Shell — HARD RULES
+
+- **Bash tool only. `PowerShell` tool is banned. Zero exceptions.**
+- **Every command must use `rtk` prefix**: `rtk git status`, `rtk bunx tsc --noEmit`, `rtk bun run test`. Hook may auto-rewrite but explicit prefix required.
+- **No `/tmp` on Windows** — unreliable in git-bash. Use `process.stdin` piping or `$USERPROFILE/AppData/Local/Temp`.
+- **No `python3`/`python`** — not on PATH. Use `node -e` for scripting/JSON parsing.
+- **Node stdin pattern**: `cmd | node -e "const c=[]; process.stdin.on('data',d=>c.push(d)); process.stdin.on('end',()=>{ const d=JSON.parse(Buffer.concat(c).toString()); ... })"` — never pipe to a temp file at `/tmp`.
+
 ## Commands
 
 ```bash
-bun run dev | format | lint | test | build | smoke
+rtk bun run dev | format | lint | test | build | smoke
 ```
 
 Pre-handoff after code/config changes:
-1. `bun run format`
-2. `bun run lint`
+1. `rtk bun run format`
+2. `rtk bun run lint`
 3. Focused tests for touched behavior
-4. `bun run build`
-5. `bun run smoke` if routing/API changed
+4. `rtk bun run build`
+5. `rtk bun run smoke` if routing/API changed
 
 Can't run a check → say why.
 
 ## Git
 
-- Check `git status --short --branch` first.
+- Check `rtk git status --short --branch` first.
 - No destructive git ops without explicit request.
 - Migration work on separate branch from `master`.
 - Coherent commit slices.

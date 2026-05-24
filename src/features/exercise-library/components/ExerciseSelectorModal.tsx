@@ -2,6 +2,7 @@ import { ScrollArea } from '@/components/ui/ScrollArea'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
 import type { ExerciseCategory } from '../model'
+import ExerciseMediaFrame from './ExerciseMediaFrame'
 
 interface ExerciseSelectorModalProps {
   isOpen: boolean
@@ -238,8 +239,15 @@ function ExerciseSelectorListItem({
       onClick={() => onSelectExercise(exercise)}
       className="group min-h-16 w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all duration-200 hover:border-blue-300 hover:bg-gray-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600 dark:hover:bg-gray-700"
     >
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <ExerciseMediaFrame
+          exercise={exercise}
+          alt={formatExerciseName(exercise.name)}
+          frameClassName="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500"
+          imageClassName="absolute inset-0 z-10 h-full w-full object-cover"
+          iconClassName="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500"
+        />
+        <div className="min-w-0 flex-1">
           <h3 className="font-medium text-gray-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
             {formatExerciseName(exercise.name)}
           </h3>
@@ -253,7 +261,7 @@ function ExerciseSelectorListItem({
           )}
         </div>
         <svg
-          className="h-5 w-5 text-gray-400 transition-colors group-hover:text-blue-500"
+          className="h-5 w-5 flex-shrink-0 text-gray-400 transition-colors group-hover:text-blue-500"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
