@@ -134,6 +134,7 @@ export default function ExerciseBrowser({
           <main className="min-w-0 flex-1">
             <ExerciseGrid
               exercises={library.exercises}
+              total={library.total}
               isLoading={library.isLoading}
               isLoadingMore={library.isLoadingMore}
               hasMore={library.hasMore}

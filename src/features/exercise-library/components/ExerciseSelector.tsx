@@ -56,7 +56,10 @@ export default function ExerciseSelector({
         categories={library.categories}
         equipmentTypes={library.equipmentTypes}
         exercises={library.exercises}
+        total={library.total}
         isLoading={library.isLoading}
+        isLoadingMore={library.isLoadingMore}
+        hasMore={library.hasMore}
         onClose={() => setIsOpen(false)}
         onQueryChange={(query) => {
           void library.actions.setQuery(query)
@@ -72,6 +75,7 @@ export default function ExerciseSelector({
           })
         }}
         onSelectExercise={handleSelectExercise}
+        onLoadMore={() => void library.actions.loadMore()}
       />
     </div>
   )

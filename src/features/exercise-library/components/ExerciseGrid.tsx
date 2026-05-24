@@ -1,8 +1,10 @@
+import { useEffect, useRef } from 'react'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import ExerciseCard from './ExerciseCard'
 
 interface ExerciseGridProps {
   exercises: ExerciseWithParsedFields[]
+  total?: number
   isLoading: boolean
   isLoadingMore?: boolean
   hasMore?: boolean
@@ -12,12 +14,27 @@ interface ExerciseGridProps {
 
 export default function ExerciseGrid({
   exercises,
+  total,
   isLoading,
   isLoadingMore = false,
   hasMore = false,
   onSelectExercise,
   onLoadMore,
 }: ExerciseGridProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore || !onLoadMore) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) onLoadMore()
+      },
+      { threshold: 0.1 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, onLoadMore])
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -111,7 +128,9 @@ export default function ExerciseGrid({
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Exercises</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {exercises.length} exercise{exercises.length !== 1 ? 's' : ''} found
+            {total !== undefined && total !== exercises.length
+              ? `Showing ${exercises.length} of ${total} exercises`
+              : `${exercises.length} exercise${exercises.length !== 1 ? 's' : ''} found`}
           </p>
         </div>
 
@@ -136,53 +155,11 @@ export default function ExerciseGrid({
         ))}
       </div>
 
-      {/* Load More Button - Enhanced with gradient */}
-      {hasMore && onLoadMore && (
-        <div className="text-center pt-8">
-          <button
-            onClick={onLoadMore}
-            disabled={isLoadingMore}
-            className="inline-flex items-center px-8 py-4 text-sm font-semibold text-white 
-                     bg-gradient-to-r from-blue-600 to-blue-500 
-                     hover:from-blue-700 hover:to-blue-600 rounded-2xl
-                     shadow-lg hover:shadow-xl
-                     focus:outline-none focus:ring-4 focus:ring-blue-500/20
-                     transition-all duration-200 min-h-[48px]
-                     disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-blue-500"
-          >
-            {isLoadingMore ? (
-              <>
-                <svg className="w-5 h-5 mr-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  />
-                </svg>
-                Loading More...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-                Load More Exercises
-              </>
-            )}
-          </button>
+      {/* Infinite scroll sentinel */}
+      <div ref={sentinelRef} className="h-4" />
+      {isLoadingMore && (
+        <div className="flex justify-center py-6">
+          <div className="h-8 w-8 animate-spin rounded-full border-blue-600 border-b-2" />
         </div>
       )}
     </div>

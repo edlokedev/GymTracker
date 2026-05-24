@@ -34,6 +34,7 @@ interface ExerciseLibraryState {
   muscleGroups: string[]
   currentPage: number
   totalPages: number
+  total: number
   hasMore: boolean
 }
 
@@ -48,10 +49,11 @@ function initialFiltersFromOptions(options: UseExerciseLibraryOptions): Exercise
 function toSearchResultState(
   result: ExerciseSearchResult,
   _pageSize: number,
-): Pick<ExerciseLibraryState, 'currentPage' | 'totalPages' | 'hasMore'> {
+): Pick<ExerciseLibraryState, 'currentPage' | 'totalPages' | 'total' | 'hasMore'> {
   return {
     currentPage: result.page,
     totalPages: result.totalPages,
+    total: result.total,
     hasMore: result.hasMore,
   }
 }
@@ -74,6 +76,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     muscleGroups: [],
     currentPage: 1,
     totalPages: 1,
+    total: 0,
     hasMore: false,
   })
 

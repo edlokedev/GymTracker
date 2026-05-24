@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
@@ -12,12 +13,16 @@ interface ExerciseSelectorModalProps {
   categories: ExerciseCategory[]
   equipmentTypes: string[]
   exercises: ExerciseWithParsedFields[]
+  total: number
   isLoading: boolean
+  isLoadingMore: boolean
+  hasMore: boolean
   onClose: () => void
   onQueryChange: (query: string) => void
   onCategoryChange: (categoryId: string) => void
   onEquipmentChange: (equipment: string) => void
   onSelectExercise: (exercise: ExerciseWithParsedFields) => void
+  onLoadMore: () => void
 }
 
 export default function ExerciseSelectorModal({
@@ -28,12 +33,16 @@ export default function ExerciseSelectorModal({
   categories,
   equipmentTypes,
   exercises,
+  total,
   isLoading,
+  isLoadingMore,
+  hasMore,
   onClose,
   onQueryChange,
   onCategoryChange,
   onEquipmentChange,
   onSelectExercise,
+  onLoadMore,
 }: ExerciseSelectorModalProps) {
   if (!isOpen) return null
 
@@ -63,8 +72,12 @@ export default function ExerciseSelectorModal({
         />
         <ExerciseSelectorList
           exercises={exercises}
+          total={total}
           isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
+          hasMore={hasMore}
           onSelectExercise={onSelectExercise}
+          onLoadMore={onLoadMore}
         />
       </div>
     </div>
@@ -198,9 +211,37 @@ function SelectorSelect({
 
 function ExerciseSelectorList({
   exercises,
+  total,
   isLoading,
+  isLoadingMore,
+  hasMore,
   onSelectExercise,
-}: Pick<ExerciseSelectorModalProps, 'exercises' | 'isLoading' | 'onSelectExercise'>) {
+  onLoadMore,
+}: Pick<
+  ExerciseSelectorModalProps,
+  | 'exercises'
+  | 'total'
+  | 'isLoading'
+  | 'isLoadingMore'
+  | 'hasMore'
+  | 'onSelectExercise'
+  | 'onLoadMore'
+>) {
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) onLoadMore()
+      },
+      { threshold: 0.1 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, onLoadMore])
+
   return (
     <ScrollArea className="flex-1 overflow-y-auto p-4 pb-[max(env(safe-area-inset-bottom),1rem)] sm:p-6">
       {isLoading ? (
@@ -209,6 +250,11 @@ function ExerciseSelectorList({
         </div>
       ) : exercises.length > 0 ? (
         <div className="space-y-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {total > exercises.length
+              ? `Showing ${exercises.length} of ${total}`
+              : `${total} exercise${total !== 1 ? 's' : ''}`}
+          </p>
           {exercises.map((exercise) => (
             <ExerciseSelectorListItem
               key={exercise.id}
@@ -216,6 +262,12 @@ function ExerciseSelectorList({
               onSelectExercise={onSelectExercise}
             />
           ))}
+          <div ref={sentinelRef} className="h-2" />
+          {isLoadingMore && (
+            <div className="flex justify-center py-4">
+              <div className="h-6 w-6 animate-spin rounded-full border-blue-600 border-b-2" />
+            </div>
+          )}
         </div>
       ) : (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">
