@@ -1,5 +1,3 @@
-import { ScrollArea } from '@/components/ui/ScrollArea'
-
 export interface ExerciseFacetOption {
   id: string
   label: string
@@ -34,7 +32,7 @@ export default function ExerciseFacetFilter({
         )}
       </div>
 
-      <ScrollArea className="-mr-1 max-h-60 space-y-1.5 overflow-y-auto pr-1">
+      <div className="space-y-1.5">
         {options.map((option) => {
           const isSelected = selectedSet.has(option.id)
 
@@ -65,7 +63,7 @@ export default function ExerciseFacetFilter({
             </button>
           )
         })}
-      </ScrollArea>
+      </div>
     </section>
   )
 }

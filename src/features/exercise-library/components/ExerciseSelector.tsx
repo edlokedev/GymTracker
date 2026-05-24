@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { emptyExerciseLibrarySearch } from '../model'
 import { useExerciseLibrary } from '../useExerciseLibrary'
@@ -19,6 +19,8 @@ export default function ExerciseSelector({
   className = '',
 }: ExerciseSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [inputQuery, setInputQuery] = useState('')
+  const queryDebounceRef = useRef<ReturnType<typeof setTimeout>>()
   const library = useExerciseLibrary({
     initialSearch: emptyExerciseLibrarySearch,
   })
@@ -26,12 +28,26 @@ export default function ExerciseSelector({
   const selectedCategory = library.filters.categoryIds[0] || ''
   const selectedEquipment = library.filters.equipment[0] || ''
 
+  // Sync display value when filter is reset externally
+  useEffect(() => {
+    setInputQuery(library.filters.query)
+  }, [library.filters.query])
+
+  const handleQueryChange = (query: string) => {
+    setInputQuery(query)
+    clearTimeout(queryDebounceRef.current)
+    queryDebounceRef.current = setTimeout(() => {
+      void library.actions.setQuery(query)
+    }, 300)
+  }
+
   const handleSelectExercise = (exercise: ExerciseWithParsedFields) => {
     onSelectExercise(exercise)
     setIsOpen(false)
   }
 
   const clearSelection = () => {
+    clearTimeout(queryDebounceRef.current)
     onClearExercise?.()
     void library.actions.resetFilters()
   }
@@ -50,7 +66,7 @@ export default function ExerciseSelector({
 
       <ExerciseSelectorModal
         isOpen={isOpen}
-        query={library.filters.query}
+        query={inputQuery}
         selectedCategory={selectedCategory}
         selectedEquipment={selectedEquipment}
         categories={library.categories}
@@ -61,9 +77,7 @@ export default function ExerciseSelector({
         isLoadingMore={library.isLoadingMore}
         hasMore={library.hasMore}
         onClose={() => setIsOpen(false)}
-        onQueryChange={(query) => {
-          void library.actions.setQuery(query)
-        }}
+        onQueryChange={handleQueryChange}
         onCategoryChange={(categoryId) => {
           void library.actions.updateFilters({
             categoryIds: categoryId ? [categoryId] : [],

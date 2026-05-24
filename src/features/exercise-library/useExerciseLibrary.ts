@@ -183,7 +183,6 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         query: nextFilters.query,
       }
       filtersRef.current = normalizedFilters
-      exercisesRef.current = []
 
       setState((prev) => ({
         ...prev,

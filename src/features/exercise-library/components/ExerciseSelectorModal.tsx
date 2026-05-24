@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
@@ -44,6 +44,28 @@ export default function ExerciseSelectorModal({
   onSelectExercise,
   onLoadMore,
 }: ExerciseSelectorModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const [lockedHeight, setLockedHeight] = useState<number>()
+
+  // Reset the locked height each time the modal closes so a fresh open re-fits.
+  useEffect(() => {
+    if (!isOpen) setLockedHeight(undefined)
+  }, [isOpen])
+
+  // Once results first render, pin the modal's height so later searches
+  // (including empty results) never resize it while it stays open.
+  useEffect(() => {
+    if (
+      isOpen &&
+      lockedHeight === undefined &&
+      !isLoading &&
+      exercises.length > 0 &&
+      dialogRef.current
+    ) {
+      setLockedHeight(dialogRef.current.getBoundingClientRect().height)
+    }
+  }, [isOpen, isLoading, exercises.length, lockedHeight])
+
   if (!isOpen) return null
 
   return (
@@ -53,7 +75,9 @@ export default function ExerciseSelectorModal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="flex max-h-[88dvh] w-full max-w-2xl flex-col rounded-t-2xl border-gray-200 border-t bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800 sm:max-h-[85vh] sm:rounded-xl sm:border"
+        style={lockedHeight ? { height: `${lockedHeight}px` } : undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby="exercise-selector-title"
@@ -244,16 +268,20 @@ function ExerciseSelectorList({
 
   return (
     <ScrollArea className="flex-1 overflow-y-auto p-4 pb-[max(env(safe-area-inset-bottom),1rem)] sm:p-6">
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8">
+      {isLoading && exercises.length === 0 ? (
+        <div className="flex h-full min-h-[280px] items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-blue-600 border-b-2" />
         </div>
       ) : exercises.length > 0 ? (
-        <div className="space-y-3">
+        <div
+          className={`space-y-3 transition-opacity duration-150 ${isLoading ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+        >
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {total > exercises.length
-              ? `Showing ${exercises.length} of ${total}`
-              : `${total} exercise${total !== 1 ? 's' : ''}`}
+            {isLoading
+              ? 'Searching…'
+              : total > exercises.length
+                ? `Showing ${exercises.length} of ${total}`
+                : `${total} exercise${total !== 1 ? 's' : ''}`}
           </p>
           {exercises.map((exercise) => (
             <ExerciseSelectorListItem
@@ -270,7 +298,7 @@ function ExerciseSelectorList({
           )}
         </div>
       ) : (
-        <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+        <div className="flex h-full min-h-[280px] items-center justify-center text-center text-gray-500 dark:text-gray-400">
           No exercises found. Try adjusting your search criteria.
         </div>
       )}

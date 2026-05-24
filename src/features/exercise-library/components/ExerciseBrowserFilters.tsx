@@ -131,8 +131,8 @@ export function DesktopFilterSidebar({
 }) {
   return (
     <aside className="hidden md:block md:w-76 md:flex-shrink-0">
-      <div className="sticky top-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/20">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="sticky top-6 flex max-h-[calc(100vh-3rem)] flex-col rounded-lg border border-gray-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/20">
+        <div className="flex items-center justify-between border-gray-200 border-b px-4 py-3 dark:border-slate-800">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Filters</h2>
           {activeFilterCount > 0 && (
             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
@@ -140,7 +140,7 @@ export function DesktopFilterSidebar({
             </span>
           )}
         </div>
-        {children}
+        <ScrollArea className="min-h-0 flex-1 overflow-y-auto p-4">{children}</ScrollArea>
       </div>
     </aside>
   )
