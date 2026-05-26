@@ -94,12 +94,22 @@ export function MobileFilterDrawer({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={onToggle} />
-      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-2xl bg-white shadow-2xl md:hidden dark:bg-gray-800">
+      <div
+        className="fixed inset-x-3 bottom-[max(env(safe-area-inset-bottom),0.75rem)] z-50 mx-auto max-h-[calc(100dvh-5rem)] max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl md:hidden dark:bg-gray-800"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="exercise-filter-title"
+      >
         <div className="flex justify-center py-3">
           <div className="h-1 w-12 rounded-full bg-gray-300 dark:bg-gray-600" />
         </div>
-        <div className="flex items-center justify-between border-gray-200 border-b px-6 pb-4 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
+        <div className="flex items-center justify-between border-gray-200 border-b px-5 pb-4 dark:border-gray-700">
+          <h3
+            id="exercise-filter-title"
+            className="text-lg font-semibold text-gray-900 dark:text-white"
+          >
+            Filters
+          </h3>
           <button
             type="button"
             onClick={onToggle}
@@ -116,7 +126,9 @@ export function MobileFilterDrawer({
             </svg>
           </button>
         </div>
-        <ScrollArea className="max-h-[calc(85vh-100px)] overflow-y-auto p-6">{children}</ScrollArea>
+        <ScrollArea className="max-h-[calc(100dvh-12rem)] overflow-y-auto p-5">
+          {children}
+        </ScrollArea>
       </div>
     </>
   )

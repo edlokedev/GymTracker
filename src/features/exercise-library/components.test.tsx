@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import ExerciseBrowser from './components/ExerciseBrowser'
+import { MobileFilterDrawer } from './components/ExerciseBrowserFilters'
 import ExerciseSelector from './components/ExerciseSelector'
 
 const navigateMock = vi.hoisted(() => vi.fn())
@@ -136,5 +137,22 @@ describe('Exercise Library components', () => {
 
     expect(onClearExercise).toHaveBeenCalledOnce()
     expect(onSelectExercise).not.toHaveBeenCalled()
+  })
+
+  it('renders the mobile filter drawer as a dialog', () => {
+    const onToggle = vi.fn()
+
+    render(
+      <MobileFilterDrawer isOpen onToggle={onToggle}>
+        <p>Filter controls</p>
+      </MobileFilterDrawer>,
+    )
+
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    expect(screen.getByText('Filter controls')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close filters' }))
+
+    expect(onToggle).toHaveBeenCalledOnce()
   })
 })
