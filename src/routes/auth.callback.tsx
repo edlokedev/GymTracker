@@ -25,33 +25,35 @@ function sanitizeNext(raw: string | null): string {
   return raw
 }
 
-export const ServerRoute = createServerFileRoute('/auth/callback').methods({
-  GET: async ({ request }: { request: Request }) => {
-    const url = new URL(request.url)
-    const code = url.searchParams.get('code')
-    const next = sanitizeNext(url.searchParams.get('next'))
+export async function getAuthCallback({ request }: { request: Request }) {
+  const url = new URL(request.url)
+  const code = url.searchParams.get('code')
+  const next = sanitizeNext(url.searchParams.get('next'))
 
-    const { supabase, responseHeaders } = getSupabaseServerClient(request)
+  const { supabase, responseHeaders } = getSupabaseServerClient(request)
 
-    if (!code) {
-      // No code — bounce home. Could also render an error page later.
-      const headers = new Headers({ location: next })
-      mergeSetCookies(headers, responseHeaders)
-      return new Response(null, { status: 302, headers })
-    }
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (error) {
-      console.error('Supabase exchangeCodeForSession failed:', error)
-      const headers = new Headers({
-        location: `/?auth_error=${encodeURIComponent(error.message)}`,
-      })
-      mergeSetCookies(headers, responseHeaders)
-      return new Response(null, { status: 302, headers })
-    }
-
+  if (!code) {
+    // No code - bounce home. Could also render an error page later.
     const headers = new Headers({ location: next })
     mergeSetCookies(headers, responseHeaders)
     return new Response(null, { status: 302, headers })
-  },
+  }
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  if (error) {
+    console.error('Supabase exchangeCodeForSession failed:', error)
+    const headers = new Headers({
+      location: `/?auth_error=${encodeURIComponent(error.message)}`,
+    })
+    mergeSetCookies(headers, responseHeaders)
+    return new Response(null, { status: 302, headers })
+  }
+
+  const headers = new Headers({ location: next })
+  mergeSetCookies(headers, responseHeaders)
+  return new Response(null, { status: 302, headers })
+}
+
+export const ServerRoute = createServerFileRoute('/auth/callback').methods({
+  GET: getAuthCallback,
 })
