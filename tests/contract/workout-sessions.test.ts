@@ -147,6 +147,12 @@ describe('/api/workout-sessions', () => {
   })
 
   it('POST creates a session for the authenticated user', async () => {
+    expect(
+      workoutSessionsContract.methods.POST.body?.safeParse({
+        user_id: 'client-supplied-user',
+      }).success,
+    ).toBe(false)
+
     const supabase = stubSupabase(
       { workout_sessions: [], workout_sets: [] },
       { userId: fakeUser.id, parentRefs },

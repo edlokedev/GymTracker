@@ -60,14 +60,15 @@ const paginatedSessions = z.object({
   hasMore: z.boolean(),
 })
 
-const sessionInput = z.object({
-  user_id: z.string().optional(),
-  name: z.string().optional(),
-  date: z.string().optional(),
-  notes: z.string().optional(),
-  start_time: z.string().optional(),
-  end_time: z.string().optional(),
-})
+const sessionInput = z
+  .object({
+    name: z.string().optional(),
+    date: z.string().optional(),
+    notes: z.string().optional(),
+    start_time: z.string().optional(),
+    end_time: z.string().optional(),
+  })
+  .strict()
 
 const createSessionQuery = z.object({
   action: z.undefined().optional(),
