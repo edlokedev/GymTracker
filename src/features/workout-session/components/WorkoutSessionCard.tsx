@@ -28,6 +28,8 @@ export function WorkoutSessionCard({
     })
   }
 
+  const sessionLabel = session.name || 'workout'
+
   return (
     <div
       onClick={() => onClick(session)}
@@ -49,22 +51,32 @@ export function WorkoutSessionCard({
           to="/workout"
           search={{ sessionId: session.id }}
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex min-h-11 items-center rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
+          aria-label={`Edit ${sessionLabel}`}
+          title={`Edit ${sessionLabel}`}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
         >
-          Edit
+          <EditIcon className="h-5 w-5" />
+          <span className="sr-only">Edit {sessionLabel}</span>
         </Link>
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation()
             onDuplicate(session.id)
           }}
           disabled={isDuplicating}
-          className="inline-flex min-h-11 items-center rounded-lg border border-purple-200 bg-purple-50 px-3 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:opacity-50 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40"
+          aria-label={isDuplicating ? `Duplicating ${sessionLabel}` : `Duplicate ${sessionLabel}`}
+          aria-busy={isDuplicating}
+          title={isDuplicating ? `Duplicating ${sessionLabel}` : `Duplicate ${sessionLabel}`}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40"
         >
-          {isDuplicating ? 'Duplicating...' : 'Duplicate'}
+          <DuplicateIcon className={isDuplicating ? 'h-5 w-5 animate-pulse' : 'h-5 w-5'} />
+          <span className="sr-only">
+            {isDuplicating ? `Duplicating ${sessionLabel}` : `Duplicate ${sessionLabel}`}
+          </span>
         </button>
         <TrashButton
-          label={`Delete ${session.name || 'workout'}`}
+          label={`Delete ${sessionLabel}`}
           onClick={(e) => {
             e.stopPropagation()
             onDelete(session)
@@ -83,5 +95,41 @@ export function WorkoutSessionCard({
         </div>
       </div>
     </div>
+  )
+}
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
+function DuplicateIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+    >
+      <rect width="13" height="13" x="9" y="9" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
   )
 }
