@@ -202,11 +202,11 @@ function WorkoutDashboardOverviewContent({
 
   return (
     <section className={className}>
-      <div className="mb-4">
-        <h1 className="font-bold text-2xl text-gray-900 dark:text-white sm:text-3xl">
+      <div className="mb-3 sm:mb-4">
+        <h1 className="truncate font-bold text-gray-900 text-xl dark:text-white sm:text-3xl">
           Welcome back, {userLabel}!
         </h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
+        <p className="mt-1 text-gray-600 text-sm dark:text-gray-400 sm:mt-2 sm:text-base">
           {history.lastWorkoutDate ? (
             <>Last workout: {timeSinceLastWorkout}</>
           ) : (
@@ -215,20 +215,20 @@ function WorkoutDashboardOverviewContent({
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[1.15fr_1fr_1fr]">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[1.15fr_1fr_1fr]">
         {lastSession ? (
           <button
             type="button"
             onClick={repeatLastWorkout}
             disabled={Boolean(history.duplicatingId)}
-            className="motion-press flex min-h-20 cursor-pointer items-center gap-4 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-4 text-left text-white shadow-sm transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            className="motion-press col-span-2 flex min-h-14 cursor-pointer items-center gap-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-left text-white shadow-sm transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-20 sm:gap-4 sm:px-5 sm:py-4 md:col-span-1"
           >
-            <RepeatWorkoutIcon className="h-8 w-8 shrink-0 text-white" />
+            <RepeatWorkoutIcon className="h-6 w-6 shrink-0 text-white sm:h-8 sm:w-8" />
             <span className="min-w-0">
               <span className="block truncate font-semibold">
                 {history.duplicatingId ? 'Preparing workout...' : 'Repeat Last Workout'}
               </span>
-              <span className="mt-1 block truncate text-blue-100 text-sm">
+              <span className="mt-0.5 hidden truncate text-blue-100 text-sm sm:block">
                 Start from {lastSession.name || 'your previous session'}.
               </span>
             </span>
@@ -236,9 +236,9 @@ function WorkoutDashboardOverviewContent({
         ) : (
           <Link
             to="/workout"
-            className="motion-press flex min-h-20 items-center gap-4 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-4 text-left text-white shadow-sm transition-all duration-200 hover:shadow-md"
+            className="motion-press col-span-2 flex min-h-14 items-center gap-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-left text-white shadow-sm transition-all duration-200 hover:shadow-md sm:min-h-20 sm:gap-4 sm:px-5 sm:py-4 md:col-span-1"
           >
-            <LightningIcon className="h-7 w-7 shrink-0 text-white" />
+            <LightningIcon className="h-6 w-6 shrink-0 text-white sm:h-7 sm:w-7" />
             <span className="font-semibold">Start Workout</span>
           </Link>
         )}
@@ -246,23 +246,23 @@ function WorkoutDashboardOverviewContent({
         {lastSession && (
           <Link
             to="/workout"
-            className="motion-press flex min-h-20 items-center justify-center gap-3 rounded-lg border border-blue-500/60 bg-blue-50/80 px-5 py-4 font-semibold text-blue-600 shadow-sm transition-colors hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-950/35"
+            className="motion-press flex min-h-12 items-center justify-center gap-2 rounded-lg border border-blue-500/60 bg-blue-50/80 px-3 py-2 font-semibold text-blue-600 text-sm shadow-sm transition-colors hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-950/35 sm:min-h-20 sm:gap-3 sm:px-5 sm:py-4 sm:text-base"
           >
-            <LightningIcon className="h-6 w-6 shrink-0" />
+            <LightningIcon className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />
             Start Workout
           </Link>
         )}
 
         <Link
           to="/exercises"
-          className="motion-press flex min-h-20 items-center justify-center gap-3 rounded-lg border border-green-500/60 bg-green-50/80 px-5 py-4 font-semibold text-green-600 shadow-sm transition-colors hover:bg-green-100 dark:bg-green-950/20 dark:text-green-400 dark:hover:bg-green-950/35"
+          className="motion-press flex min-h-12 items-center justify-center gap-2 rounded-lg border border-green-500/60 bg-green-50/80 px-3 py-2 font-semibold text-green-600 text-sm shadow-sm transition-colors hover:bg-green-100 dark:bg-green-950/20 dark:text-green-400 dark:hover:bg-green-950/35 sm:min-h-20 sm:gap-3 sm:px-5 sm:py-4 sm:text-base"
         >
-          <DumbbellIcon className="h-6 w-6 shrink-0" />
+          <DumbbellIcon className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />
           Exercises
         </Link>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-2 grid grid-cols-4 gap-1.5 sm:mt-3 sm:gap-2">
         <DashboardStat
           icon={<BarChartIcon className="h-6 w-6" />}
           label="Workouts"
@@ -278,6 +278,7 @@ function WorkoutDashboardOverviewContent({
         <DashboardStat
           icon={<CalendarIcon className="h-6 w-6" />}
           label="This Month"
+          mobileLabel="Month"
           value={workoutsThisMonth}
           isLoading={isSummaryLoading}
         />
@@ -295,25 +296,30 @@ function WorkoutDashboardOverviewContent({
 function DashboardStat({
   icon,
   label,
+  mobileLabel,
   value,
   isLoading,
 }: {
   icon: ReactNode
   label: string
+  mobileLabel?: string
   value: string | number
   isLoading: boolean
 }) {
   return (
-    <div className="flex min-h-20 items-center gap-3 rounded-lg border border-gray-200 bg-white/80 px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/45">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950/45 dark:text-blue-400">
+    <div className="flex min-h-14 flex-col justify-center rounded-lg border border-gray-200 bg-white/80 px-2 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/45 sm:min-h-20 sm:flex-row sm:items-center sm:justify-start sm:gap-3 sm:px-3 sm:py-3">
+      <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950/45 dark:text-blue-400 sm:flex">
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="truncate text-gray-500 text-sm dark:text-gray-400">{label}</p>
+        <p className="truncate text-gray-500 text-xs dark:text-gray-400 sm:text-sm">
+          <span className="sm:hidden">{mobileLabel || label}</span>
+          <span className="hidden sm:inline">{label}</span>
+        </p>
         {isLoading ? (
-          <div className="mt-1 h-6 w-14 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="mt-1 h-5 w-10 animate-pulse rounded bg-gray-200 dark:bg-gray-700 sm:h-6 sm:w-14" />
         ) : (
-          <p className="mt-0.5 truncate font-semibold text-blue-600 text-lg dark:text-blue-400">
+          <p className="mt-0.5 truncate font-semibold text-base text-blue-600 dark:text-blue-400 sm:text-lg">
             {value}
           </p>
         )}
