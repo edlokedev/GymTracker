@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { InlineError } from '@/components/ui/InlineError'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -66,6 +66,13 @@ export default function WorkoutSessionManager({
     onConfirm: () => {},
   })
   const [showWorkoutDetails, setShowWorkoutDetails] = useState(false)
+  const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    if (session?.id) {
+      setCompletedExerciseIds(new Set())
+    }
+  }, [session?.id])
 
   const promptDeleteSession = () => {
     if (!session) return
@@ -100,9 +107,26 @@ export default function WorkoutSessionManager({
       onConfirm: async () => {
         const didRemove = await actions.removeExercise(exerciseId)
         if (didRemove) {
+          setCompletedExerciseIds((current) => {
+            const next = new Set(current)
+            next.delete(exerciseId)
+            return next
+          })
           setConfirmModal((prev) => ({ ...prev, isOpen: false }))
         }
       },
+    })
+  }
+
+  const completeExercise = (exerciseId: string) => {
+    setCompletedExerciseIds((current) => new Set(current).add(exerciseId))
+  }
+
+  const resumeExercise = (exerciseId: string) => {
+    setCompletedExerciseIds((current) => {
+      const next = new Set(current)
+      next.delete(exerciseId)
+      return next
     })
   }
 
@@ -263,10 +287,17 @@ export default function WorkoutSessionManager({
         <div className="space-y-4 sm:space-y-6">
           {exercises.map((exerciseInWorkout) => {
             const previousSet = exerciseInWorkout.sets[exerciseInWorkout.sets.length - 1]
+            const exerciseId = exerciseInWorkout.exercise.id
+            const exerciseName = formatExerciseName(exerciseInWorkout.exercise.name)
+            const isExerciseComplete = completedExerciseIds.has(exerciseId)
+            const exerciseVolume = exerciseInWorkout.sets.reduce(
+              (total, set) => total + (set.weight || 0) * (set.reps || 0),
+              0,
+            )
 
             return (
               <div
-                key={exerciseInWorkout.exercise.id}
+                key={exerciseId}
                 className="motion-enter rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6"
               >
                 <div className="mb-4 flex items-start justify-between gap-3">
@@ -275,7 +306,7 @@ export default function WorkoutSessionManager({
                       Current exercise
                     </p>
                     <h3 className="mt-1 font-bold text-gray-900 text-xl dark:text-white">
-                      {formatExerciseName(exerciseInWorkout.exercise.name)}
+                      {exerciseName}
                     </h3>
                     <p className="mt-1 text-gray-600 text-sm dark:text-gray-400">
                       {exerciseInWorkout.exercise.category_name} -{' '}
@@ -287,85 +318,130 @@ export default function WorkoutSessionManager({
                       </p>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeExercise(exerciseInWorkout.exercise.id)}
-                    className="motion-press min-h-11 rounded-lg border border-red-300 bg-red-100 px-3 py-2 font-medium text-red-700 transition-colors duration-200 hover:bg-red-200 dark:border-red-600 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                <LastSetSummary set={previousSet} />
-
-                <div className="mt-4">
-                  <SetEntry
-                    key={`new-set-${exerciseInWorkout.exercise.id}-${exerciseInWorkout.sets.length}`}
-                    exerciseId={exerciseInWorkout.exercise.id}
-                    workoutId={session?.id}
-                    setNumber={actions.getNextSetNumber(exerciseInWorkout.sets)}
-                    previousSet={previousSet}
-                    onSave={(setData) => actions.saveSet(exerciseInWorkout.exercise.id, setData)}
-                    className="border-blue-200 shadow-md dark:border-blue-800"
-                  />
-                </div>
-
-                <details className="mt-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40">
-                  <summary className="motion-press flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 font-semibold text-gray-700 text-sm dark:text-gray-200">
-                    <span>Past performance and logged sets</span>
-                    <span className="inline-flex items-center gap-2 text-gray-500 text-xs dark:text-gray-400">
-                      {exerciseInWorkout.sets.length} sets
-                      <svg
-                        className="motion-chevron h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                    {isExerciseComplete ? (
+                      <button
+                        type="button"
+                        onClick={() => resumeExercise(exerciseId)}
+                        className="motion-press min-h-11 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 font-medium text-blue-700 transition-colors duration-200 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                        aria-label={`Resume ${exerciseName}`}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </span>
-                  </summary>
-                  <div className="motion-disclosure-content space-y-4 border-gray-200 border-t p-3 dark:border-gray-700">
-                    <div>
-                      <h4 className="mb-2 px-1 font-semibold text-gray-700 text-sm dark:text-gray-300">
-                        Past Performance
-                      </h4>
-                      <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                        <ExerciseHistory exerciseId={exerciseInWorkout.exercise.id} limit={15} />
+                        Resume
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => completeExercise(exerciseId)}
+                        disabled={exerciseInWorkout.sets.length === 0}
+                        className="motion-press min-h-11 rounded-lg border border-green-300 bg-green-50 px-3 py-2 font-medium text-green-700 transition-colors duration-200 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300 dark:hover:bg-green-900/50"
+                        aria-label={`Mark ${exerciseName} done`}
+                      >
+                        Done
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeExercise(exerciseId)}
+                      className="motion-press min-h-11 rounded-lg border border-red-300 bg-red-100 px-3 py-2 font-medium text-red-700 transition-colors duration-200 hover:bg-red-200 dark:border-red-600 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                {isExerciseComplete ? (
+                  <div className="motion-enter rounded-lg border border-green-200 bg-green-50 p-3 text-green-900 dark:border-green-900/60 dark:bg-green-950/30 dark:text-green-200">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-green-700 text-xs uppercase dark:text-green-300">
+                          Exercise done
+                        </p>
+                        <p className="mt-1 text-sm text-green-800 dark:text-green-200">
+                          Ready for the next exercise.
+                        </p>
+                      </div>
+                      <div className="flex gap-4 text-right text-sm">
+                        <span>
+                          <strong>{exerciseInWorkout.sets.length}</strong> sets
+                        </span>
+                        <span>
+                          <strong>{exerciseVolume.toLocaleString()}</strong> kg
+                        </span>
                       </div>
                     </div>
-
-                    {exerciseInWorkout.sets.length > 0 && (
-                      <div>
-                        <h4 className="mb-2 px-1 font-semibold text-gray-700 text-sm dark:text-gray-300">
-                          Logged Sets
-                        </h4>
-                        <div className="space-y-3">
-                          {exerciseInWorkout.sets.map((set) => (
-                            <SetEntry
-                              key={set.id}
-                              exerciseId={exerciseInWorkout.exercise.id}
-                              workoutId={session?.id}
-                              existingSet={set}
-                              setNumber={set.set_number}
-                              onSave={(setData) =>
-                                actions.updateSet(exerciseInWorkout.exercise.id, set.id, setData)
-                              }
-                              onDelete={() =>
-                                actions.deleteSet(exerciseInWorkout.exercise.id, set.id)
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                </details>
+                ) : (
+                  <>
+                    <LastSetSummary set={previousSet} />
+
+                    <div className="mt-4">
+                      <SetEntry
+                        key={`new-set-${exerciseId}-${exerciseInWorkout.sets.length}`}
+                        exerciseId={exerciseId}
+                        workoutId={session?.id}
+                        setNumber={actions.getNextSetNumber(exerciseInWorkout.sets)}
+                        previousSet={previousSet}
+                        onSave={(setData) => actions.saveSet(exerciseId, setData)}
+                        className="border-blue-200 shadow-md dark:border-blue-800"
+                      />
+                    </div>
+
+                    <details className="mt-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40">
+                      <summary className="motion-press flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 font-semibold text-gray-700 text-sm dark:text-gray-200">
+                        <span>Past performance and logged sets</span>
+                        <span className="inline-flex items-center gap-2 text-gray-500 text-xs dark:text-gray-400">
+                          {exerciseInWorkout.sets.length} sets
+                          <svg
+                            className="motion-chevron h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </span>
+                      </summary>
+                      <div className="motion-disclosure-content space-y-4 border-gray-200 border-t p-3 dark:border-gray-700">
+                        <div>
+                          <h4 className="mb-2 px-1 font-semibold text-gray-700 text-sm dark:text-gray-300">
+                            Past Performance
+                          </h4>
+                          <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                            <ExerciseHistory exerciseId={exerciseId} limit={15} />
+                          </div>
+                        </div>
+
+                        {exerciseInWorkout.sets.length > 0 && (
+                          <div>
+                            <h4 className="mb-2 px-1 font-semibold text-gray-700 text-sm dark:text-gray-300">
+                              Logged Sets
+                            </h4>
+                            <div className="space-y-3">
+                              {exerciseInWorkout.sets.map((set) => (
+                                <SetEntry
+                                  key={set.id}
+                                  exerciseId={exerciseId}
+                                  workoutId={session?.id}
+                                  existingSet={set}
+                                  setNumber={set.set_number}
+                                  onSave={(setData) =>
+                                    actions.updateSet(exerciseId, set.id, setData)
+                                  }
+                                  onDelete={() => actions.deleteSet(exerciseId, set.id)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  </>
+                )}
               </div>
             )
           })}

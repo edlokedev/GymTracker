@@ -83,16 +83,20 @@ export function WorkoutDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm modal-container"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="modal-content flex max-h-[90dvh] max-w-2xl flex-col sm:max-h-[85dvh]"
+        className="flex max-h-[calc(100dvh_-_1.5rem_-_env(safe-area-inset-bottom))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border shadow-2xl sm:max-h-[85dvh]"
         onClick={stopModalClick}
         role="dialog"
         aria-modal="true"
         aria-labelledby="workout-detail-title"
+        style={{
+          background: 'var(--color-surface-primary)',
+          borderColor: 'var(--color-border)',
+        }}
       >
         <div className="h-1 w-full" style={{ background: 'var(--gradient-primary)' }} />
 
@@ -283,40 +287,39 @@ export function WorkoutDetailModal({
           )}
         </ScrollArea>
 
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-3 border-t border-gray-200/70 bg-white/80 p-4 backdrop-blur dark:border-gray-700/70 dark:bg-gray-900/80 sm:p-6">
+        <div className="flex flex-shrink-0 flex-col gap-3 border-t border-gray-200/70 bg-white/80 p-4 pb-[max(env(safe-area-inset-bottom),1rem)] backdrop-blur dark:border-gray-700/70 dark:bg-gray-900/80 sm:flex-row sm:items-center sm:p-6">
           <InlineError message={detail.duplicateError} />
 
           {workout && (
-            <>
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:items-center">
               <button
                 type="button"
                 onClick={handleDuplicate}
                 disabled={detail.isDuplicating || detail.isDeleting}
-                className="cursor-pointer rounded-md border border-purple-200 bg-purple-50 px-4 py-2 font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40"
+                className="min-h-11 min-w-0 cursor-pointer rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-center font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40 sm:px-4"
               >
                 {detail.isDuplicating ? 'Duplicating...' : 'Duplicate'}
               </button>
-              <div className="ml-auto flex items-center gap-3">
-                <Link
-                  to="/workout"
-                  search={{ sessionId: workout.id }}
-                  onClick={(event) => {
-                    if (detail.isDeleting) {
-                      event.preventDefault()
-                    }
-                  }}
-                  className="cursor-pointer rounded-md border border-blue-200 bg-blue-50 px-4 py-2 font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
-                >
-                  Edit Workout
-                </Link>
-                <TrashButton
-                  onClick={handleDelete}
-                  disabled={detail.isDeleting || detail.isDuplicating}
-                  aria-busy={detail.isDeleting}
-                  label="Delete workout"
-                />
-              </div>
-            </>
+              <Link
+                to="/workout"
+                search={{ sessionId: workout.id }}
+                onClick={(event) => {
+                  if (detail.isDeleting) {
+                    event.preventDefault()
+                  }
+                }}
+                className="flex min-h-11 min-w-0 cursor-pointer items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-center font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40 sm:px-4"
+              >
+                Edit Workout
+              </Link>
+              <TrashButton
+                onClick={handleDelete}
+                disabled={detail.isDeleting || detail.isDuplicating}
+                aria-busy={detail.isDeleting}
+                label="Delete workout"
+                className="justify-self-end"
+              />
+            </div>
           )}
         </div>
 

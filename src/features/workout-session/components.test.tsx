@@ -130,6 +130,28 @@ describe('WorkoutSessionManager', () => {
     expect(screen.getByText('8')).toBeInTheDocument()
   })
 
+  it('lets a logged exercise be marked done and resumed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
+    )
+
+    render(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() => expect(screen.getByText('Bench Press')).toBeInTheDocument())
+    expect(screen.getByText('Set 2')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Bench Press done' }))
+
+    expect(screen.getByText('Exercise done')).toBeInTheDocument()
+    expect(screen.getByText('Ready for the next exercise.')).toBeInTheDocument()
+    expect(screen.queryByText('Set 2')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Bench Press' }))
+
+    expect(screen.getByText('Set 2')).toBeInTheDocument()
+  })
+
   it('confirms exercise removal before calling the remove action', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
