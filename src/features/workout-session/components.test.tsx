@@ -171,7 +171,7 @@ describe('WorkoutSessionManager', () => {
     render(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() => expect(screen.getByText('Bench Press')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Bench Press' }))
     await waitFor(() => expect(screen.getByText(/remove "Bench Press"/i)).toBeInTheDocument())
     const removeButtons = screen.getAllByRole('button', { name: 'Remove' })
     const confirmRemoveButton = removeButtons[removeButtons.length - 1]

@@ -318,35 +318,11 @@ export default function WorkoutSessionManager({
                       </p>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-                    {isExerciseComplete ? (
-                      <button
-                        type="button"
-                        onClick={() => resumeExercise(exerciseId)}
-                        className="motion-press min-h-11 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 font-medium text-blue-700 transition-colors duration-200 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
-                        aria-label={`Resume ${exerciseName}`}
-                      >
-                        Resume
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => completeExercise(exerciseId)}
-                        disabled={exerciseInWorkout.sets.length === 0}
-                        className="motion-press min-h-11 rounded-lg border border-green-300 bg-green-50 px-3 py-2 font-medium text-green-700 transition-colors duration-200 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300 dark:hover:bg-green-900/50"
-                        aria-label={`Mark ${exerciseName} done`}
-                      >
-                        Done
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeExercise(exerciseId)}
-                      className="motion-press min-h-11 rounded-lg border border-red-300 bg-red-100 px-3 py-2 font-medium text-red-700 transition-colors duration-200 hover:bg-red-200 dark:border-red-600 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-                    >
-                      Remove
-                    </button>
-                  </div>
+                  <TrashButton
+                    label={`Remove ${exerciseName}`}
+                    onClick={() => removeExercise(exerciseId)}
+                    className="shrink-0"
+                  />
                 </div>
 
                 {isExerciseComplete ? (
@@ -369,6 +345,14 @@ export default function WorkoutSessionManager({
                         </span>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => resumeExercise(exerciseId)}
+                      className="motion-press mt-3 min-h-11 w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 font-medium text-blue-700 transition-colors duration-200 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                      aria-label={`Resume ${exerciseName}`}
+                    >
+                      Resume Exercise
+                    </button>
                   </div>
                 ) : (
                   <>
@@ -385,6 +369,16 @@ export default function WorkoutSessionManager({
                         className="border-blue-200 shadow-md dark:border-blue-800"
                       />
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => completeExercise(exerciseId)}
+                      disabled={exerciseInWorkout.sets.length === 0}
+                      className="motion-press mt-3 min-h-12 w-full rounded-lg border border-green-300 bg-green-50 px-4 py-3 font-semibold text-green-700 transition-colors duration-200 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300 dark:hover:bg-green-900/50"
+                      aria-label={`Mark ${exerciseName} done`}
+                    >
+                      Done with Exercise
+                    </button>
 
                     <details className="mt-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40">
                       <summary className="motion-press flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 font-semibold text-gray-700 text-sm dark:text-gray-200">

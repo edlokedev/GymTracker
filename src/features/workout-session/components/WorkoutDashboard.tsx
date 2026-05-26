@@ -79,7 +79,7 @@ export default function WorkoutDashboard({
       <div
         className={`${showOverview ? 'min-h-screen bg-gray-50 dark:bg-gray-900' : ''} ${className}`}
       >
-        <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className={showOverview ? 'mx-auto max-w-7xl px-4 py-8' : 'mx-auto max-w-7xl p-0'}>
           <div className="animate-pulse">
             {showOverview && (
               <>
@@ -103,7 +103,7 @@ export default function WorkoutDashboard({
     <div
       className={`${showOverview ? 'min-h-screen bg-gray-50 dark:bg-gray-900' : ''} ${className}`}
     >
-      <div className="mx-auto max-w-7xl px-4 py-8">
+      <div className={showOverview ? 'mx-auto max-w-7xl px-4 py-8' : 'mx-auto max-w-7xl p-0'}>
         {showOverview && (
           <WorkoutDashboardOverviewContent
             className="mb-8"
