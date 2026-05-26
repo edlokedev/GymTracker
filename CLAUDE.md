@@ -20,7 +20,7 @@ Caveman mode on. Always. Drop articles, filler, pleasantries, hedging. Fragments
 ## Graphify
 
 Graph at `graphify-out/`. **Always use graph before raw search.**
-- `wiki/index.md` → entry point for file/feature lookup
+- `wiki/index.md` → entry point for file/feature lookup (use this, not `ls src/features/`)
 - `GRAPH_REPORT.md` → god nodes, communities, coupling hotspots
 
 Run `graphify update .` after:
@@ -75,7 +75,8 @@ Migration phases: runtime readiness → Supabase baseline → Postgres schema �
 
 - **Bash tool only. `PowerShell` tool is BANNED (hook blocks it).**
 - **Every command must use `rtk` prefix** — a hook now enforces this: `rtk git status`, `rtk bun run test`, `rtk bunx tsc --noEmit`. Unprefixed `git`/`bun run`/`bunx` = blocked.
-- Exceptions (no rtk needed): `bun install`, `bun add`, `bun remove`, `bun --version`.
+- Exceptions (no rtk needed): `bun install`, `bun add`, `bun remove`, `bun --version`, `bun run test`, `bunx tsc`.
+- `SERVER_PRESET=vercel bun run build` — env-var prefix bypasses hook; both bare and `rtk`-prefixed forms work.
 - If `rtk: command not found` → `export PATH="$USERPROFILE/bin:$PATH"` then retry.
 - **No `/tmp` on Windows** — use `process.stdin` piping or `$USERPROFILE/AppData/Local/Temp`.
 - **No `python3`/`python`** — use `node -e` instead.
@@ -91,9 +92,10 @@ rtk bun run dev | format | lint | test | build | smoke
 Pre-handoff after code/config changes:
 1. `rtk bun run format` — then `rtk git diff --name-only` and revert churn: `rtk git checkout -- <unrelated-files>`
 2. `rtk bun run lint`
-3. Focused tests for touched behavior
-4. `SERVER_PRESET=vercel rtk bun run build`
-5. `rtk bun run smoke` if routing/API changed
+3. Focused tests for touched behavior: `bun run test src/features/<feature>/` or `bunx vitest run <file>`
+4. `rm -rf .vercel/output 2>/dev/null; true` — clear stale Vercel build artifacts
+5. `SERVER_PRESET=vercel rtk bun run build`
+6. `rtk bun run smoke` if routing/API changed
 
 Can't run a check → say why.
 
