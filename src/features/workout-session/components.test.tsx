@@ -91,7 +91,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeSession() })),
     )
 
-    render(<WorkoutSessionManager userId="user-1" />)
+    render(<WorkoutSessionManager />)
 
     expect(screen.getByText('New Workout')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Start Workout' }))
@@ -108,7 +108,7 @@ describe('WorkoutSessionManager', () => {
       ),
     )
 
-    render(<WorkoutSessionManager userId="user-1" />)
+    render(<WorkoutSessionManager />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Start Workout' }))
 
@@ -123,7 +123,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    render(<WorkoutSessionManager userId="user-1" existingSession={makeSession()} />)
+    render(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() => expect(screen.getByText('Bench Press')).toBeInTheDocument())
     expect(screen.getByText('Set 1')).toBeInTheDocument()
@@ -146,7 +146,7 @@ describe('WorkoutSessionManager', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<WorkoutSessionManager userId="user-1" existingSession={makeSession()} />)
+    render(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() => expect(screen.getByText('Bench Press')).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
@@ -186,11 +186,7 @@ describe('WorkoutSessionManager', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     render(
-      <WorkoutSessionManager
-        userId="user-1"
-        existingSession={makeSession()}
-        onSessionDelete={onSessionDelete}
-      />,
+      <WorkoutSessionManager existingSession={makeSession()} onSessionDelete={onSessionDelete} />,
     )
 
     await waitFor(() => expect(screen.getByText('Active Workout')).toBeInTheDocument())

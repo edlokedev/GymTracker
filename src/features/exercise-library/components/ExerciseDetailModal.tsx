@@ -203,7 +203,7 @@ export default function ExerciseDetailModal({
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                     Progression History
                   </h3>
-                  <ExerciseHistory userId={user.id} exerciseId={exercise.id} />
+                  <ExerciseHistory exerciseId={exercise.id} />
                 </div>
               )}
             </div>

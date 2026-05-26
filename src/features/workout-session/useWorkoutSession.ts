@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   ExerciseWithParsedFields,
   WorkoutSession,
-  WorkoutSessionInput,
   WorkoutSet,
   WorkoutSetInput,
 } from '@/lib/types/database'
@@ -16,6 +15,7 @@ import {
   removeExerciseSets,
   updateWorkoutSession,
   updateWorkoutSet,
+  type WorkoutSessionWriteInput,
 } from './client'
 import {
   addExerciseToWorkout,
@@ -35,7 +35,6 @@ import {
 type WorkoutCommandStatus = 'idle' | 'running' | 'success' | 'error'
 
 interface UseWorkoutSessionOptions {
-  userId: string
   existingSession?: WorkoutSession
   onSessionSave?: (session: WorkoutSession) => void
   onSessionComplete?: (session: WorkoutSession) => void
@@ -55,7 +54,6 @@ function commandErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function useWorkoutSession({
-  userId,
   existingSession,
   onSessionSave,
   onSessionComplete,
@@ -147,7 +145,7 @@ export function useWorkoutSession({
 
     setSession({
       id: existingSessionId,
-      user_id: existingSessionUserId || userId,
+      user_id: existingSessionUserId || '',
       name: existingSessionName,
       date: existingSessionDate || todayString(),
       notes: existingSessionNotes,
@@ -164,14 +162,13 @@ export function useWorkoutSession({
   }, [
     existingSessionDate,
     existingSessionEndTime,
-    existingSessionId,
     existingSessionName,
     existingSessionNotes,
     existingSessionStartTime,
+    existingSessionId,
     existingSessionUserId,
     loadSessionData,
     resetSession,
-    userId,
   ])
 
   const startSession = useCallback(async () => {
@@ -179,8 +176,7 @@ export function useWorkoutSession({
       setLoading(true)
       beginCommand()
 
-      const sessionData: WorkoutSessionInput = {
-        user_id: userId,
+      const sessionData: WorkoutSessionWriteInput = {
         name: sessionName.trim() || undefined,
         date: sessionDate,
         notes: sessionNotes.trim() || undefined,
@@ -206,7 +202,6 @@ export function useWorkoutSession({
     sessionName,
     sessionNotes,
     sessionStartTime,
-    userId,
   ])
 
   const saveSession = useCallback(async () => {

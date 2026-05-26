@@ -7,13 +7,17 @@ import type {
   WorkoutWithDetails,
 } from '@/lib/types/database'
 
+export type WorkoutSessionWriteInput = Omit<WorkoutSessionInput, 'user_id'>
+
 export async function loadWorkoutSessionDetails(sessionId: string): Promise<WorkoutWithDetails> {
   const params = buildSearchParams({ id: sessionId, includeDetails: true })
   const response = await fetch(`/api/workout-sessions?${params.toString()}`)
   return readApiData(response, `Failed to load session data: ${response.status}`)
 }
 
-export async function createWorkoutSession(data: WorkoutSessionInput): Promise<WorkoutSession> {
+export async function createWorkoutSession(
+  data: WorkoutSessionWriteInput,
+): Promise<WorkoutSession> {
   const response = await fetch('/api/workout-sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -25,7 +29,7 @@ export async function createWorkoutSession(data: WorkoutSessionInput): Promise<W
 
 export async function updateWorkoutSession(
   id: string,
-  data: Partial<WorkoutSessionInput>,
+  data: Partial<WorkoutSessionWriteInput>,
 ): Promise<WorkoutSession> {
   const response = await fetch(`/api/workout-sessions?id=${id}`, {
     method: 'PATCH',

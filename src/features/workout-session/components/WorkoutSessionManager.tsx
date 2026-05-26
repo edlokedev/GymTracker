@@ -11,7 +11,6 @@ import { useWorkoutSession } from '../useWorkoutSession'
 import SetEntry from './SetEntry'
 
 interface WorkoutSessionManagerProps {
-  userId: string
   existingSession?: WorkoutSession
   onSessionSave?: (session: WorkoutSession) => void
   onSessionComplete?: (session: WorkoutSession) => void
@@ -20,7 +19,6 @@ interface WorkoutSessionManagerProps {
 }
 
 export default function WorkoutSessionManager({
-  userId,
   existingSession,
   onSessionSave,
   onSessionComplete,
@@ -28,7 +26,6 @@ export default function WorkoutSessionManager({
   className = '',
 }: WorkoutSessionManagerProps) {
   const workout = useWorkoutSession({
-    userId,
     existingSession,
     onSessionSave,
     onSessionComplete,
@@ -339,11 +336,7 @@ export default function WorkoutSessionManager({
                         Past Performance
                       </h4>
                       <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                        <ExerciseHistory
-                          userId={userId}
-                          exerciseId={exerciseInWorkout.exercise.id}
-                          limit={15}
-                        />
+                        <ExerciseHistory exerciseId={exerciseInWorkout.exercise.id} limit={15} />
                       </div>
                     </div>
 

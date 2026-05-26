@@ -324,6 +324,35 @@ describe('/api/workout-sets', () => {
     expect(parsed.reps).toBe(7)
   })
 
+  it('PUT returns 400 when id is missing', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSetsContract,
+      method: 'PUT',
+      handler: updateWorkoutSet,
+      user: fakeUser,
+      supabase,
+      body: { reps: 7 },
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Set ID is required')
+  })
+
+  it('PUT ?id=missing returns 404', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSetsContract,
+      method: 'PUT',
+      handler: updateWorkoutSet,
+      user: fakeUser,
+      supabase,
+      query: { id: 'set-missing' },
+      body: { reps: 7 },
+    })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Workout set not found')
+  })
+
   it('DELETE ?id=… returns {}', async () => {
     const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
     const res = await runRoute({
@@ -351,5 +380,32 @@ describe('/api/workout-sets', () => {
     expect(res.status).toBe(200)
     const parsed = workoutSetsContract.methods.DELETE.response.parse(res.body.data)
     expect(parsed).toEqual({ deleted: 1 })
+  })
+
+  it('DELETE returns 400 when no selector is provided', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSetsContract,
+      method: 'DELETE',
+      handler: deleteWorkoutSet,
+      user: fakeUser,
+      supabase,
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Set ID (or workoutId+exerciseId) is required')
+  })
+
+  it('DELETE ?id=missing returns 404', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSetsContract,
+      method: 'DELETE',
+      handler: deleteWorkoutSet,
+      user: fakeUser,
+      supabase,
+      query: { id: 'set-missing' },
+    })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Workout set not found')
   })
 })

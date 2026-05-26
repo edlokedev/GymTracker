@@ -283,6 +283,20 @@ describe('/api/workout-sessions', () => {
     expect(res.status).toBe(404)
   })
 
+  it('POST returns 400 for unsupported actions', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'POST',
+      handler: createWorkoutSession,
+      user: fakeUser,
+      supabase,
+      query: { action: 'archive' },
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Unsupported workout session action')
+  })
+
   it('PATCH ?id=… without action updates the session', async () => {
     const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
     const res = await runRoute({
@@ -312,6 +326,51 @@ describe('/api/workout-sessions', () => {
     expect(res.status).toBe(400)
   })
 
+  it('PATCH ?id=...&action=complete stamps end_time', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date'],
+      now: new Date('2026-05-26T12:00:00.000Z'),
+    })
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'PATCH',
+      handler: patchWorkoutSession,
+      user: fakeUser,
+      supabase,
+      query: { id: 'sess-1', action: 'complete' },
+    })
+    expect(res.status).toBe(200)
+    const parsed = workoutSession.parse(res.body.data)
+    expect(parsed.end_time).toBe('2026-05-26T12:00:00.000Z')
+  })
+
+  it('PATCH ?id=...&action=complete returns 404 when already completed', async () => {
+    const base = fixtures()
+    const supabase = stubSupabase(
+      {
+        ...base,
+        workout_sessions: [
+          {
+            ...base.workout_sessions[0],
+            end_time: '2026-05-20T11:00:00Z',
+          },
+        ],
+      },
+      { userId: fakeUser.id, parentRefs },
+    )
+    const res = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'PATCH',
+      handler: patchWorkoutSession,
+      user: fakeUser,
+      supabase,
+      query: { id: 'sess-1', action: 'complete' },
+    })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Session not found or already completed')
+  })
+
   it('DELETE ?id=… returns {}', async () => {
     const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
     const res = await runRoute({
@@ -337,5 +396,18 @@ describe('/api/workout-sessions', () => {
       query: { id: 'sess-missing' },
     })
     expect(res.status).toBe(404)
+  })
+
+  it('DELETE returns 400 when id is missing', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'DELETE',
+      handler: deleteWorkoutSession,
+      user: fakeUser,
+      supabase,
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Session ID is required')
   })
 })

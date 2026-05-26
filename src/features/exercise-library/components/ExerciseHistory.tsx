@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 
 export interface ExerciseHistoryProps {
-  userId: string
   exerciseId: string
   limit?: number
 }
@@ -14,7 +13,7 @@ interface HistoricalSet {
   session_name: string | null
 }
 
-export function ExerciseHistory({ userId, exerciseId, limit = 50 }: ExerciseHistoryProps) {
+export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps) {
   const [history, setHistory] = useState<HistoricalSet[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -40,14 +39,14 @@ export function ExerciseHistory({ userId, exerciseId, limit = 50 }: ExerciseHist
       }
     }
 
-    if (userId && exerciseId) {
+    if (exerciseId) {
       load()
     }
 
     return () => {
       active = false
     }
-  }, [userId, exerciseId, limit])
+  }, [exerciseId, limit])
 
   if (loading) {
     return (
@@ -108,7 +107,7 @@ export function ExerciseHistory({ userId, exerciseId, limit = 50 }: ExerciseHist
               >
                 <span className="text-gray-500 dark:text-gray-400">Set {idx + 1}</span>
                 <span className="text-gray-900 dark:text-gray-200">
-                  {s.weight}kg × {s.reps}
+                  {s.weight}kg x {s.reps}
                 </span>
               </div>
             ))}

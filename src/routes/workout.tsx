@@ -73,8 +73,6 @@ function WorkoutPage() {
     )
   }
 
-  const userId = user.id
-
   const handleSessionSave = (session: WorkoutSession) => {
     setCurrentSession(session)
     console.log('Session saved:', session)
@@ -101,7 +99,6 @@ function WorkoutPage() {
         </div>
 
         <WorkoutSessionManager
-          userId={userId}
           existingSession={currentSession || undefined}
           onSessionSave={handleSessionSave}
           onSessionComplete={handleSessionComplete}

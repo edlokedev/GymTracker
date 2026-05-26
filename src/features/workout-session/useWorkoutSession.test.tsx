@@ -76,9 +76,7 @@ describe('useWorkoutSession', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    const { result } = renderHook(() =>
-      useWorkoutSession({ userId: 'user-1', existingSession: makeSession() }),
-    )
+    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }))
 
     await waitFor(() => expect(result.current.exercises).toHaveLength(1))
 
@@ -94,7 +92,7 @@ describe('useWorkoutSession', () => {
     const fetchMock = vi.fn(async () => Response.json({ success: true, data: makeSession() }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useWorkoutSession({ userId: 'user-1', onSessionSave }))
+    const { result } = renderHook(() => useWorkoutSession({ onSessionSave }))
 
     await act(async () => {
       result.current.setSessionName('Push Day')
@@ -105,6 +103,8 @@ describe('useWorkoutSession', () => {
       '/api/workout-sessions',
       expect.objectContaining({ method: 'POST' }),
     )
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('user_id')
     expect(result.current.session?.id).toBe('session-1')
     expect(result.current.commandStatus).toBe('success')
     expect(result.current.commandError).toBeNull()
@@ -119,7 +119,7 @@ describe('useWorkoutSession', () => {
     vi.stubGlobal('alert', alertMock)
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useWorkoutSession({ userId: 'user-1' }))
+    const { result } = renderHook(() => useWorkoutSession({}))
 
     await act(async () => {
       await result.current.actions.startSession()
@@ -156,7 +156,6 @@ describe('useWorkoutSession', () => {
 
     const { result } = renderHook(() =>
       useWorkoutSession({
-        userId: 'user-1',
         existingSession: makeSession(),
         onSessionSave,
       }),
@@ -207,9 +206,7 @@ describe('useWorkoutSession', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useWorkoutSession({ userId: 'user-1', existingSession: makeSession() }),
-    )
+    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -287,7 +284,6 @@ describe('useWorkoutSession', () => {
 
     const { result } = renderHook(() =>
       useWorkoutSession({
-        userId: 'user-1',
         existingSession: makeSession(),
         onSessionComplete,
         onSessionDelete,

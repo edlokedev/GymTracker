@@ -51,14 +51,22 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     mountedRef.current = true
-    const supabase = getSupabaseBrowserClient()
+    let unsubscribe: (() => void) | undefined
 
     // Hydrate from any persisted session in the browser cookies/local storage.
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
+    getSupabaseBrowserClient()
+      .then(async (supabase) => {
+        const { data } = await supabase.auth.getSession()
         if (!mountedRef.current) return
         setSession(data.session ?? null)
+
+        // Keep state in sync with login/logout/refresh events.
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+          if (!mountedRef.current) return
+          setSession(next)
+          setIsLoading(false)
+        })
+        unsubscribe = () => sub.subscription.unsubscribe()
       })
       .catch((error) => {
         console.error('Supabase getSession failed:', error)
@@ -68,21 +76,14 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setIsLoading(false)
       })
 
-    // Keep state in sync with login/logout/refresh events.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      if (!mountedRef.current) return
-      setSession(next)
-      setIsLoading(false)
-    })
-
     return () => {
       mountedRef.current = false
-      sub.subscription.unsubscribe()
+      unsubscribe?.()
     }
   }, [])
 
   const signInWithGoogle = useCallback(async () => {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = await getSupabaseBrowserClient()
     const redirectTo = `${resolveSiteUrl()}/auth/callback`
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -107,7 +108,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   )
 
   const signOut = useCallback(async () => {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = await getSupabaseBrowserClient()
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
