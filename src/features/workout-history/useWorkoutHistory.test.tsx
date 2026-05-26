@@ -24,7 +24,7 @@ describe('useWorkoutHistory', () => {
       const url = new URL(String(input), 'http://localhost')
 
       expect(url.pathname).toBe('/api/workout-sessions')
-      expect(url.searchParams.get('userId')).toBe('user-1')
+      expect(url.searchParams.has('userId')).toBe(false)
       expect(url.searchParams.get('limit')).toBe('1')
 
       if (url.searchParams.get('offset') === '0') {
@@ -104,7 +104,7 @@ describe('useWorkoutHistory', () => {
       }
 
       if (url.pathname === '/api/workout-details') {
-        expect(url.searchParams.get('userId')).toBe('user-1')
+        expect(url.searchParams.has('userId')).toBe(false)
         expect(url.searchParams.get('date')).toBe('2026-05-10')
         return Response.json({
           success: true,

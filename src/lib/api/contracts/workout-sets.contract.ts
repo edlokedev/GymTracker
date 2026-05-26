@@ -27,13 +27,28 @@ const workoutSetInput = z.object({
   notes: z.string().optional(),
 })
 
+const workoutSetHistoryItem = z.object({
+  id: z.string(),
+  reps: z.number(),
+  weight: z.number(),
+  session_date: z.string(),
+  session_name: z.string().nullable(),
+})
+
 export const workoutSetsContract = defineContract({
   path: '/api/workout-sets',
   methods: {
     GET: {
-      query: z.object({ id: z.string().optional(), workoutId: z.string().optional() }),
+      query: z.object({
+        id: z.string().optional(),
+        workoutId: z.string().optional(),
+        action: z.literal('history').optional(),
+        exerciseId: z.string().optional(),
+        limit: z.string().optional(),
+      }),
       // GET ?id=… returns one set; GET ?workoutId=… returns a list.
-      response: z.union([workoutSet, z.array(workoutSet)]),
+      // GET ?action=history&exerciseId=... returns ExerciseHistory rows.
+      response: z.union([workoutSet, z.array(workoutSet), z.array(workoutSetHistoryItem)]),
     },
     POST: {
       body: workoutSetInput,
@@ -58,4 +73,4 @@ export const workoutSetsContract = defineContract({
   },
 })
 
-export { workoutSet }
+export { workoutSet, workoutSetHistoryItem }

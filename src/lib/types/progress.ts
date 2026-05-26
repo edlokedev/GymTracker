@@ -59,7 +59,6 @@ export interface ProgressState {
 
 // API Request/Response Types
 export interface ProgressRequest {
-  userId: string
   exerciseIds?: string[]
   startDate: string
   endDate: string

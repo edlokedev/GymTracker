@@ -81,7 +81,7 @@ describe('useCalendarData', () => {
 
     const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost')
     expect(url.pathname).toBe('/api/calendar-data')
-    expect(url.searchParams.get('userId')).toBe('user-1')
+    expect(url.searchParams.has('userId')).toBe(false)
     expect(url.searchParams.get('start')).toBeTruthy()
     expect(url.searchParams.get('end')).toBeTruthy()
     expect(result.current.state.workoutData).toHaveLength(1)
@@ -117,7 +117,7 @@ describe('useCalendarData', () => {
 
     const detailsUrl = new URL(String(fetchMock.mock.calls[1][0]), 'http://localhost')
     expect(detailsUrl.pathname).toBe('/api/workout-details')
-    expect(detailsUrl.searchParams.get('userId')).toBe('user-1')
+    expect(detailsUrl.searchParams.has('userId')).toBe(false)
     expect(detailsUrl.searchParams.get('date')).toBe('2026-05-10')
     expect(result.current.state.isModalOpen).toBe(true)
   })

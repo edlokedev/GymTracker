@@ -10,13 +10,26 @@ import type { User } from '@supabase/supabase-js'
 import { makePrivateMethod } from '../../src/lib/api/define-private-route'
 import { makePublicMethod } from '../../src/lib/api/define-public-route'
 
+type RunRouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+type ContractResponseSchema = { parse: (input: unknown) => unknown }
+
+interface RunRouteContract {
+  path: string
+  methods: Partial<
+    Record<
+      RunRouteMethod,
+      {
+        response: ContractResponseSchema
+      }
+    >
+  >
+}
+
 export interface RunRouteOptions {
-  // The contract is accepted to bind the test to a specific path / method
-  // but is not currently used to validate inputs — the bare handler is the
-  // unit under test, and the test body parses the response against the
-  // contract explicitly.
-  contract: { path: string }
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  // The contract binds the test to a path/method and validates successful
+  // response payloads against the route's declared schema.
+  contract: RunRouteContract
+  method: RunRouteMethod
   handler: (ctx: any) => unknown
   // Marks the route as public (skip auth gate). Default is private.
   isPublic?: boolean
@@ -45,7 +58,49 @@ function buildUrl(path: string, query?: Record<string, string | string[] | undef
   return url.toString()
 }
 
+function assertContractMethod(contract: RunRouteContract, method: RunRouteMethod) {
+  const methodContract = contract.methods[method]
+  if (!methodContract) {
+    throw new Error(`No ${method} contract defined for ${contract.path}`)
+  }
+  return methodContract
+}
+
+async function parseResponseBody(res: Response): Promise<unknown> {
+  const text = await res.text()
+  return text ? JSON.parse(text) : null
+}
+
+function validateResponseEnvelope(opts: RunRouteOptions, status: number, body: unknown): void {
+  const methodContract = assertContractMethod(opts.contract, opts.method)
+  const isSuccess = status >= 200 && status < 300
+
+  if (!body || typeof body !== 'object') {
+    throw new Error(`Expected ${opts.method} ${opts.contract.path} to return an API envelope`)
+  }
+
+  const envelope = body as { success?: unknown; data?: unknown; error?: unknown }
+
+  if (!isSuccess) {
+    if (envelope.success !== false || typeof envelope.error !== 'string') {
+      throw new Error(
+        `Expected ${opts.method} ${opts.contract.path} error response to return { success: false, error: string }`,
+      )
+    }
+    return
+  }
+
+  if (envelope.success !== true || !('data' in envelope)) {
+    throw new Error(
+      `Expected ${opts.method} ${opts.contract.path} success response to return { success: true, data }`,
+    )
+  }
+
+  methodContract.response.parse(envelope.data)
+}
+
 export async function runRoute(opts: RunRouteOptions): Promise<RunRouteResult> {
+  assertContractMethod(opts.contract, opts.method)
   const url = buildUrl(opts.contract.path, opts.query)
   const init: RequestInit = { method: opts.method }
   if (opts.body !== undefined) {
@@ -61,11 +116,12 @@ export async function runRoute(opts: RunRouteOptions): Promise<RunRouteResult> {
       `TEST ${opts.method} ${opts.contract.path}`,
     )
     const res = await run({ request })
-    const text = await res.text()
+    const body = await parseResponseBody(res)
+    validateResponseEnvelope(opts, res.status, body)
     return {
       status: res.status,
       headers: res.headers,
-      body: text ? JSON.parse(text) : null,
+      body,
     }
   }
 
@@ -79,11 +135,12 @@ export async function runRoute(opts: RunRouteOptions): Promise<RunRouteResult> {
     `TEST ${opts.method} ${opts.contract.path}`,
   )
   const res = await run({ request })
-  const text = await res.text()
+  const body = await parseResponseBody(res)
+  validateResponseEnvelope(opts, res.status, body)
   return {
     status: res.status,
     headers: res.headers,
-    body: text ? JSON.parse(text) : null,
+    body,
   }
 }
 

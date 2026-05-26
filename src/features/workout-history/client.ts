@@ -4,27 +4,23 @@ import type { PaginatedResult, WorkoutSession } from '@/lib/types/database'
 import type { SelectedWorkout } from './model'
 
 export async function loadWorkoutHistorySessions({
-  userId,
   limit,
   offset,
 }: {
-  userId: string
   limit: number
   offset?: number
 }): Promise<PaginatedResult<WorkoutSession>> {
-  const params = buildSearchParams({ userId, limit, offset })
+  const params = buildSearchParams({ limit, offset })
   const response = await fetch(`/api/workout-sessions?${params.toString()}`)
   return readApiData(response, `Failed to load workout history: ${response.status}`)
 }
 
 export async function loadWorkoutDetailsForSession({
-  userId,
   session,
 }: {
-  userId: string
   session: WorkoutSession
 }): Promise<SelectedWorkout | null> {
-  const params = buildSearchParams({ userId, date: session.date })
+  const params = buildSearchParams({ date: session.date })
   const response = await fetch(`/api/workout-details?${params.toString()}`)
   const workouts = await readApiData<WorkoutSessionWithSets[]>(
     response,

@@ -70,7 +70,7 @@ describe('useProgressDashboard', () => {
     await waitFor(() => expect(result.current.state.data).toHaveLength(1))
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/progress?userId=user-1&startDate=2026-01-01&endDate=2026-02-01&metric=volume',
+      '/api/progress?startDate=2026-01-01&endDate=2026-02-01&metric=volume',
     )
     expect(result.current.summary.totalWorkouts).toBe(1)
     expect(result.current.chartPoints).toHaveLength(1)
@@ -108,7 +108,7 @@ describe('useProgressDashboard', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/progress?userId=user-1&startDate=2026-01-01&endDate=2026-02-01&metric=weight&exercises=bench',
+      '/api/progress?startDate=2026-01-01&endDate=2026-02-01&metric=weight&exercises=bench',
     )
   })
 })

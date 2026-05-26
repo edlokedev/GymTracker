@@ -25,7 +25,7 @@ export function ExerciseHistory({ userId, exerciseId, limit = 50 }: ExerciseHist
       try {
         setLoading(true)
         const res = await fetch(
-          `/api/workout-sets?action=history&userId=${encodeURIComponent(userId)}&exerciseId=${encodeURIComponent(exerciseId)}&limit=${limit}`,
+          `/api/workout-sets?action=history&exerciseId=${encodeURIComponent(exerciseId)}&limit=${limit}`,
         )
         if (res.ok) {
           const json = await res.json()

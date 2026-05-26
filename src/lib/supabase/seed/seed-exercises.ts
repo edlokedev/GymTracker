@@ -201,15 +201,16 @@ async function main() {
   if (delCatErr) throw delCatErr
 
   console.log(`Upserting ${categories.size} categories…`)
+  const categoryRows = Array.from(categories.values()) as unknown as Record<string, unknown>[]
   const { error: catErr } = await supabase
     .from('exercise_categories')
-    .upsert(Array.from(categories.values()), { onConflict: 'id' })
+    .upsert(categoryRows, { onConflict: 'id' })
   if (catErr) throw catErr
 
   console.log(`Upserting ${exercises.length} exercises…`)
   const CHUNK = 500
   for (let i = 0; i < exercises.length; i += CHUNK) {
-    const slice = exercises.slice(i, i + CHUNK)
+    const slice = exercises.slice(i, i + CHUNK) as unknown as Record<string, unknown>[]
     const { error } = await supabase.from('exercises').upsert(slice, { onConflict: 'id' })
     if (error) throw error
     console.log(`  …${Math.min(i + CHUNK, exercises.length)} / ${exercises.length}`)

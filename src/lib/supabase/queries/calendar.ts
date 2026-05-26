@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { assertPostgresOk } from '../../api/errors'
 import type { WorkoutCalendarData } from '../../types/calendar'
 import {
@@ -9,7 +8,7 @@ import {
   getRolling30DayRange,
   getWorkoutsThisMonth,
 } from '../../utils/calendar'
-import type { Database } from '../database.types'
+import { type AppSupabaseClient, queryClient } from '../query-client'
 
 // Request-scoped Supabase client (anon key + user JWT). RLS already restricts
 // rows to the authenticated user; user_id filtering is added as defense in
@@ -52,8 +51,6 @@ type SetRow = {
   reps: number | null
 }
 
-type AnyClient = SupabaseClient<Database> | SupabaseClient<any, 'public', any>
-
 export function resolveCalendarRange(
   startDateParam: string | null,
   endDateParam: string | null,
@@ -70,16 +67,17 @@ export function resolveCalendarRange(
 }
 
 export async function getCalendarAggregate(
-  supabase: AnyClient,
+  supabase: AppSupabaseClient,
   userId: string,
   range: CalendarDateRange,
 ): Promise<CalendarAggregate> {
+  const db = queryClient(supabase)
   const startDate = range.startISOString.split('T')[0]
   const endDate = range.endISOString.split('T')[0]
 
   // 1) Sessions in the requested window.
-  const { data: sessionsData, error: sessionsError } = await (supabase as any)
-    .from('workout_sessions')
+  const { data: sessionsData, error: sessionsError } = await db
+    .from<SessionRow>('workout_sessions')
     .select('id, date, start_time, end_time')
     .eq('user_id', userId)
     .gte('date', startDate)
@@ -94,8 +92,8 @@ export async function getCalendarAggregate(
   let sets: SetRow[] = []
   if (sessions.length > 0) {
     const sessionIds = sessions.map((s) => s.id)
-    const { data: setsData, error: setsError } = await (supabase as any)
-      .from('workout_sets')
+    const { data: setsData, error: setsError } = await db
+      .from<SetRow>('workout_sets')
       .select('workout_id, exercise_id, weight, reps')
       .in('workout_id', sessionIds)
     assertPostgresOk(setsError)
@@ -186,8 +184,8 @@ export async function getCalendarAggregate(
   oneYearAgo.setDate(oneYearAgo.getDate() - 365)
   const yearStart = formatCalendarDate(oneYearAgo)
 
-  const { data: yearSessionsData, error: yearError } = await (supabase as any)
-    .from('workout_sessions')
+  const { data: yearSessionsData, error: yearError } = await db
+    .from<{ date: string }>('workout_sessions')
     .select('date')
     .eq('user_id', userId)
     .gte('date', yearStart)

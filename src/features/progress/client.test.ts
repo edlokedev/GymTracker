@@ -7,13 +7,13 @@ describe('progress client', () => {
   })
 
   it('converts filters into progress api params', () => {
-    const params = progressFiltersToApiSearchParams('user-1', {
+    const params = progressFiltersToApiSearchParams({
       exerciseIds: ['bench', 'squat'],
       dateRange: { start: '2026-01-01', end: '2026-02-01' },
       metric: 'weight',
     })
 
-    expect(params.get('userId')).toBe('user-1')
+    expect(params.has('userId')).toBe(false)
     expect(params.get('startDate')).toBe('2026-01-01')
     expect(params.get('endDate')).toBe('2026-02-01')
     expect(params.get('metric')).toBe('weight')
@@ -33,14 +33,14 @@ describe('progress client', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const data = await fetchProgressData('user-1', {
+    const data = await fetchProgressData({
       exerciseIds: [],
       dateRange: { start: '2026-01-01', end: '2026-02-01' },
       metric: 'volume',
     })
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/progress?userId=user-1&startDate=2026-01-01&endDate=2026-02-01&metric=volume',
+      '/api/progress?startDate=2026-01-01&endDate=2026-02-01&metric=volume',
     )
     expect(data).toEqual({
       progress: [],

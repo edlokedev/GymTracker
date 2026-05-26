@@ -11,7 +11,6 @@ export interface WorkoutCalendarData {
 }
 
 export interface CalendarDataRequest {
-  userId: string
   startDate: string // ISO date string
   endDate: string // ISO date string
   includeDetails?: boolean
@@ -47,7 +46,6 @@ export interface CalendarDataResponse {
 }
 
 export interface WorkoutDetailRequest {
-  userId: string
   date: string // ISO date string
 }
 

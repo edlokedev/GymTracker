@@ -11,9 +11,9 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 type PermissiveTable = {
-  Row: Record<string, any>
-  Insert: Record<string, any>
-  Update: Record<string, any>
+  Row: Record<string, unknown>
+  Insert: Record<string, unknown>
+  Update: Record<string, unknown>
   Relationships: []
 }
 

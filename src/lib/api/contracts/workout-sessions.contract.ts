@@ -69,6 +69,16 @@ const sessionInput = z.object({
   end_time: z.string().optional(),
 })
 
+const createSessionQuery = z.object({
+  action: z.undefined().optional(),
+  duplicateId: z.undefined().optional(),
+})
+
+const duplicateSessionQuery = z.object({
+  action: z.literal('duplicate'),
+  duplicateId: z.string().trim().min(1),
+})
+
 export const workoutSessionsContract = defineContract({
   path: '/api/workout-sessions',
   methods: {
@@ -86,7 +96,8 @@ export const workoutSessionsContract = defineContract({
       response: z.union([workoutSession, workoutWithDetails, paginatedSessions]),
     },
     POST: {
-      body: sessionInput,
+      query: z.union([duplicateSessionQuery, createSessionQuery]),
+      body: sessionInput.optional(),
       response: workoutSession,
     },
     PATCH: {

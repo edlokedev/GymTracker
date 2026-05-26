@@ -1,7 +1,10 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
 import { type PrivateHandlerContext, privateMethod } from '../lib/api/define-private-route'
 import { badRequest, notFound } from '../lib/api/errors'
-import { workoutSetQueries } from '../lib/supabase/queries/workout-sets'
+import {
+  normalizeWorkoutSetHistoryLimit,
+  workoutSetQueries,
+} from '../lib/supabase/queries/workout-sets'
 import type { WorkoutSetInput } from '../lib/types/database'
 
 // Private workout-set CRUD. Identity comes from the Supabase session; row
@@ -9,9 +12,18 @@ import type { WorkoutSetInput } from '../lib/types/database'
 // Postgres signals (PGRST116/23503/42501) are raised as NotFoundError by
 // assertPostgresOk inside the query module — see ADR-0002.
 
-export const getWorkoutSets = async ({ supabase, url }: PrivateHandlerContext) => {
+export const getWorkoutSets = async ({ user, supabase, url }: PrivateHandlerContext) => {
+  const action = url.searchParams.get('action')
   const workoutId = url.searchParams.get('workoutId')
   const setId = url.searchParams.get('id')
+
+  if (action === 'history') {
+    const exerciseId = url.searchParams.get('exerciseId')
+    if (!exerciseId) badRequest('exerciseId is required')
+
+    const limit = normalizeWorkoutSetHistoryLimit(url.searchParams.get('limit'))
+    return workoutSetQueries.listHistory(supabase, user.id, exerciseId, limit)
+  }
 
   if (setId) {
     const set = await workoutSetQueries.getById(supabase, setId)

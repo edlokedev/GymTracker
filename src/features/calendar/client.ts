@@ -3,24 +3,18 @@ import type { CalendarDataResponse, WorkoutDetailResponse } from '@/lib/types/ca
 import { formatCalendarDate } from '@/lib/utils/calendar'
 
 interface CalendarDataRequest {
-  userId: string
   dateRange: { start: Date; end: Date }
 }
 
-export function calendarDataSearchParams({
-  userId,
-  dateRange,
-}: CalendarDataRequest): URLSearchParams {
+export function calendarDataSearchParams({ dateRange }: CalendarDataRequest): URLSearchParams {
   return buildSearchParams({
-    userId,
     start: dateRange.start.toISOString(),
     end: dateRange.end.toISOString(),
   })
 }
 
-export function workoutDetailsSearchParams(userId: string, date: Date): URLSearchParams {
+export function workoutDetailsSearchParams(date: Date): URLSearchParams {
   return buildSearchParams({
-    userId,
     date: formatCalendarDate(date),
   })
 }
@@ -37,11 +31,8 @@ export async function fetchCalendarData(
   )) as CalendarDataResponse
 }
 
-export async function fetchWorkoutDetails(
-  userId: string,
-  date: Date,
-): Promise<WorkoutDetailResponse> {
-  const params = workoutDetailsSearchParams(userId, date)
+export async function fetchWorkoutDetails(date: Date): Promise<WorkoutDetailResponse> {
+  const params = workoutDetailsSearchParams(date)
   const response = await fetch(`/api/workout-details?${params.toString()}`)
 
   return (await readApiResult(

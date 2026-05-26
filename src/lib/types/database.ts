@@ -225,7 +225,7 @@ export interface WorkoutSearchParams {
 export interface DatabaseResult {
   success: boolean
   error?: string
-  data?: any
+  data?: unknown
 }
 
 export interface PaginatedResult<T> {
@@ -274,7 +274,7 @@ export class ValidationError extends Error {
   constructor(
     message: string,
     public field?: string,
-    public value?: any,
+    public value?: unknown,
   ) {
     super(message)
     this.name = 'ValidationError'

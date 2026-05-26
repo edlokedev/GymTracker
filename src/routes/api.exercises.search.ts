@@ -12,8 +12,8 @@ export const searchExercises = async ({ supabase, url }: PublicHandlerContext) =
   const equipment = url.searchParams.get('equipment') || undefined
   const muscle_group = url.searchParams.get('muscle_group') || undefined
   const level = url.searchParams.get('level') || undefined
-  const limit = parseInt(url.searchParams.get('limit') || '20')
-  const offset = parseInt(url.searchParams.get('offset') || '0')
+  const limit = parseInt(url.searchParams.get('limit') || '20', 10)
+  const offset = parseInt(url.searchParams.get('offset') || '0', 10)
 
   const result = await exerciseCatalogQueries.search(supabase, {
     query,

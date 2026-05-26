@@ -40,6 +40,106 @@ function fixtures() {
   }
 }
 
+const otherUserId = 'user-2'
+
+function historyFixtures(count: number) {
+  return {
+    workout_sessions: Array.from({ length: count }, (_, index) => ({
+      id: `hist-sess-${index + 1}`,
+      user_id: fakeUser.id,
+      name: `History ${index + 1}`,
+      date: `2026-05-${String((index % 28) + 1).padStart(2, '0')}`,
+      start_time: `2026-05-${String((index % 28) + 1).padStart(2, '0')}T10:00:00Z`,
+    })),
+    workout_sets: Array.from({ length: count }, (_, index) => ({
+      id: `hist-set-${index + 1}`,
+      workout_id: `hist-sess-${index + 1}`,
+      exercise_id: 'ex-history',
+      set_number: 1,
+      weight: 100 + index,
+      reps: 5,
+      rest_time: null,
+      notes: null,
+      created_at: `2026-05-${String((index % 28) + 1).padStart(2, '0')}T10:00:00Z`,
+      updated_at: `2026-05-${String((index % 28) + 1).padStart(2, '0')}T10:00:00Z`,
+      workout_sessions: {
+        user_id: fakeUser.id,
+        name: `History ${index + 1}`,
+        date: `2026-05-${String((index % 28) + 1).padStart(2, '0')}`,
+      },
+    })),
+  }
+}
+
+function exerciseHistoryFixtures() {
+  return {
+    workout_sessions: [
+      {
+        id: 'hist-sess-1',
+        user_id: fakeUser.id,
+        name: 'Push Day',
+        date: '2026-05-20',
+        start_time: '2026-05-20T10:00:00Z',
+      },
+      {
+        id: 'hist-sess-2',
+        user_id: otherUserId,
+        name: 'Other User Push',
+        date: '2026-05-21',
+        start_time: '2026-05-21T10:00:00Z',
+      },
+      {
+        id: 'hist-sess-3',
+        user_id: fakeUser.id,
+        name: 'Leg Day',
+        date: '2026-05-22',
+        start_time: '2026-05-22T10:00:00Z',
+      },
+    ],
+    workout_sets: [
+      {
+        id: 'hist-set-1',
+        workout_id: 'hist-sess-1',
+        exercise_id: 'ex-1',
+        set_number: 1,
+        weight: 100,
+        reps: 5,
+        rest_time: null,
+        notes: null,
+        created_at: '2026-05-20T10:00:00Z',
+        updated_at: '2026-05-20T10:00:00Z',
+        workout_sessions: { user_id: fakeUser.id, name: 'Push Day', date: '2026-05-20' },
+      },
+      {
+        id: 'hist-set-2',
+        workout_id: 'hist-sess-2',
+        exercise_id: 'ex-1',
+        set_number: 1,
+        weight: 200,
+        reps: 1,
+        rest_time: null,
+        notes: null,
+        created_at: '2026-05-21T10:00:00Z',
+        updated_at: '2026-05-21T10:00:00Z',
+        workout_sessions: { user_id: otherUserId, name: 'Other User Push', date: '2026-05-21' },
+      },
+      {
+        id: 'hist-set-3',
+        workout_id: 'hist-sess-3',
+        exercise_id: 'ex-2',
+        set_number: 1,
+        weight: 50,
+        reps: 10,
+        rest_time: null,
+        notes: null,
+        created_at: '2026-05-22T10:00:00Z',
+        updated_at: '2026-05-22T10:00:00Z',
+        workout_sessions: { user_id: fakeUser.id, name: 'Leg Day', date: '2026-05-22' },
+      },
+    ],
+  }
+}
+
 describe('/api/workout-sets', () => {
   it('GET ?id=… returns one set', async () => {
     const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
@@ -69,6 +169,71 @@ describe('/api/workout-sets', () => {
     expect(res.status).toBe(200)
     const parsed = workoutSetsContract.methods.GET.response.parse(res.body.data)
     expect(Array.isArray(parsed)).toBe(true)
+  })
+
+  it('GET ?action=history returns exercise history for the authenticated user', async () => {
+    const supabase = stubSupabase(exerciseHistoryFixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSetsContract,
+      method: 'GET',
+      handler: getWorkoutSets,
+      user: fakeUser,
+      supabase,
+      query: { action: 'history', userId: otherUserId, exerciseId: 'ex-1', limit: '10' },
+    })
+    expect(res.status).toBe(200)
+    const parsed = workoutSetsContract.methods.GET.response.parse(res.body.data)
+    expect(parsed).toEqual([
+      {
+        id: 'hist-set-1',
+        reps: 5,
+        weight: 100,
+        session_date: '2026-05-20',
+        session_name: 'Push Day',
+      },
+    ])
+  })
+
+  it('GET ?action=history returns 400 without exerciseId', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSetsContract,
+      method: 'GET',
+      handler: getWorkoutSets,
+      user: fakeUser,
+      supabase,
+      query: { action: 'history' },
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('exerciseId is required')
+  })
+
+  it('GET ?action=history defaults to 50 rows and caps oversized limits at 100', async () => {
+    const defaultSupabase = stubSupabase(historyFixtures(55), { userId: fakeUser.id, parentRefs })
+    const defaultRes = await runRoute({
+      contract: workoutSetsContract,
+      method: 'GET',
+      handler: getWorkoutSets,
+      user: fakeUser,
+      supabase: defaultSupabase,
+      query: { action: 'history', exerciseId: 'ex-history' },
+    })
+    expect(defaultRes.status).toBe(200)
+    const defaultParsed = workoutSetsContract.methods.GET.response.parse(defaultRes.body.data)
+    expect(defaultParsed).toHaveLength(50)
+
+    const cappedSupabase = stubSupabase(historyFixtures(105), { userId: fakeUser.id, parentRefs })
+    const cappedRes = await runRoute({
+      contract: workoutSetsContract,
+      method: 'GET',
+      handler: getWorkoutSets,
+      user: fakeUser,
+      supabase: cappedSupabase,
+      query: { action: 'history', exerciseId: 'ex-history', limit: '500' },
+    })
+    expect(cappedRes.status).toBe(200)
+    const cappedParsed = workoutSetsContract.methods.GET.response.parse(cappedRes.body.data)
+    expect(cappedParsed).toHaveLength(100)
   })
 
   it('GET returns 401 anonymously', async () => {

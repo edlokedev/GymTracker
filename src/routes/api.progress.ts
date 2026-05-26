@@ -11,7 +11,7 @@ export const getProgress = async ({ user, supabase, url }: PrivateHandlerContext
     searchParams.get('startDate') || dayjs().subtract(90, 'day').format('YYYY-MM-DD')
   const endDate = searchParams.get('endDate') || dayjs().format('YYYY-MM-DD')
   const metric = (searchParams.get('metric') as 'weight' | 'reps' | 'volume') || 'volume'
-  const limit = parseInt(searchParams.get('limit') || '1000')
+  const limit = parseInt(searchParams.get('limit') || '1000', 10)
 
   if (dayjs(startDate).isAfter(dayjs(endDate))) {
     badRequest('Start date cannot be after end date')

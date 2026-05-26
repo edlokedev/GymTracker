@@ -55,7 +55,6 @@ export function useWorkoutHistory({
         setIsLoading(true)
         const offset = mode === 'recent' ? undefined : (pageNum - 1) * limit
         const result = await loadWorkoutHistorySessions({
-          userId,
           limit,
           offset,
         })
@@ -180,7 +179,7 @@ export function useWorkoutHistory({
       setIsModalLoading(true)
 
       try {
-        setSelectedWorkout(await loadWorkoutDetailsForSession({ userId, session }))
+        setSelectedWorkout(await loadWorkoutDetailsForSession({ session }))
       } catch (detailsError) {
         console.error('Failed to load workout details:', detailsError)
         setSelectedWorkout(null)

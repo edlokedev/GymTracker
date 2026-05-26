@@ -1,12 +1,8 @@
 import { buildSearchParams, readApiResult } from '@/lib/api'
 import type { ProgressFilters, ProgressResponse } from '@/lib/types/progress'
 
-export function progressFiltersToApiSearchParams(
-  userId: string,
-  filters: ProgressFilters,
-): URLSearchParams {
+export function progressFiltersToApiSearchParams(filters: ProgressFilters): URLSearchParams {
   return buildSearchParams({
-    userId,
     startDate: filters.dateRange.start,
     endDate: filters.dateRange.end,
     metric: filters.metric,
@@ -15,10 +11,9 @@ export function progressFiltersToApiSearchParams(
 }
 
 export async function fetchProgressData(
-  userId: string,
   filters: ProgressFilters,
 ): Promise<ProgressResponse['data']> {
-  const params = progressFiltersToApiSearchParams(userId, filters)
+  const params = progressFiltersToApiSearchParams(filters)
   const response = await fetch(`/api/progress?${params.toString()}`)
   const result = (await readApiResult<ProgressResponse['data']>(
     response,

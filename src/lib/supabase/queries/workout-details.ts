@@ -11,12 +11,9 @@
 // RLS gates which sessions/sets are visible — the caller doesn't pass a
 // userId.
 
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { assertPostgresOk } from '../../api/errors'
 import type { WorkoutSessionWithSets } from '../../types/calendar'
-import type { Database } from '../database.types'
-
-type SB = SupabaseClient<Database> | SupabaseClient<any, 'public', any>
+import { type AppSupabaseClient, queryClient } from '../query-client'
 
 type SessionRow = {
   id: string
@@ -49,9 +46,10 @@ function computeDurationMinutes(
 export const workoutDetailsQueries = {
   // All of the caller's workout sessions on `date`, each rolled up with its
   // sets and totals. Returns an empty array when no sessions exist.
-  async getByDate(supabase: SB, date: string): Promise<WorkoutSessionWithSets[]> {
-    const { data: sessionsData, error: sessionsError } = await (supabase as any)
-      .from('workout_sessions')
+  async getByDate(supabase: AppSupabaseClient, date: string): Promise<WorkoutSessionWithSets[]> {
+    const db = queryClient(supabase)
+    const { data: sessionsData, error: sessionsError } = await db
+      .from<SessionRow>('workout_sessions')
       .select('id, user_id, date, start_time, end_time, notes')
       .eq('date', date)
       .order('start_time', { ascending: true })
@@ -61,8 +59,8 @@ export const workoutDetailsQueries = {
     if (sessions.length === 0) return []
 
     const sessionIds = sessions.map((s) => s.id)
-    const { data: setsData, error: setsError } = await (supabase as any)
-      .from('workout_sets')
+    const { data: setsData, error: setsError } = await db
+      .from<SetRow>('workout_sets')
       .select('id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes')
       .in('workout_id', sessionIds)
       .order('set_number', { ascending: true })
@@ -78,8 +76,8 @@ export const workoutDetailsQueries = {
     const uniqueExerciseIds = Array.from(new Set(sets.map((s) => s.exercise_id)))
     const exerciseNameById = new Map<string, string>()
     if (uniqueExerciseIds.length > 0) {
-      const { data: exData, error: exError } = await (supabase as any)
-        .from('exercises')
+      const { data: exData, error: exError } = await db
+        .from<{ id: string; name: string }>('exercises')
         .select('id, name')
         .in('id', uniqueExerciseIds)
       assertPostgresOk(exError)

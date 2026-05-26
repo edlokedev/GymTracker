@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import { assertPostgresOk } from '../../api/errors'
 import type {
@@ -7,15 +6,13 @@ import type {
   ProgressRequest,
   TrendDirection,
 } from '../../types/progress'
-import type { Database } from '../database.types'
+import { type AppSupabaseClient, queryClient } from '../query-client'
 
 // Request-scoped Supabase client (anon key + user JWT). RLS restricts both
 // `workout_sessions` and `workout_sets` to rows owned by the authenticated
 // user, so the embedded join cannot leak other users' data. We still pass
 // `user_id` explicitly as defense in depth and to keep the planner on the
 // (user_id, date) index.
-
-type AnyClient = SupabaseClient<Database> | SupabaseClient<any, 'public', any>
 
 type SetJoinRow = {
   id: string
@@ -29,20 +26,20 @@ type SetJoinRow = {
   workout_sessions: { date: string; user_id: string } | null
 }
 
-export type ProgressQueryInput = Omit<ProgressRequest, 'userId'> & {
+export type ProgressQueryInput = ProgressRequest & {
   userId: string
 }
 
 export async function getProgressData(
-  supabase: AnyClient,
+  supabase: AppSupabaseClient,
   input: ProgressQueryInput,
 ): Promise<ExerciseProgress[]> {
   const { userId, exerciseIds, startDate, endDate, limit = 1000 } = input
 
   // One round-trip: join sets -> exercises (for name) and sets -> sessions
   // (for date + user_id filter). PostgREST embeds resolve via FK references.
-  let query = (supabase as any)
-    .from('workout_sets')
+  let query = queryClient(supabase)
+    .from<SetJoinRow>('workout_sets')
     .select(
       `
         id,
@@ -178,8 +175,8 @@ function calculateTrends(dataPoints: ProgressDataPoint[]) {
     return 'stable'
   }
 
-  const weights = dataPoints.filter((p) => p.weight).map((p) => p.weight!)
-  const reps = dataPoints.filter((p) => p.reps).map((p) => p.reps!)
+  const weights = dataPoints.map((p) => p.weight).filter(isNumber)
+  const reps = dataPoints.map((p) => p.reps).filter(isNumber)
   const volumes = dataPoints.filter((p) => p.volume > 0).map((p) => p.volume)
 
   return {
@@ -191,8 +188,8 @@ function calculateTrends(dataPoints: ProgressDataPoint[]) {
 
 function calculateStatistics(dataPoints: ProgressDataPoint[]) {
   const workoutDates = new Set(dataPoints.map((p) => p.date))
-  const weights = dataPoints.filter((p) => p.weight).map((p) => p.weight!)
-  const reps = dataPoints.filter((p) => p.reps).map((p) => p.reps!)
+  const weights = dataPoints.map((p) => p.weight).filter(isNumber)
+  const reps = dataPoints.map((p) => p.reps).filter(isNumber)
   const volumes = dataPoints.filter((p) => p.volume > 0).map((p) => p.volume)
 
   let improvementPercentage = 0
@@ -209,4 +206,8 @@ function calculateStatistics(dataPoints: ProgressDataPoint[]) {
     totalVolume: volumes.reduce((a, b) => a + b, 0),
     improvementPercentage: Math.round(improvementPercentage * 100) / 100,
   }
+}
+
+function isNumber(value: number | null): value is number {
+  return value !== null
 }

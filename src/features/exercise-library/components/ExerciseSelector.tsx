@@ -20,7 +20,7 @@ export default function ExerciseSelector({
 }: ExerciseSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [inputQuery, setInputQuery] = useState('')
-  const queryDebounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const queryDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const library = useExerciseLibrary({
     initialSearch: emptyExerciseLibrarySearch,
   })

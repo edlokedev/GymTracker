@@ -35,7 +35,7 @@ export function useProgressDashboard({ userId, initialFilters }: UseProgressDash
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
     try {
-      const data = await fetchProgressData(userId, state.filters)
+      const data = await fetchProgressData(state.filters)
       setState((prev) => ({
         ...prev,
         data: data.progress,

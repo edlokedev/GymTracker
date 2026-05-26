@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   paginatedSessions,
   workoutSession,
@@ -70,6 +70,10 @@ function fixtures() {
 }
 
 describe('/api/workout-sessions', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('GET ?id=… returns the "one" shape', async () => {
     const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
     const res = await runRoute({
@@ -159,6 +163,124 @@ describe('/api/workout-sessions', () => {
     const parsed = workoutSession.parse(res.body.data)
     expect(parsed.name).toBe('Pull Day')
     expect(parsed.user_id).toBe(fakeUser.id)
+  })
+
+  it('POST ?action=duplicate&duplicateId=... duplicates a visible session and its sets', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date'],
+      now: new Date('2026-05-26T09:30:00.000Z'),
+    })
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    expect(
+      workoutSessionsContract.methods.POST.query?.parse({
+        action: 'duplicate',
+        duplicateId: 'sess-1',
+      }),
+    ).toEqual({ action: 'duplicate', duplicateId: 'sess-1' })
+    expect(workoutSessionsContract.methods.POST.body?.safeParse(undefined).success).toBe(true)
+
+    const duplicateRes = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'POST',
+      handler: createWorkoutSession,
+      user: fakeUser,
+      supabase,
+      query: { action: 'duplicate', duplicateId: 'sess-1' },
+    })
+    expect(duplicateRes.status).toBe(200)
+    const duplicated = workoutSession.parse(duplicateRes.body.data)
+    expect(duplicated.id).not.toBe('sess-1')
+    expect(duplicated.user_id).toBe(fakeUser.id)
+    expect(duplicated.name).toBe('Push Day')
+    expect(duplicated.date).toBe('2026-05-26')
+    expect(duplicated.start_time).toBe('2026-05-26T09:30:00.000Z')
+    expect(duplicated.end_time).toBeUndefined()
+
+    const detailRes = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'GET',
+      handler: getWorkoutSessions,
+      user: fakeUser,
+      supabase,
+      query: { id: duplicated.id, includeDetails: 'true' },
+    })
+    expect(detailRes.status).toBe(200)
+    const detail = workoutWithDetails.parse(detailRes.body.data)
+    expect(detail.exercises[0].sets).toHaveLength(1)
+    expect(detail.exercises[0].sets[0]).toMatchObject({
+      workout_id: duplicated.id,
+      exercise_id: 'ex-1',
+      set_number: 1,
+      weight: 100,
+      reps: 5,
+    })
+    expect(detail.exercises[0].sets[0].id).not.toBe('set-1')
+  })
+
+  it('POST ?action=duplicate returns 400 when duplicateId is missing', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    const res = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'POST',
+      handler: createWorkoutSession,
+      user: fakeUser,
+      supabase,
+      query: { action: 'duplicate' },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('POST ?action=duplicate returns 400 when duplicateId is blank', async () => {
+    const supabase = stubSupabase(fixtures(), { userId: fakeUser.id, parentRefs })
+    expect(
+      workoutSessionsContract.methods.POST.query?.safeParse({
+        action: 'duplicate',
+        duplicateId: '   ',
+      }).success,
+    ).toBe(false)
+
+    const res = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'POST',
+      handler: createWorkoutSession,
+      user: fakeUser,
+      supabase,
+      query: { action: 'duplicate', duplicateId: '   ' },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('POST ?action=duplicate returns 404 when the source session is not visible to the user', async () => {
+    const base = fixtures()
+    const supabase = stubSupabase(
+      {
+        ...base,
+        workout_sessions: [
+          ...base.workout_sessions,
+          {
+            id: 'sess-other-user',
+            user_id: 'user-2',
+            name: 'Hidden Day',
+            date: '2026-05-21',
+            start_time: '2026-05-21T10:00:00Z',
+            end_time: null,
+            notes: null,
+            created_at: '2026-05-21T10:00:00Z',
+            updated_at: '2026-05-21T10:00:00Z',
+          },
+        ],
+      },
+      { userId: fakeUser.id, parentRefs },
+    )
+    const res = await runRoute({
+      contract: workoutSessionsContract,
+      method: 'POST',
+      handler: createWorkoutSession,
+      user: fakeUser,
+      supabase,
+      query: { action: 'duplicate', duplicateId: 'sess-other-user' },
+    })
+    expect(res.status).toBe(404)
   })
 
   it('PATCH ?id=… without action updates the session', async () => {

@@ -30,6 +30,19 @@ export const getWorkoutSessions = async ({ supabase, url }: PrivateHandlerContex
 }
 
 export const createWorkoutSession = async ({ user, supabase, request }: PrivateHandlerContext) => {
+  const url = new URL(request.url)
+  const action = url.searchParams.get('action')
+
+  if (action === 'duplicate') {
+    const duplicateId = url.searchParams.get('duplicateId')?.trim()
+    if (!duplicateId) badRequest('duplicateId is required')
+
+    const session = await workoutSessionQueries.duplicate(supabase, user.id, duplicateId)
+    if (!session) notFound('Session not found')
+    return session
+  }
+  if (action) badRequest('Unsupported workout session action')
+
   // Accept the legacy WorkoutSessionInput shape but ignore any user_id the
   // client tried to send. Identity is always taken from the Supabase JWT.
   const body = (await request.json()) as Partial<WorkoutSessionInput>

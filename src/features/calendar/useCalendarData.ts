@@ -15,7 +15,7 @@ export const useCalendarData = (userId: string) => {
       setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
       try {
-        const data = await fetchCalendarData({ userId, dateRange })
+        const data = await fetchCalendarData({ dateRange })
 
         if (data.success && data.data) {
           setState((prev) => ({
@@ -49,7 +49,7 @@ export const useCalendarData = (userId: string) => {
       setState((prev) => ({ ...prev, isLoading: true }))
 
       try {
-        const data = await fetchWorkoutDetails(userId, date)
+        const data = await fetchWorkoutDetails(date)
 
         if (data.success && data.data.length > 0) {
           setState((prev) => ({

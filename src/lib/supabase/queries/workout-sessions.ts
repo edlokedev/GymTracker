@@ -11,7 +11,6 @@
 //   * list:        PaginatedResult<WorkoutSession>.
 // `id` is generated server-side by `gen_random_uuid()`; never pass it on insert.
 
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { assertPostgresOk } from '../../api/errors'
 import type {
   PaginatedResult,
@@ -20,9 +19,9 @@ import type {
   WorkoutSet,
   WorkoutWithDetails,
 } from '../../types/database'
-import type { Database } from '../database.types'
+import { type AppSupabaseClient, queryClient } from '../query-client'
 
-type SB = SupabaseClient<Database> | SupabaseClient<any, 'public', any>
+type SB = AppSupabaseClient
 
 // Shape Postgres returns for a workout_sessions row.
 type SessionRow = {
@@ -32,6 +31,19 @@ type SessionRow = {
   date: string
   start_time: string
   end_time: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+type SetRow = {
+  id: string
+  workout_id: string
+  exercise_id: string
+  set_number: number
+  weight: number | null
+  reps: number | null
+  rest_time: number | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -56,6 +68,8 @@ function mapSession(row: SessionRow): WorkoutSession {
 
 const SESSION_COLUMNS =
   'id, user_id, name, date, start_time, end_time, notes, created_at, updated_at'
+const SET_COLUMNS =
+  'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, created_at, updated_at'
 
 export const workoutSessionQueries = {
   // Paginated list of the authenticated user's workout sessions.
@@ -66,7 +80,7 @@ export const workoutSessionQueries = {
     limit: number = 20,
     offset: number = 0,
   ): Promise<PaginatedResult<WorkoutSession>> {
-    const { data, error, count } = await (supabase as any)
+    const { data, error, count } = await queryClient(supabase)
       .from('workout_sessions')
       .select(SESSION_COLUMNS, { count: 'exact' })
       .order('date', { ascending: false })
@@ -88,7 +102,7 @@ export const workoutSessionQueries = {
   },
 
   async getById(supabase: SB, id: string): Promise<WorkoutSession | null> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await queryClient(supabase)
       .from('workout_sessions')
       .select(SESSION_COLUMNS)
       .eq('id', id)
@@ -119,7 +133,7 @@ export const workoutSessionQueries = {
       end_time: data.end_time ?? null,
     }
 
-    const { data: row, error } = await (supabase as any)
+    const { data: row, error } = await queryClient(supabase)
       .from('workout_sessions')
       .insert(insertRow)
       .select(SESSION_COLUMNS)
@@ -148,7 +162,7 @@ export const workoutSessionQueries = {
       return workoutSessionQueries.getById(supabase, id)
     }
 
-    const { data: row, error } = await (supabase as any)
+    const { data: row, error } = await queryClient(supabase)
       .from('workout_sessions')
       .update(patch)
       .eq('id', id)
@@ -163,7 +177,7 @@ export const workoutSessionQueries = {
   // Mark a session as complete by stamping end_time = now(). Mirrors the
   // SQLite behavior which only completes a session if end_time was null.
   async complete(supabase: SB, id: string): Promise<WorkoutSession | null> {
-    const { data: row, error } = await (supabase as any)
+    const { data: row, error } = await queryClient(supabase)
       .from('workout_sessions')
       .update({ end_time: new Date().toISOString() })
       .eq('id', id)
@@ -176,6 +190,64 @@ export const workoutSessionQueries = {
     return mapSession(row as SessionRow)
   },
 
+  // Duplicate a visible source session into a new row owned by the
+  // authenticated user, then copy all source sets to the new session.
+  async duplicate(
+    supabase: SB,
+    userId: string,
+    sourceSessionId: string,
+  ): Promise<WorkoutSession | null> {
+    const { data: source, error: sourceError } = await queryClient(supabase)
+      .from('workout_sessions')
+      .select(SESSION_COLUMNS)
+      .eq('id', sourceSessionId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    assertPostgresOk(sourceError)
+    if (!source) return null
+
+    const { data: sourceSets, error: sourceSetsError } = await queryClient(supabase)
+      .from('workout_sets')
+      .select(SET_COLUMNS)
+      .eq('workout_id', sourceSessionId)
+      .order('set_number', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    assertPostgresOk(sourceSetsError)
+
+    const sourceRow = source as SessionRow
+    const duplicatedSession = await workoutSessionQueries.create(supabase, userId, {
+      name: sourceRow.name ?? undefined,
+      notes: sourceRow.notes ?? undefined,
+    })
+
+    try {
+      for (const set of (sourceSets ?? []) as SetRow[]) {
+        const { error } = await queryClient(supabase)
+          .from('workout_sets')
+          .insert({
+            workout_id: duplicatedSession.id,
+            exercise_id: set.exercise_id,
+            set_number: set.set_number,
+            weight: set.weight,
+            reps: set.reps,
+            rest_time: set.rest_time,
+            notes: set.notes,
+          })
+          .select(SET_COLUMNS)
+          .single()
+
+        assertPostgresOk(error)
+      }
+    } catch (error) {
+      await workoutSessionQueries.delete(supabase, duplicatedSession.id).catch(() => undefined)
+      throw error
+    }
+
+    return duplicatedSession
+  },
+
   // Fetch a single session plus every set on it, grouped by exercise and
   // hydrated with exercise metadata (joined from `exercises` and the catalog
   // category name). Returns null when the session doesn't exist or RLS hides
@@ -185,7 +257,7 @@ export const workoutSessionQueries = {
     const sessionRow = await workoutSessionQueries.getById(supabase, id)
     if (!sessionRow) return null
 
-    const { data: setsData, error: setsError } = await (supabase as any)
+    const { data: setsData, error: setsError } = await queryClient(supabase)
       .from('workout_sets')
       .select(
         'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, created_at, updated_at',
@@ -195,18 +267,7 @@ export const workoutSessionQueries = {
       .order('created_at', { ascending: true })
     assertPostgresOk(setsError)
 
-    const sets = (setsData ?? []) as Array<{
-      id: string
-      workout_id: string
-      exercise_id: string
-      set_number: number
-      weight: number | null
-      reps: number | null
-      rest_time: number | null
-      notes: string | null
-      created_at: string
-      updated_at: string
-    }>
+    const sets = (setsData ?? []) as SetRow[]
 
     const uniqueExerciseIds = Array.from(new Set(sets.map((s) => s.exercise_id)))
 
@@ -230,7 +291,7 @@ export const workoutSessionQueries = {
 
     let exerciseRows: ExerciseRow[] = []
     if (uniqueExerciseIds.length > 0) {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await queryClient(supabase)
         .from('exercises')
         .select(
           'id, name, category_id, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)',
@@ -300,7 +361,7 @@ export const workoutSessionQueries = {
 
   async delete(supabase: SB, id: string): Promise<boolean> {
     // Use `.select('id')` to learn whether anything was deleted under RLS.
-    const { data, error } = await (supabase as any)
+    const { data, error } = await queryClient(supabase)
       .from('workout_sessions')
       .delete()
       .eq('id', id)
