@@ -76,7 +76,7 @@ export default function ExerciseSelectorModal({
     >
       <div
         ref={dialogRef}
-        className="flex max-h-[88dvh] w-full max-w-2xl flex-col rounded-t-2xl border-gray-200 border-t bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800 sm:max-h-[85vh] sm:rounded-xl sm:border"
+        className="flex max-h-[94dvh] w-full max-w-2xl flex-col rounded-t-2xl border-gray-200 border-t bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800 sm:max-h-[85vh] sm:rounded-xl sm:border"
         style={lockedHeight ? { height: `${lockedHeight}px` } : undefined}
         role="dialog"
         aria-modal="true"
@@ -110,12 +110,12 @@ export default function ExerciseSelectorModal({
 
 function ExerciseSelectorModalHeader({ onClose }: { onClose: () => void }) {
   return (
-    <div className="border-gray-200 border-b p-4 dark:border-gray-700 sm:p-6">
-      <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-gray-300 dark:bg-gray-600 sm:hidden" />
+    <div className="border-gray-200 border-b p-3 dark:border-gray-700 sm:p-6">
+      <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-gray-300 dark:bg-gray-600 sm:hidden" />
       <div className="flex items-center justify-between">
         <h2
           id="exercise-selector-title"
-          className="text-xl font-semibold text-gray-900 dark:text-white"
+          className="text-lg font-semibold text-gray-900 dark:text-white sm:text-xl"
         >
           Select Exercise
         </h2>
@@ -160,9 +160,9 @@ function ExerciseSelectorFilters({
   | 'onEquipmentChange'
 >) {
   return (
-    <div className="space-y-4 border-gray-200 border-b p-4 dark:border-gray-700 sm:p-6">
+    <div className="space-y-3 border-gray-200 border-b p-3 dark:border-gray-700 sm:space-y-4 sm:p-6">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="sr-only mb-1 text-sm font-medium text-gray-700 dark:text-gray-300 sm:not-sr-only sm:block">
           Search
         </label>
         <input
@@ -170,10 +170,10 @@ function ExerciseSelectorFilters({
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search by name or muscle group..."
-          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 sm:text-base"
         />
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
         <SelectorSelect
           label="Category"
           value={selectedCategory}
@@ -214,13 +214,14 @@ function SelectorSelect({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <label className="sr-only mb-1 text-sm font-medium text-gray-700 dark:text-gray-300 sm:not-sr-only sm:block">
         {label}
       </label>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+        aria-label={label}
+        className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-base"
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
@@ -267,14 +268,14 @@ function ExerciseSelectorList({
   }, [hasMore, onLoadMore])
 
   return (
-    <ScrollArea className="flex-1 overflow-y-auto p-4 pb-[max(env(safe-area-inset-bottom),1rem)] sm:p-6">
+    <ScrollArea className="flex-1 overflow-y-auto p-3 pb-[max(env(safe-area-inset-bottom),1rem)] sm:p-6">
       {isLoading && exercises.length === 0 ? (
         <div className="flex h-full min-h-[280px] items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-blue-600 border-b-2" />
         </div>
       ) : exercises.length > 0 ? (
         <div
-          className={`space-y-3 transition-opacity duration-150 ${isLoading ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+          className={`space-y-2 transition-opacity duration-150 sm:space-y-3 ${isLoading ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
         >
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {isLoading
@@ -317,25 +318,25 @@ function ExerciseSelectorListItem({
     <button
       type="button"
       onClick={() => onSelectExercise(exercise)}
-      className="group min-h-16 w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all duration-200 hover:border-blue-300 hover:bg-gray-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600 dark:hover:bg-gray-700"
+      className="group min-h-14 w-full rounded-xl border border-gray-200 bg-white p-3 text-left transition-all duration-200 hover:border-blue-300 hover:bg-gray-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600 dark:hover:bg-gray-700 sm:min-h-16 sm:p-4"
     >
       <div className="flex items-center justify-between gap-3">
         <ExerciseMediaFrame
           exercise={exercise}
           alt={formatExerciseName(exercise.name)}
-          frameClassName="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500"
+          frameClassName="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500 sm:h-16 sm:w-16"
           imageClassName="absolute inset-0 z-10 h-full w-full object-cover"
           iconClassName="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500"
         />
         <div className="min-w-0 flex-1">
-          <h3 className="font-medium text-gray-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
+          <h3 className="font-medium text-gray-900 text-sm transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400 sm:text-base">
             {formatExerciseName(exercise.name)}
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 text-xs dark:text-gray-400 sm:text-sm">
             {exercise.category_name} &bull; {exercise.equipment || 'No equipment'}
           </p>
           {exercise.primary_muscles.length > 0 && (
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-500">
+            <p className="mt-0.5 truncate text-gray-500 text-xs dark:text-gray-500 sm:mt-1 sm:text-sm">
               {exercise.primary_muscles.join(', ')}
             </p>
           )}
