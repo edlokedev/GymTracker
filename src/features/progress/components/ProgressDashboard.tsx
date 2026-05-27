@@ -58,26 +58,35 @@ export default function ProgressDashboard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Exercises Tracked
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="rounded-lg bg-white p-3 shadow dark:bg-gray-800 sm:p-6">
+              <h3 className="mb-1 font-semibold text-gray-900 text-xs dark:text-white sm:mb-2 sm:text-lg">
+                <span className="sm:hidden">Exercises</span>
+                <span className="hidden sm:inline">Exercises Tracked</span>
               </h3>
-              <p className="text-3xl font-bold text-blue-600">{summary.exercisesTracked}</p>
+              <p className="font-bold text-2xl text-blue-600 sm:text-3xl">
+                {summary.exercisesTracked}
+              </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Total Workouts
+            <div className="rounded-lg bg-white p-3 shadow dark:bg-gray-800 sm:p-6">
+              <h3 className="mb-1 font-semibold text-gray-900 text-xs dark:text-white sm:mb-2 sm:text-lg">
+                <span className="sm:hidden">Workouts</span>
+                <span className="hidden sm:inline">Total Workouts</span>
               </h3>
-              <p className="text-3xl font-bold text-green-600">{summary.totalWorkouts}</p>
+              <p className="font-bold text-2xl text-green-600 sm:text-3xl">
+                {summary.totalWorkouts}
+              </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Personal Records
+            <div className="rounded-lg bg-white p-3 shadow dark:bg-gray-800 sm:p-6">
+              <h3 className="mb-1 font-semibold text-gray-900 text-xs dark:text-white sm:mb-2 sm:text-lg">
+                <span className="sm:hidden">PRs</span>
+                <span className="hidden sm:inline">Personal Records</span>
               </h3>
-              <p className="text-3xl font-bold text-purple-600">{summary.personalRecords}</p>
+              <p className="font-bold text-2xl text-purple-600 sm:text-3xl">
+                {summary.personalRecords}
+              </p>
             </div>
           </div>
 
