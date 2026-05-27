@@ -168,11 +168,11 @@ function ProgressControls({
   actions: ProgressDashboardActions
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="rounded-lg bg-white p-3 shadow dark:bg-gray-800 sm:p-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <div>
           <label
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            className="mb-1 block font-medium text-gray-700 text-xs dark:text-gray-300 sm:mb-2 sm:text-sm"
             htmlFor="progress-metric"
           >
             Metric
@@ -193,7 +193,7 @@ function ProgressControls({
 
         <div>
           <label
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            className="mb-1 block font-medium text-gray-700 text-xs dark:text-gray-300 sm:mb-2 sm:text-sm"
             htmlFor="progress-start-date"
           >
             Start Date
@@ -214,7 +214,7 @@ function ProgressControls({
 
         <div>
           <label
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            className="mb-1 block font-medium text-gray-700 text-xs dark:text-gray-300 sm:mb-2 sm:text-sm"
             htmlFor="progress-end-date"
           >
             End Date
@@ -235,7 +235,7 @@ function ProgressControls({
 
         <div>
           <label
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            className="mb-1 block font-medium text-gray-700 text-xs dark:text-gray-300 sm:mb-2 sm:text-sm"
             htmlFor="progress-chart-type"
           >
             Chart Type
@@ -256,39 +256,41 @@ function ProgressControls({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-3 grid grid-cols-4 gap-2 sm:mt-4 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
         {DATE_PRESETS.map((preset) => (
           <button
             key={preset.value}
             type="button"
-            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            className="min-h-9 rounded-md border border-gray-300 px-2 py-1 text-center font-medium text-gray-700 text-xs hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 sm:px-3 sm:py-1.5 sm:text-sm"
             onClick={() => actions.setDatePreset(preset.value)}
           >
             {preset.label}
           </button>
         ))}
 
-        <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <input
-            type="checkbox"
-            checked={state.showTrendLines}
-            onChange={(event) => actions.setShowTrendLines(event.target.checked)}
-          />
-          Trend lines
-        </label>
+        <div className="col-span-4 flex flex-wrap items-center gap-x-4 gap-y-2 sm:contents">
+          <label className="inline-flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={state.showTrendLines}
+              onChange={(event) => actions.setShowTrendLines(event.target.checked)}
+            />
+            Trend lines
+          </label>
 
-        <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <input
-            type="checkbox"
-            checked={state.highlightPRs}
-            onChange={(event) => actions.setHighlightPRs(event.target.checked)}
-          />
-          Highlight PRs
-        </label>
+          <label className="inline-flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={state.highlightPRs}
+              onChange={(event) => actions.setHighlightPRs(event.target.checked)}
+            />
+            Highlight PRs
+          </label>
 
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          {chartPointsCount} chart points ready
-        </span>
+          <span className="text-gray-500 text-xs dark:text-gray-400 sm:text-sm">
+            {chartPointsCount} chart points ready
+          </span>
+        </div>
       </div>
     </div>
   )

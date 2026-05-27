@@ -67,6 +67,12 @@ export default function WorkoutSessionManager({
   })
   const [showWorkoutDetails, setShowWorkoutDetails] = useState(false)
   const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(() => new Set())
+  const showWorkoutHeader =
+    isSessionStarted ||
+    Boolean(session) ||
+    saveStatus !== 'idle' ||
+    commandStatus === 'running' ||
+    commandStatus === 'error'
 
   useEffect(() => {
     if (session?.id) {
@@ -133,39 +139,43 @@ export default function WorkoutSessionManager({
   return (
     <div className={`space-y-4 sm:space-y-6 ${className}`}>
       <div className="motion-enter rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="font-bold text-gray-900 text-xl dark:text-white sm:text-2xl">
-              {isSessionStarted ? 'Active Workout' : 'New Workout'}
-            </h1>
-            {saveStatus === 'saving' && (
-              <StatusBadge tone="neutral" className="animate-pulse">
-                Saving...
-              </StatusBadge>
-            )}
-            {saveStatus === 'saved' && (
-              <span className="font-medium text-green-600 text-sm opacity-100 transition-opacity duration-300 dark:text-green-400">
-                Saved
-              </span>
-            )}
-            {saveStatus === 'error' && <StatusBadge tone="danger">Save failed</StatusBadge>}
-            {commandStatus === 'running' && saveStatus !== 'saving' && (
-              <StatusBadge tone="info" className="animate-pulse">
-                Working...
-              </StatusBadge>
-            )}
+        {showWorkoutHeader && (
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {isSessionStarted && (
+                <h1 className="font-bold text-gray-900 text-xl dark:text-white sm:text-2xl">
+                  Active Workout
+                </h1>
+              )}
+              {saveStatus === 'saving' && (
+                <StatusBadge tone="neutral" className="animate-pulse">
+                  Saving...
+                </StatusBadge>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="font-medium text-green-600 text-sm opacity-100 transition-opacity duration-300 dark:text-green-400">
+                  Saved
+                </span>
+              )}
+              {saveStatus === 'error' && <StatusBadge tone="danger">Save failed</StatusBadge>}
+              {commandStatus === 'running' && saveStatus !== 'saving' && (
+                <StatusBadge tone="info" className="animate-pulse">
+                  Working...
+                </StatusBadge>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {session?.end_time && <StatusBadge tone="success">Completed</StatusBadge>}
+              {session && (
+                <TrashButton
+                  label="Delete workout"
+                  onClick={promptDeleteSession}
+                  disabled={loading}
+                />
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {session?.end_time && <StatusBadge tone="success">Completed</StatusBadge>}
-            {session && (
-              <TrashButton
-                label="Delete workout"
-                onClick={promptDeleteSession}
-                disabled={loading}
-              />
-            )}
-          </div>
-        </div>
+        )}
 
         <InlineError message={commandError} className="mb-4" />
 

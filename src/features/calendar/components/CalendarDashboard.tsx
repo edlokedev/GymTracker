@@ -63,7 +63,11 @@ export function CalendarDashboardContent({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
+    <div
+      className={`mx-auto max-w-7xl space-y-4 sm:space-y-6 ${
+        showSummaryStats ? 'px-4 sm:px-6' : ''
+      }`}
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
@@ -88,21 +92,21 @@ export function CalendarDashboardContent({
       )}
 
       {/* Calendar */}
-      <div className="relative rounded-2xl shadow-md border border-gray-200/60 dark:border-gray-700/70 bg-gradient-to-br from-white via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-blue-950/20 dark:to-indigo-950/30 overflow-hidden">
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 bg-gradient-to-br from-white via-blue-50 to-indigo-50 shadow-md dark:border-gray-700/70 dark:from-gray-900 dark:via-blue-950/20 dark:to-indigo-950/30">
         <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_30%_20%,black,transparent_70%)] opacity-40">
           <div className="absolute -top-24 -left-24 w-72 h-72 bg-gradient-to-br from-blue-400/30 via-indigo-400/20 to-purple-400/10 rounded-full blur-3xl" />
           <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-gradient-to-tr from-purple-500/20 via-indigo-500/10 to-blue-500/20 rounded-full blur-3xl" />
         </div>
-        <div className="relative p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg sm:text-xl font-semibold gradient-text">
+        <div className="relative p-4 sm:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="gradient-text text-base font-semibold leading-snug sm:text-xl">
               {formatDisplayDate(state.dateRange.start)} - {formatDisplayDate(state.dateRange.end)}
             </h2>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
               <button
                 onClick={() => actions.navigateMonth('prev')}
-                className="px-3 py-2 text-sm rounded-md border transition-colors min-h-[44px]"
+                className="min-h-11 rounded-md border px-3 py-2 text-sm transition-colors"
                 style={{
                   background: 'var(--color-surface-primary)',
                   borderColor: 'var(--color-border)',
@@ -115,7 +119,7 @@ export function CalendarDashboardContent({
               {!isToday(state.currentDate) && (
                 <button
                   onClick={() => actions.setCurrentDate(new Date())}
-                  className="btn-primary text-sm"
+                  className="btn-primary col-span-2 text-sm sm:col-span-1"
                 >
                   Today
                 </button>
@@ -123,7 +127,7 @@ export function CalendarDashboardContent({
 
               <button
                 onClick={() => actions.navigateMonth('next')}
-                className="px-3 py-2 text-sm rounded-md border transition-colors min-h-[44px]"
+                className="min-h-11 rounded-md border px-3 py-2 text-sm transition-colors"
                 style={{
                   background: 'var(--color-surface-primary)',
                   borderColor: 'var(--color-border)',

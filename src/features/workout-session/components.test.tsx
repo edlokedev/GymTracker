@@ -93,7 +93,7 @@ describe('WorkoutSessionManager', () => {
 
     render(<WorkoutSessionManager />)
 
-    expect(screen.getByText('New Workout')).toBeInTheDocument()
+    expect(screen.queryByText('New Workout')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Start Workout' }))
 
     await waitFor(() => expect(screen.getByText('Active Workout')).toBeInTheDocument())
