@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { type MouseEvent, useEffect } from 'react'
+import { DuplicateIcon, EditIcon } from '@/components/ui/ActionIcons'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { InlineError } from '@/components/ui/InlineError'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -291,15 +292,7 @@ export function WorkoutDetailModal({
           <InlineError message={detail.duplicateError} />
 
           {workout && (
-            <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:items-center">
-              <button
-                type="button"
-                onClick={handleDuplicate}
-                disabled={detail.isDuplicating || detail.isDeleting}
-                className="min-h-11 min-w-0 cursor-pointer rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-center font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40 sm:px-4"
-              >
-                {detail.isDuplicating ? 'Duplicating...' : 'Duplicate'}
-              </button>
+            <div className="flex w-full items-center justify-end gap-3">
               <Link
                 to="/workout"
                 search={{ sessionId: workout.id }}
@@ -308,10 +301,36 @@ export function WorkoutDetailModal({
                     event.preventDefault()
                   }
                 }}
-                className="flex min-h-11 min-w-0 cursor-pointer items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-center font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40 sm:px-4"
+                aria-disabled={detail.isDeleting}
+                aria-label={`Edit ${workoutLabel}`}
+                title={`Edit ${workoutLabel}`}
+                className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition-colors hover:bg-blue-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
               >
-                Edit Workout
+                <EditIcon className="h-5 w-5" />
+                <span className="sr-only">Edit {workoutLabel}</span>
               </Link>
+              <button
+                type="button"
+                onClick={handleDuplicate}
+                disabled={detail.isDuplicating || detail.isDeleting}
+                aria-busy={detail.isDuplicating}
+                aria-label={
+                  detail.isDuplicating ? `Duplicating ${workoutLabel}` : `Duplicate ${workoutLabel}`
+                }
+                title={
+                  detail.isDuplicating ? `Duplicating ${workoutLabel}` : `Duplicate ${workoutLabel}`
+                }
+                className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40"
+              >
+                <DuplicateIcon
+                  className={detail.isDuplicating ? 'h-5 w-5 animate-pulse' : 'h-5 w-5'}
+                />
+                <span className="sr-only">
+                  {detail.isDuplicating
+                    ? `Duplicating ${workoutLabel}`
+                    : `Duplicate ${workoutLabel}`}
+                </span>
+              </button>
               <TrashButton
                 onClick={handleDelete}
                 disabled={detail.isDeleting || detail.isDuplicating}

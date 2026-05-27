@@ -1,3 +1,4 @@
+export { DuplicateIcon, EditIcon } from './ActionIcons'
 export { ConfirmDialog } from './ConfirmDialog'
 export { EmptyState } from './EmptyState'
 export { InlineError } from './InlineError'

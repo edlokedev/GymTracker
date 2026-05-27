@@ -66,8 +66,11 @@ describe('WorkoutDetailModal', () => {
     expect(screen.getByRole('columnheader', { name: 'Weight' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Reps' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Machine Inner Chest Press' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit Full Body' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Duplicate Full Body' })).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Volume' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Edit Workout')).not.toBeInTheDocument()
   })
 
   it('closes on backdrop click but keeps clicks inside the modal open', () => {
@@ -110,7 +113,7 @@ describe('WorkoutDetailModal', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate Full Body' }))
     await waitFor(() => expect(onDuplicateWorkout).toHaveBeenCalledWith('workout-1'))
     expect(onClose).toHaveBeenCalledTimes(1)
 
