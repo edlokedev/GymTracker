@@ -116,7 +116,7 @@ export default function ExerciseBrowser({
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-900 md:pb-0">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 lg:px-8 lg:py-8">
         <ExerciseBrowserHeader
           activeFilterCount={library.activeFilterCount}

@@ -47,7 +47,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <AuthProvider>
           <ConditionalHeader />
-          {children}
+          <ConditionalAppContent>{children}</ConditionalAppContent>
         </AuthProvider>
         {DevtoolsPanel && (
           <Suspense fallback={null}>
@@ -75,4 +75,18 @@ function ConditionalHeader() {
 
   // Show header for authenticated users
   return <Header />
+}
+
+function ConditionalAppContent({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+
+  if (isLoading || !isAuthenticated) {
+    return <>{children}</>
+  }
+
+  return (
+    <main className="bg-gray-50 pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-gray-900 md:pb-0">
+      {children}
+    </main>
+  )
 }

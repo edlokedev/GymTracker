@@ -87,7 +87,7 @@ function WorkoutPage() {
   const isEditing = Boolean(sessionId)
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-900 md:pb-0">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto px-3 py-4 sm:px-4 sm:py-6 lg:px-8 lg:py-8">
         <div className="mb-4 sm:mb-6 lg:mb-8">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white leading-tight">

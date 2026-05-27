@@ -33,7 +33,7 @@ function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-900 md:pb-0">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <WorkoutDashboardOverview
           className="mb-6"
