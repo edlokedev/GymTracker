@@ -10,6 +10,8 @@ import {
   formatWorkoutDuration,
   formatWorkoutSummaryDate,
   getWorkoutDetailLabel,
+  getWorkoutSetMetricColumns,
+  getWorkoutSetMetricValue,
   getWorkoutTotalVolume,
   groupWorkoutSetsByExercise,
   type WorkoutDetailWorkout,
@@ -228,61 +230,69 @@ export function WorkoutDetailModal({
                   Exercises
                 </h3>
 
-                {exerciseGroups.map((group) => (
-                  <div key={group.exerciseId} className="mb-6 last:mb-0">
-                    <h4 className="font-medium text-gray-900 dark:text-white mb-3">
-                      {group.exerciseName}
-                    </h4>
+                {exerciseGroups.map((group) => {
+                  const metricColumns = getWorkoutSetMetricColumns(group.sets)
 
-                    <div className="bg-white/90 dark:bg-gray-900/80 rounded-xl border border-gray-200/70 dark:border-gray-700/60 overflow-hidden shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
-                      <table className="w-full">
-                        <thead className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 dark:from-blue-600/20 dark:via-indigo-600/20 dark:to-purple-600/20">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                              Set
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                              Weight
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                              Reps
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200/70 dark:divide-gray-700/60">
-                          {group.sets.map((set, index) => (
-                            <tr key={set.id}>
-                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">
-                                {index + 1}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">
-                                {set.weight} kg
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">
-                                {set.reps}
-                              </td>
+                  return (
+                    <div key={group.exerciseId} className="mb-6 last:mb-0">
+                      <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                        {group.exerciseName}
+                      </h4>
+
+                      <div className="bg-white/90 dark:bg-gray-900/80 rounded-xl border border-gray-200/70 dark:border-gray-700/60 overflow-hidden shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
+                        <table className="w-full">
+                          <thead className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 dark:from-blue-600/20 dark:via-indigo-600/20 dark:to-purple-600/20">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                                Set
+                              </th>
+                              {metricColumns.map((column) => (
+                                <th
+                                  key={column.key}
+                                  className="px-4 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide"
+                                >
+                                  {column.label}
+                                </th>
+                              ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {group.sets.find((set) => set.notes) && (
-                      <div className="mt-2 p-3 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-purple-950/30 rounded-lg border border-blue-100/60 dark:border-indigo-900/40">
-                        <p className="text-xs font-medium text-blue-800 dark:text-blue-400 mb-1">
-                          Notes:
-                        </p>
-                        {group.sets
-                          .filter((set) => set.notes)
-                          .map((set) => (
-                            <p key={set.id} className="text-sm text-blue-700 dark:text-blue-300">
-                              Set {group.sets.indexOf(set) + 1}: {set.notes}
-                            </p>
-                          ))}
+                          </thead>
+                          <tbody className="divide-y divide-gray-200/70 dark:divide-gray-700/60">
+                            {group.sets.map((set, index) => (
+                              <tr key={set.id}>
+                                <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">
+                                  {index + 1}
+                                </td>
+                                {metricColumns.map((column) => (
+                                  <td
+                                    key={column.key}
+                                    className="px-4 py-2 text-sm text-gray-900 dark:text-white"
+                                  >
+                                    {getWorkoutSetMetricValue(set, column.key)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {group.sets.find((set) => set.notes) && (
+                        <div className="mt-2 p-3 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-purple-950/30 rounded-lg border border-blue-100/60 dark:border-indigo-900/40">
+                          <p className="text-xs font-medium text-blue-800 dark:text-blue-400 mb-1">
+                            Notes:
+                          </p>
+                          {group.sets
+                            .filter((set) => set.notes)
+                            .map((set) => (
+                              <p key={set.id} className="text-sm text-blue-700 dark:text-blue-300">
+                                Set {group.sets.indexOf(set) + 1}: {set.notes}
+                              </p>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

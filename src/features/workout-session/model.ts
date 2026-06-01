@@ -25,6 +25,7 @@ export function mapWorkoutDetailsToExercises(workout: WorkoutWithDetails): Exerc
         name: exercise.name,
         category_id: exercise.category_id || '',
         category_name: exercise.category_name,
+        tracking_type: exercise.tracking_type ?? 'strength',
         force: exercise.force ?? null,
         level: exercise.level,
         mechanic: exercise.mechanic ?? null,

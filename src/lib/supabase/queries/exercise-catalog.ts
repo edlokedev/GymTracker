@@ -35,6 +35,7 @@ export interface CatalogExercise {
   id: string
   name: string
   category_id: string
+  tracking_type: 'strength' | 'cardio' | 'timed'
   force: string | null
   level: string | null
   mechanic: string | null
@@ -81,6 +82,7 @@ type RawExerciseRow = {
   id: string
   name: string
   category_id: string
+  tracking_type: 'strength' | 'cardio' | 'timed'
   force: string | null
   level: string | null
   mechanic: string | null
@@ -108,6 +110,7 @@ function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
     id: row.id,
     name: row.name,
     category_id: row.category_id,
+    tracking_type: row.tracking_type ?? 'strength',
     force: row.force,
     level: row.level,
     mechanic: row.mechanic,
@@ -124,7 +127,7 @@ function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
 }
 
 const EXERCISE_SELECT =
-  'id, name, category_id, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)'
+  'id, name, category_id, tracking_type, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)'
 
 export const exerciseCatalogQueries = {
   async listCategories(supabase: SB): Promise<CatalogCategoryWithCount[]> {

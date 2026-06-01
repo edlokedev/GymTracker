@@ -33,6 +33,10 @@ type SetRow = {
   reps: number | null
   rest_time: number | null
   notes: string | null
+  duration_seconds: number | null
+  distance_km: number | null
+  incline: number | null
+  speed_kmh: number | null
 }
 
 function computeDurationMinutes(
@@ -61,7 +65,9 @@ export const workoutDetailsQueries = {
     const sessionIds = sessions.map((s) => s.id)
     const { data: setsData, error: setsError } = await db
       .from<SetRow>('workout_sets')
-      .select('id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes')
+      .select(
+        'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, duration_seconds, distance_km, incline, speed_kmh',
+      )
       .in('workout_id', sessionIds)
       .order('set_number', { ascending: true })
       .order('created_at', { ascending: true })
@@ -114,6 +120,10 @@ export const workoutDetailsQueries = {
           restTime: s.rest_time ?? undefined,
           notes: s.notes ?? undefined,
           exerciseName: exerciseNameById.get(s.exercise_id),
+          durationSeconds: s.duration_seconds ?? undefined,
+          distanceKm: s.distance_km ?? undefined,
+          incline: s.incline ?? undefined,
+          speedKmh: s.speed_kmh ?? undefined,
         })),
         totalVolume,
         exerciseCount,

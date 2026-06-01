@@ -13,6 +13,10 @@ const workoutSet = z.object({
   reps: z.number().optional(),
   rest_time: z.number().optional(),
   notes: z.string().optional(),
+  duration_seconds: z.number().optional(),
+  distance_km: z.number().optional(),
+  incline: z.number().optional(),
+  speed_kmh: z.number().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -25,12 +29,20 @@ const workoutSetInput = z.object({
   weight: z.number().optional(),
   rest_time: z.number().optional(),
   notes: z.string().optional(),
+  duration_seconds: z.number().optional(),
+  distance_km: z.number().optional(),
+  incline: z.number().optional(),
+  speed_kmh: z.number().optional(),
 })
 
 const workoutSetHistoryItem = z.object({
   id: z.string(),
   reps: z.number(),
   weight: z.number(),
+  duration_seconds: z.number().optional(),
+  distance_km: z.number().optional(),
+  incline: z.number().optional(),
+  speed_kmh: z.number().optional(),
   session_date: z.string(),
   session_name: z.string().nullable(),
 })

@@ -55,6 +55,16 @@ describe('set entry model', () => {
           workoutId: 'session-1',
           setNumber: 1,
           trackingType: 'strength',
+          values: { ...strengthValues, reps: '1.5' },
+        }),
+      ).toMatchObject({ ok: false, error: 'invalid-reps' })
+
+      expect(
+        buildWorkoutSetInput({
+          exerciseId: 'bench-press',
+          workoutId: 'session-1',
+          setNumber: 1,
+          trackingType: 'strength',
           values: { ...strengthValues, weight: '-1' },
         }),
       ).toMatchObject({ ok: false, error: 'invalid-weight' })
@@ -111,6 +121,36 @@ describe('set entry model', () => {
           distance_km: 3.5,
           incline: 5,
           speed_kmh: 7,
+          rest_time: undefined,
+          notes: undefined,
+        },
+      })
+    })
+
+    it('allows zero-valued optional cardio metrics', () => {
+      expect(
+        buildWorkoutSetInput({
+          exerciseId: 'treadmill',
+          workoutId: 'session-1',
+          setNumber: 1,
+          trackingType: 'cardio',
+          values: {
+            ...cardioValues,
+            distanceKm: '0',
+            incline: '0',
+            speedKmh: '0',
+          },
+        }),
+      ).toEqual({
+        ok: true,
+        data: {
+          workout_id: 'session-1',
+          exercise_id: 'treadmill',
+          set_order: 1,
+          duration_seconds: 1800,
+          distance_km: 0,
+          incline: 0,
+          speed_kmh: 0,
           rest_time: undefined,
           notes: undefined,
         },

@@ -301,12 +301,13 @@ export default function WorkoutSessionManager({
             const previousSet = exerciseInWorkout.sets[exerciseInWorkout.sets.length - 1]
             const exerciseId = exerciseInWorkout.exercise.id
             const exerciseName = formatExerciseName(exerciseInWorkout.exercise.name)
-            const trackingType = getTrackingType(exerciseInWorkout.exercise.category_name)
+            const trackingType = getTrackingType({
+              trackingType: exerciseInWorkout.exercise.tracking_type,
+              categoryName: exerciseInWorkout.exercise.category_name,
+              force: exerciseInWorkout.exercise.force,
+            })
             const isExerciseComplete = completedExerciseIds.has(exerciseId)
-            const exerciseVolume = exerciseInWorkout.sets.reduce(
-              (total, set) => total + (set.weight || 0) * (set.reps || 0),
-              0,
-            )
+            const completionStats = getExerciseCompletionStats(exerciseInWorkout.sets, trackingType)
 
             return (
               <div
@@ -350,12 +351,12 @@ export default function WorkoutSessionManager({
                         </p>
                       </div>
                       <div className="flex gap-4 text-right text-sm">
-                        <span>
-                          <strong>{exerciseInWorkout.sets.length}</strong> sets
-                        </span>
-                        <span>
-                          <strong>{exerciseVolume.toLocaleString()}</strong> kg
-                        </span>
+                        {completionStats.map((stat, index) => (
+                          <span key={`${stat.label}-${index}`}>
+                            <strong>{stat.value}</strong>
+                            {stat.label && <> {stat.label}</>}
+                          </span>
+                        ))}
                       </div>
                     </div>
                     <button
@@ -533,7 +534,7 @@ function LastSetSummary({
     if (set.duration_seconds) stats.push(formatDuration(set.duration_seconds))
   }
 
-  if (set.rest_time !== undefined) stats.push(formatSetRestTime(set.rest_time) + ' rest')
+  if (set.rest_time !== undefined) stats.push(`${formatSetRestTime(set.rest_time)} rest`)
 
   return (
     <div className="motion-enter rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-3 text-white shadow-sm">
@@ -545,4 +546,31 @@ function LastSetSummary({
       </div>
     </div>
   )
+}
+
+function getExerciseCompletionStats(
+  sets: WorkoutSet[],
+  trackingType: ExerciseTrackingType,
+): Array<{ value: string; label: string }> {
+  const stats = [{ value: String(sets.length), label: 'sets' }]
+
+  if (trackingType === 'cardio') {
+    const durationSeconds = sets.reduce((total, set) => total + (set.duration_seconds ?? 0), 0)
+    const distanceKm = sets.reduce((total, set) => total + (set.distance_km ?? 0), 0)
+    if (durationSeconds > 0) stats.push({ value: formatDuration(durationSeconds), label: '' })
+    if (sets.some((set) => set.distance_km !== undefined)) {
+      stats.push({ value: distanceKm.toLocaleString(), label: 'km' })
+    }
+    return stats
+  }
+
+  if (trackingType === 'timed') {
+    const durationSeconds = sets.reduce((total, set) => total + (set.duration_seconds ?? 0), 0)
+    if (durationSeconds > 0) stats.push({ value: formatDuration(durationSeconds), label: '' })
+    return stats
+  }
+
+  const exerciseVolume = sets.reduce((total, set) => total + (set.weight || 0) * (set.reps || 0), 0)
+  stats.push({ value: exerciseVolume.toLocaleString(), label: 'kg' })
+  return stats
 }

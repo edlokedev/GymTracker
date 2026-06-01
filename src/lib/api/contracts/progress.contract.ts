@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { defineContract } from '../define-contract'
 
+const progressMetric = z.enum(['weight', 'reps', 'volume', 'duration', 'distance', 'speed'])
+
 // GET /api/progress — returns ExerciseProgress[] plus totals + resolved range.
 const dataPoint = z.object({
   id: z.string(),
@@ -10,6 +12,10 @@ const dataPoint = z.object({
   weight: z.number().nullable(),
   reps: z.number().nullable(),
   volume: z.number(),
+  durationSeconds: z.number().nullable(),
+  distanceKm: z.number().nullable(),
+  speedKmh: z.number().nullable(),
+  incline: z.number().nullable(),
   isPersonalRecord: z.boolean(),
   sessionId: z.string(),
   setNumber: z.number(),
@@ -25,13 +31,19 @@ const exerciseProgress = z.object({
     maxWeight: dataPoint.nullable(),
     maxReps: dataPoint.nullable(),
     maxVolume: dataPoint.nullable(),
+    maxDuration: dataPoint.nullable(),
+    maxDistance: dataPoint.nullable(),
+    maxSpeed: dataPoint.nullable(),
   }),
-  trends: z.object({ weight: trend, reps: trend, volume: trend }),
+  trends: z.record(progressMetric, trend),
   statistics: z.object({
     totalWorkouts: z.number(),
     averageWeight: z.number().nullable(),
     averageReps: z.number().nullable(),
     totalVolume: z.number(),
+    totalDurationSeconds: z.number(),
+    totalDistanceKm: z.number(),
+    averageSpeedKmh: z.number().nullable(),
     improvementPercentage: z.number(),
   }),
 })
@@ -44,7 +56,7 @@ export const progressContract = defineContract({
         exercises: z.string().optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
-        metric: z.enum(['weight', 'reps', 'volume']).optional(),
+        metric: progressMetric.optional(),
         limit: z.string().optional(),
       }),
       response: z.object({

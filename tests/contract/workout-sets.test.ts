@@ -106,6 +106,10 @@ function exerciseHistoryFixtures() {
         reps: 5,
         rest_time: null,
         notes: null,
+        duration_seconds: 1800,
+        distance_km: 3.5,
+        incline: 0,
+        speed_kmh: 7,
         created_at: '2026-05-20T10:00:00Z',
         updated_at: '2026-05-20T10:00:00Z',
         workout_sessions: { user_id: fakeUser.id, name: 'Push Day', date: '2026-05-20' },
@@ -188,6 +192,10 @@ describe('/api/workout-sets', () => {
         id: 'hist-set-1',
         reps: 5,
         weight: 100,
+        duration_seconds: 1800,
+        distance_km: 3.5,
+        incline: 0,
+        speed_kmh: 7,
         session_date: '2026-05-20',
         session_name: 'Push Day',
       },
@@ -284,15 +292,24 @@ describe('/api/workout-sets', () => {
       supabase,
       body: {
         workout_id: 'sess-1',
-        exercise_id: 'ex-1',
+        exercise_id: 'treadmill',
         set_order: 2,
-        reps: 10,
-        weight: 80,
+        duration_seconds: 1800,
+        distance_km: 3.5,
+        incline: 0,
+        speed_kmh: 7,
       },
     })
     expect(res.status).toBe(200)
     const parsed = workoutSetsContract.methods.POST.response.parse(res.body.data)
     expect(parsed.set_number).toBe(2)
+    expect(parsed).toMatchObject({
+      exercise_id: 'treadmill',
+      duration_seconds: 1800,
+      distance_km: 3.5,
+      incline: 0,
+      speed_kmh: 7,
+    })
   })
 
   it('POST returns 400 when required fields are missing', async () => {

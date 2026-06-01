@@ -46,14 +46,31 @@ function invalid(error: SetEntryValidationError): SetEntryValidationResult {
   return { ok: false, error, message: SET_ENTRY_ERROR_MESSAGES[error] }
 }
 
+function parseNumber(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const n = Number(trimmed)
+  return Number.isFinite(n) ? n : null
+}
+
 function parsePositiveNumber(value: string): number | null {
-  const n = Number.parseFloat(value)
-  return value && !Number.isNaN(n) && n > 0 ? n : null
+  const n = parseNumber(value)
+  return n !== null && n > 0 ? n : null
+}
+
+function parseNonNegativeNumber(value: string): number | null {
+  const n = parseNumber(value)
+  return n !== null && n >= 0 ? n : null
 }
 
 function parseNonNegativeInt(value: string): number | null {
-  const n = Number.parseInt(value, 10)
-  return value && !Number.isNaN(n) && n >= 0 ? n : null
+  const n = parseNumber(value)
+  return n !== null && Number.isInteger(n) && n >= 0 ? n : null
+}
+
+function parsePositiveInt(value: string): number | null {
+  const n = parseNumber(value)
+  return n !== null && Number.isInteger(n) && n > 0 ? n : null
 }
 
 export function buildWorkoutSetInput({
@@ -88,39 +105,36 @@ export function buildWorkoutSetInput({
   }
 
   if (trackingType === 'strength') {
-    const repsNum = Number.parseInt(values.reps, 10)
-    if (!values.reps || Number.isNaN(repsNum) || repsNum <= 0) return invalid('invalid-reps')
+    const repsNum = parsePositiveInt(values.reps)
+    if (repsNum === null) return invalid('invalid-reps')
 
-    const weightNum = Number.parseFloat(values.weight)
-    if (values.weight && (Number.isNaN(weightNum) || weightNum < 0))
-      return invalid('invalid-weight')
+    const weightNum = values.weight ? parseNonNegativeNumber(values.weight) : null
+    if (values.weight && weightNum === null) return invalid('invalid-weight')
 
     return {
       ok: true,
       data: {
         ...base,
         reps: repsNum,
-        weight: values.weight && !Number.isNaN(weightNum) && weightNum > 0 ? weightNum : undefined,
+        weight: weightNum !== null && weightNum > 0 ? weightNum : undefined,
         rest_time: restTimeNum,
       },
     }
   }
 
   if (trackingType === 'cardio') {
-    const durationMin = Number.parseFloat(values.durationMin)
-    if (!values.durationMin || Number.isNaN(durationMin) || durationMin <= 0) {
+    const durationMin = parsePositiveNumber(values.durationMin)
+    if (durationMin === null) {
       return invalid('invalid-duration')
     }
 
-    const distanceKm = values.distanceKm ? parsePositiveNumber(values.distanceKm) : null
+    const distanceKm = values.distanceKm ? parseNonNegativeNumber(values.distanceKm) : null
     if (values.distanceKm && distanceKm === null) return invalid('invalid-distance')
 
-    const incline = values.incline ? Number.parseFloat(values.incline) : null
-    if (values.incline && (incline === null || Number.isNaN(incline) || incline < 0)) {
-      return invalid('invalid-incline')
-    }
+    const incline = values.incline ? parseNonNegativeNumber(values.incline) : null
+    if (values.incline && incline === null) return invalid('invalid-incline')
 
-    const speedKmh = values.speedKmh ? parsePositiveNumber(values.speedKmh) : null
+    const speedKmh = values.speedKmh ? parseNonNegativeNumber(values.speedKmh) : null
     if (values.speedKmh && speedKmh === null) return invalid('invalid-speed')
 
     return {
@@ -129,7 +143,7 @@ export function buildWorkoutSetInput({
         ...base,
         duration_seconds: Math.round(durationMin * 60),
         distance_km: distanceKm ?? undefined,
-        incline: incline !== null && !Number.isNaN(incline) ? incline : undefined,
+        incline: incline ?? undefined,
         speed_kmh: speedKmh ?? undefined,
         rest_time: restTimeNum,
       },
@@ -137,8 +151,8 @@ export function buildWorkoutSetInput({
   }
 
   // timed
-  const durationSec = Number.parseInt(values.durationSec, 10)
-  if (!values.durationSec || Number.isNaN(durationSec) || durationSec <= 0) {
+  const durationSec = parsePositiveInt(values.durationSec)
+  if (durationSec === null) {
     return invalid('invalid-duration')
   }
 

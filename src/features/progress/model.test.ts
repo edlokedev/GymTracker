@@ -21,6 +21,10 @@ const makeProgress = (): ExerciseProgress => ({
       weight: 82.5,
       reps: 5,
       volume: 412.5,
+      durationSeconds: null,
+      distanceKm: null,
+      speedKmh: null,
+      incline: null,
       isPersonalRecord: true,
       sessionId: 'session-2',
       setNumber: 1,
@@ -33,6 +37,10 @@ const makeProgress = (): ExerciseProgress => ({
       weight: 80,
       reps: 5,
       volume: 400,
+      durationSeconds: null,
+      distanceKm: null,
+      speedKmh: null,
+      incline: null,
       isPersonalRecord: false,
       sessionId: 'session-1',
       setNumber: 1,
@@ -42,17 +50,26 @@ const makeProgress = (): ExerciseProgress => ({
     maxWeight: null,
     maxReps: null,
     maxVolume: null,
+    maxDuration: null,
+    maxDistance: null,
+    maxSpeed: null,
   },
   trends: {
     weight: 'up',
     reps: 'stable',
     volume: 'up',
+    duration: 'stable',
+    distance: 'stable',
+    speed: 'stable',
   },
   statistics: {
     totalWorkouts: 2,
     averageWeight: 81.25,
     averageReps: 5,
     totalVolume: 812.5,
+    totalDurationSeconds: 0,
+    totalDistanceKm: 0,
+    averageSpeedKmh: null,
     improvementPercentage: 3.1,
   },
 })
@@ -97,15 +114,31 @@ describe('progress model', () => {
     expect(points[0].isPersonalRecord).toBe(false)
   })
 
+  it('builds chart points for cardio metrics', () => {
+    const progress = makeProgress()
+    progress.dataPoints[0].durationSeconds = 1800
+    progress.dataPoints[0].distanceKm = 2.5
+    progress.dataPoints[0].speedKmh = 5
+
+    const durationPoints = buildProgressChartPoints([progress], 'duration')
+    const distancePoints = buildProgressChartPoints([progress], 'distance')
+    const speedPoints = buildProgressChartPoints([progress], 'speed')
+
+    expect(durationPoints.at(-1)?.value).toBe(1800)
+    expect(distancePoints.at(-1)?.value).toBe(2.5)
+    expect(speedPoints.at(-1)?.value).toBe(5)
+  })
+
   it('summarizes dashboard totals', () => {
     const progress = makeProgress()
     progress.personalRecords.maxWeight = progress.dataPoints[1]
     progress.personalRecords.maxVolume = progress.dataPoints[0]
+    progress.personalRecords.maxDistance = progress.dataPoints[0]
 
     expect(summarizeProgress([progress])).toEqual({
       exercisesTracked: 1,
       totalWorkouts: 2,
-      personalRecords: 2,
+      personalRecords: 3,
     })
   })
 })

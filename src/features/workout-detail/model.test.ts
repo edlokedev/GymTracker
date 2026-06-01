@@ -6,6 +6,8 @@ import {
   formatWorkoutDetailDate,
   formatWorkoutDuration,
   getWorkoutDetailLabel,
+  getWorkoutSetMetricColumns,
+  getWorkoutSetMetricValue,
   getWorkoutTotalVolume,
   groupWorkoutSetsByExercise,
 } from './model'
@@ -80,6 +82,32 @@ describe('workout detail model', () => {
     expect(calculateWorkoutVolume(workout.sets)).toBe(660)
     expect(getWorkoutTotalVolume(workout)).toBe(570)
     expect(getWorkoutTotalVolume({ ...workout, totalVolume: undefined })).toBe(660)
+  })
+
+  it('builds metric columns for strength and cardio detail rows', () => {
+    expect(getWorkoutSetMetricColumns(workout.sets)).toEqual([
+      { key: 'weight', label: 'Weight' },
+      { key: 'reps', label: 'Reps' },
+    ])
+
+    const cardioSet = {
+      ...workout.sets[0],
+      durationSeconds: 1530,
+      distanceKm: 3.2,
+      incline: 0,
+      speedKmh: 7.5,
+    }
+
+    expect(getWorkoutSetMetricColumns([cardioSet])).toEqual([
+      { key: 'duration', label: 'Duration' },
+      { key: 'distance', label: 'Distance' },
+      { key: 'incline', label: 'Incline' },
+      { key: 'speed', label: 'Speed' },
+    ])
+    expect(getWorkoutSetMetricValue(cardioSet, 'duration')).toBe('25m 30s')
+    expect(getWorkoutSetMetricValue(cardioSet, 'distance')).toBe('3.2 km')
+    expect(getWorkoutSetMetricValue(cardioSet, 'incline')).toBe('0')
+    expect(getWorkoutSetMetricValue(cardioSet, 'speed')).toBe('7.5 km/h')
   })
 
   it('builds delete dialog labels from name or date', () => {

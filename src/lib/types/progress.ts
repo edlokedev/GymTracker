@@ -1,5 +1,8 @@
 import type { Exercise } from './database'
 
+export type ProgressMetric = 'weight' | 'reps' | 'volume' | 'duration' | 'distance' | 'speed'
+export type TrendDirection = 'up' | 'down' | 'stable'
+
 // Core Progress Data Types
 export interface ProgressDataPoint {
   id: string
@@ -9,6 +12,10 @@ export interface ProgressDataPoint {
   weight: number | null
   reps: number | null
   volume: number // weight * reps
+  durationSeconds: number | null
+  distanceKm: number | null
+  speedKmh: number | null
+  incline: number | null
   isPersonalRecord: boolean
   sessionId: string
   setNumber: number
@@ -22,17 +29,19 @@ export interface ExerciseProgress {
     maxWeight: ProgressDataPoint | null
     maxReps: ProgressDataPoint | null
     maxVolume: ProgressDataPoint | null
+    maxDuration: ProgressDataPoint | null
+    maxDistance: ProgressDataPoint | null
+    maxSpeed: ProgressDataPoint | null
   }
-  trends: {
-    weight: 'up' | 'down' | 'stable'
-    reps: 'up' | 'down' | 'stable'
-    volume: 'up' | 'down' | 'stable'
-  }
+  trends: Record<ProgressMetric, TrendDirection>
   statistics: {
     totalWorkouts: number
     averageWeight: number | null
     averageReps: number | null
     totalVolume: number
+    totalDurationSeconds: number
+    totalDistanceKm: number
+    averageSpeedKmh: number | null
     improvementPercentage: number
   }
 }
@@ -44,7 +53,7 @@ export interface ProgressFilters {
     start: string // ISO date string
     end: string // ISO date string
   }
-  metric: 'weight' | 'reps' | 'volume'
+  metric: ProgressMetric
 }
 
 export interface ProgressState {
@@ -62,7 +71,7 @@ export interface ProgressRequest {
   exerciseIds?: string[]
   startDate: string
   endDate: string
-  metric?: 'weight' | 'reps' | 'volume'
+  metric?: ProgressMetric
   limit?: number
 }
 
@@ -88,13 +97,16 @@ export interface ChartDataPoint {
   volume: number
   weight: number | null
   reps: number | null
+  durationSeconds: number | null
+  distanceKm: number | null
+  speedKmh: number | null
 }
 
 export interface ChartConfig {
   type: 'line' | 'bar'
   showTrendLine: boolean
   highlightPRs: boolean
-  metric: 'weight' | 'reps' | 'volume'
+  metric: ProgressMetric
   colors: {
     primary: string
     secondary: string
@@ -124,12 +136,10 @@ export interface ProgressFiltersProps {
 
 export interface ProgressStatsProps {
   data: ExerciseProgress[]
-  selectedMetric: 'weight' | 'reps' | 'volume'
+  selectedMetric: ProgressMetric
 }
 
 // Utility Types
-export type TrendDirection = 'up' | 'down' | 'stable'
-
 export interface TrendCalculation {
   direction: TrendDirection
   percentage: number

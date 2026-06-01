@@ -44,6 +44,10 @@ type HistoryRow = {
   id: string
   weight: number | null
   reps: number | null
+  duration_seconds: number | null
+  distance_km: number | null
+  incline: number | null
+  speed_kmh: number | null
   created_at: string
   workout_sessions: HistorySessionRow | HistorySessionRow[] | null
 }
@@ -52,6 +56,10 @@ export type WorkoutSetHistoryItem = {
   id: string
   reps: number
   weight: number
+  duration_seconds?: number
+  distance_km?: number
+  incline?: number
+  speed_kmh?: number
   session_date: string
   session_name: string | null
 }
@@ -86,6 +94,10 @@ function mapHistorySet(row: HistoryRow): WorkoutSetHistoryItem {
     id: row.id,
     reps: row.reps ?? 0,
     weight: row.weight ?? 0,
+    duration_seconds: row.duration_seconds ?? undefined,
+    distance_km: row.distance_km ?? undefined,
+    incline: row.incline ?? undefined,
+    speed_kmh: row.speed_kmh ?? undefined,
     session_date: session?.date ?? '',
     session_name: session?.name ?? null,
   }
@@ -93,7 +105,8 @@ function mapHistorySet(row: HistoryRow): WorkoutSetHistoryItem {
 
 const SET_COLUMNS =
   'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, duration_seconds, distance_km, incline, speed_kmh, created_at, updated_at'
-const HISTORY_COLUMNS = 'id, weight, reps, created_at, workout_sessions!inner(date, name, user_id)'
+const HISTORY_COLUMNS =
+  'id, weight, reps, duration_seconds, distance_km, incline, speed_kmh, created_at, workout_sessions!inner(date, name, user_id)'
 
 export const WORKOUT_SET_HISTORY_DEFAULT_LIMIT = 50
 export const WORKOUT_SET_HISTORY_MAX_LIMIT = 100

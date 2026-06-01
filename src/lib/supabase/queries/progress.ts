@@ -3,6 +3,7 @@ import { assertPostgresOk } from '../../api/errors'
 import type {
   ExerciseProgress,
   ProgressDataPoint,
+  ProgressMetric,
   ProgressRequest,
   TrendDirection,
 } from '../../types/progress'
@@ -21,6 +22,10 @@ type SetJoinRow = {
   set_number: number
   weight: number | null
   reps: number | null
+  duration_seconds: number | null
+  distance_km: number | null
+  speed_kmh: number | null
+  incline: number | null
   created_at: string
   exercises: { name: string | null } | null
   workout_sessions: { date: string; user_id: string } | null
@@ -34,7 +39,7 @@ export async function getProgressData(
   supabase: AppSupabaseClient,
   input: ProgressQueryInput,
 ): Promise<ExerciseProgress[]> {
-  const { userId, exerciseIds, startDate, endDate, limit = 1000 } = input
+  const { userId, exerciseIds, startDate, endDate, metric = 'volume', limit = 1000 } = input
 
   // One round-trip: join sets -> exercises (for name) and sets -> sessions
   // (for date + user_id filter). PostgREST embeds resolve via FK references.
@@ -48,6 +53,10 @@ export async function getProgressData(
         set_number,
         weight,
         reps,
+        duration_seconds,
+        distance_km,
+        speed_kmh,
+        incline,
         created_at,
         exercises!inner ( name ),
         workout_sessions!inner ( date, user_id )
@@ -90,6 +99,10 @@ export async function getProgressData(
       weight: weight,
       reps: reps,
       volume: (weight || 0) * (reps || 0),
+      durationSeconds: row.duration_seconds ?? null,
+      distanceKm: row.distance_km ?? null,
+      speedKmh: row.speed_kmh ?? null,
+      incline: row.incline ?? null,
       isPersonalRecord: false,
       sessionId: row.workout_id,
       setNumber: row.set_number,
@@ -105,7 +118,7 @@ export async function getProgressData(
     const exerciseName = dataPoints[0]?.exerciseName || 'Unknown Exercise'
     const { markedDataPoints, personalRecords } = calculatePersonalRecords(dataPoints)
     const trends = calculateTrends(markedDataPoints)
-    const statistics = calculateStatistics(markedDataPoints)
+    const statistics = calculateStatistics(markedDataPoints, metric)
 
     results.push({
       exerciseId,
@@ -126,6 +139,9 @@ function calculatePersonalRecords(dataPoints: ProgressDataPoint[]) {
   let maxWeight: ProgressDataPoint | null = null
   let maxReps: ProgressDataPoint | null = null
   let maxVolume: ProgressDataPoint | null = null
+  let maxDuration: ProgressDataPoint | null = null
+  let maxDistance: ProgressDataPoint | null = null
+  let maxSpeed: ProgressDataPoint | null = null
 
   const sortedPoints = [...dataPoints].sort((a, b) => (dayjs(a.date).isBefore(b.date) ? -1 : 1))
 
@@ -153,12 +169,30 @@ function calculatePersonalRecords(dataPoints: ProgressDataPoint[]) {
       updatedPoint.isPersonalRecord = true
     }
 
+    if (
+      point.durationSeconds &&
+      (!maxDuration || point.durationSeconds > (maxDuration.durationSeconds || 0))
+    ) {
+      maxDuration = point
+      updatedPoint.isPersonalRecord = true
+    }
+
+    if (point.distanceKm && (!maxDistance || point.distanceKm > (maxDistance.distanceKm || 0))) {
+      maxDistance = point
+      updatedPoint.isPersonalRecord = true
+    }
+
+    if (point.speedKmh && (!maxSpeed || point.speedKmh > (maxSpeed.speedKmh || 0))) {
+      maxSpeed = point
+      updatedPoint.isPersonalRecord = true
+    }
+
     return updatedPoint
   })
 
   return {
     markedDataPoints,
-    personalRecords: { maxWeight, maxReps, maxVolume },
+    personalRecords: { maxWeight, maxReps, maxVolume, maxDuration, maxDistance, maxSpeed },
   }
 }
 
@@ -178,25 +212,35 @@ function calculateTrends(dataPoints: ProgressDataPoint[]) {
   const weights = dataPoints.map((p) => p.weight).filter(isNumber)
   const reps = dataPoints.map((p) => p.reps).filter(isNumber)
   const volumes = dataPoints.filter((p) => p.volume > 0).map((p) => p.volume)
+  const durations = dataPoints.map((p) => p.durationSeconds).filter(isPositiveNumber)
+  const distances = dataPoints.map((p) => p.distanceKm).filter(isPositiveNumber)
+  const speeds = dataPoints.map((p) => p.speedKmh).filter(isPositiveNumber)
 
   return {
     weight: calculateTrendForMetric(weights),
     reps: calculateTrendForMetric(reps),
     volume: calculateTrendForMetric(volumes),
+    duration: calculateTrendForMetric(durations),
+    distance: calculateTrendForMetric(distances),
+    speed: calculateTrendForMetric(speeds),
   }
 }
 
-function calculateStatistics(dataPoints: ProgressDataPoint[]) {
+function calculateStatistics(dataPoints: ProgressDataPoint[], metric: ProgressMetric) {
   const workoutDates = new Set(dataPoints.map((p) => p.date))
   const weights = dataPoints.map((p) => p.weight).filter(isNumber)
   const reps = dataPoints.map((p) => p.reps).filter(isNumber)
   const volumes = dataPoints.filter((p) => p.volume > 0).map((p) => p.volume)
+  const durations = dataPoints.map((p) => p.durationSeconds).filter(isPositiveNumber)
+  const distances = dataPoints.map((p) => p.distanceKm).filter(isPositiveNumber)
+  const speeds = dataPoints.map((p) => p.speedKmh).filter(isPositiveNumber)
+  const metricValues = getMetricValues(dataPoints, metric)
 
   let improvementPercentage = 0
-  if (volumes.length >= 2) {
-    const firstVolume = volumes[0]
-    const lastVolume = volumes[volumes.length - 1]
-    improvementPercentage = ((lastVolume - firstVolume) / firstVolume) * 100
+  if (metricValues.length >= 2) {
+    const firstValue = metricValues[0]
+    const lastValue = metricValues[metricValues.length - 1]
+    improvementPercentage = ((lastValue - firstValue) / firstValue) * 100
   }
 
   return {
@@ -204,10 +248,40 @@ function calculateStatistics(dataPoints: ProgressDataPoint[]) {
     averageWeight: weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : null,
     averageReps: reps.length > 0 ? reps.reduce((a, b) => a + b, 0) / reps.length : null,
     totalVolume: volumes.reduce((a, b) => a + b, 0),
+    totalDurationSeconds: durations.reduce((a, b) => a + b, 0),
+    totalDistanceKm: distances.reduce((a, b) => a + b, 0),
+    averageSpeedKmh: speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null,
     improvementPercentage: Math.round(improvementPercentage * 100) / 100,
   }
 }
 
 function isNumber(value: number | null): value is number {
   return value !== null
+}
+
+function isPositiveNumber(value: number | null): value is number {
+  return value !== null && value > 0
+}
+
+function getMetricValues(dataPoints: ProgressDataPoint[], metric: ProgressMetric): number[] {
+  return dataPoints
+    .map((point) => {
+      switch (metric) {
+        case 'weight':
+          return point.weight
+        case 'reps':
+          return point.reps
+        case 'volume':
+          return point.volume
+        case 'duration':
+          return point.durationSeconds
+        case 'distance':
+          return point.distanceKm
+        case 'speed':
+          return point.speedKmh
+        default:
+          return null
+      }
+    })
+    .filter(isPositiveNumber)
 }

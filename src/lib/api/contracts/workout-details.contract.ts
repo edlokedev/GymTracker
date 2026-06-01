@@ -16,6 +16,10 @@ const workoutDetailSet = z.object({
   restTime: z.number().optional(),
   notes: z.string().optional(),
   exerciseName: z.string().optional(),
+  durationSeconds: z.number().optional(),
+  distanceKm: z.number().optional(),
+  incline: z.number().optional(),
+  speedKmh: z.number().optional(),
 })
 
 const workoutSessionWithSets = z.object({

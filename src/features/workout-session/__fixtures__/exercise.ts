@@ -14,6 +14,7 @@ export function makeExerciseFixture(overrides: Partial<ExerciseFixture> = {}): E
     equipment: 'barbell',
     category_id: 'strength',
     category_name: 'Strength',
+    tracking_type: 'strength',
     force: null,
     level: null,
     mechanic: null,

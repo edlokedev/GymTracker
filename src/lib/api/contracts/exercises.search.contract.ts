@@ -5,6 +5,7 @@ const catalogExercise = z.object({
   id: z.string(),
   name: z.string(),
   category_id: z.string(),
+  tracking_type: z.enum(['strength', 'cardio', 'timed']),
   force: z.string().nullable(),
   level: z.string().nullable(),
   mechanic: z.string().nullable(),

@@ -1,6 +1,8 @@
 import { useAuth } from '@/lib/auth'
+import type { ExerciseProgress, ProgressMetric } from '@/lib/types/progress'
 import { DATE_PRESETS } from '@/lib/types/progress'
 import { formatExerciseName } from '@/lib/utils/text'
+import { PROGRESS_METRIC_OPTIONS } from '../model'
 import { useProgressDashboard } from '../useProgressDashboard'
 
 type ProgressDashboardState = ReturnType<typeof useProgressDashboard>['state']
@@ -97,68 +99,63 @@ export default function ProgressDashboard() {
               </h2>
             </div>
             <div className="p-6">
-              {state.data.map((exercise) => (
-                <div key={exercise.exerciseId} className="mb-6 last:mb-0">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                      {formatExerciseName(exercise.exerciseName)}
-                    </h3>
-                    <div className="flex space-x-2">
-                      {exercise.trends.volume === 'up' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
-                          Improving
-                        </span>
-                      )}
-                      {exercise.trends.volume === 'down' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
-                          Declining
-                        </span>
-                      )}
-                      {exercise.trends.volume === 'stable' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300">
-                          Stable
-                        </span>
-                      )}
-                    </div>
-                  </div>
+              {state.data.map((exercise) => {
+                const trend = exercise.trends[state.filters.metric]
+                const fields = buildSummaryFields(exercise, state.filters.metric)
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Workouts:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                        {exercise.statistics.totalWorkouts}
-                      </span>
+                return (
+                  <div key={exercise.exerciseId} className="mb-6 last:mb-0">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                        {formatExerciseName(exercise.exerciseName)}
+                      </h3>
+                      <div className="flex space-x-2">
+                        {trend === 'up' && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                            Improving
+                          </span>
+                        )}
+                        {trend === 'down' && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
+                            Declining
+                          </span>
+                        )}
+                        {trend === 'stable' && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300">
+                            Stable
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Total Volume:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                        {exercise.statistics.totalVolume.toLocaleString()} kg
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Avg Weight:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                        {exercise.statistics.averageWeight?.toFixed(1) || 'N/A'} kg
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Improvement:</span>
-                      <span
-                        className={`ml-2 font-medium ${
-                          exercise.statistics.improvementPercentage > 0
-                            ? 'text-green-600 dark:text-green-400'
-                            : exercise.statistics.improvementPercentage < 0
-                              ? 'text-red-600 dark:text-red-400'
-                              : 'text-gray-900 dark:text-white'
-                        }`}
-                      >
-                        {exercise.statistics.improvementPercentage > 0 ? '+' : ''}
-                        {exercise.statistics.improvementPercentage.toFixed(1)}%
-                      </span>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      {fields.map((field) => (
+                        <div key={field.label}>
+                          <span className="text-gray-500 dark:text-gray-400">{field.label}:</span>
+                          <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                            {field.value}
+                          </span>
+                        </div>
+                      ))}
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400">Improvement:</span>
+                        <span
+                          className={`ml-2 font-medium ${
+                            exercise.statistics.improvementPercentage > 0
+                              ? 'text-green-600 dark:text-green-400'
+                              : exercise.statistics.improvementPercentage < 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-900 dark:text-white'
+                          }`}
+                        >
+                          {exercise.statistics.improvementPercentage > 0 ? '+' : ''}
+                          {exercise.statistics.improvementPercentage.toFixed(1)}%
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </>
@@ -194,9 +191,11 @@ function ProgressControls({
               actions.setMetric(event.target.value as ProgressDashboardState['filters']['metric'])
             }
           >
-            <option value="volume">Volume</option>
-            <option value="weight">Weight</option>
-            <option value="reps">Reps</option>
+            {PROGRESS_METRIC_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -303,4 +302,54 @@ function ProgressControls({
       </div>
     </div>
   )
+}
+
+function buildSummaryFields(
+  exercise: ExerciseProgress,
+  metric: ProgressMetric,
+): Array<{ label: string; value: string }> {
+  const base = [{ label: 'Workouts', value: String(exercise.statistics.totalWorkouts) }]
+
+  if (metric === 'duration') {
+    return [
+      ...base,
+      { label: 'Duration', value: formatDuration(exercise.statistics.totalDurationSeconds) },
+      { label: 'Avg Speed', value: formatSpeed(exercise.statistics.averageSpeedKmh) },
+    ]
+  }
+
+  if (metric === 'distance' || metric === 'speed') {
+    return [
+      ...base,
+      { label: 'Distance', value: `${formatNumber(exercise.statistics.totalDistanceKm)} km` },
+      { label: 'Avg Speed', value: formatSpeed(exercise.statistics.averageSpeedKmh) },
+    ]
+  }
+
+  return [
+    ...base,
+    { label: 'Volume', value: `${formatNumber(exercise.statistics.totalVolume)} kg` },
+    { label: 'Avg Weight', value: formatWeight(exercise.statistics.averageWeight) },
+  ]
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: 1 })
+}
+
+function formatWeight(value: number | null): string {
+  return value === null ? 'N/A' : `${formatNumber(value)} kg`
+}
+
+function formatSpeed(value: number | null): string {
+  return value === null ? 'N/A' : `${formatNumber(value)} km/h`
+}
+
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds <= 0) return 'N/A'
+  const minutes = Math.round(totalSeconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
 }

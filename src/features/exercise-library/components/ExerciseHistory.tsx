@@ -9,8 +9,31 @@ interface HistoricalSet {
   id: string
   reps: number
   weight: number
+  duration_seconds?: number
+  distance_km?: number
+  incline?: number
+  speed_kmh?: number
   session_date: string
   session_name: string | null
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes === 0) return `${remainingSeconds}s`
+  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
+}
+
+function formatHistoricalSet(set: HistoricalSet): string {
+  if (set.duration_seconds !== undefined) {
+    const parts = [formatDuration(set.duration_seconds)]
+    if (set.distance_km !== undefined) parts.push(`${set.distance_km} km`)
+    if (set.incline !== undefined) parts.push(`incline ${set.incline}`)
+    if (set.speed_kmh !== undefined) parts.push(`${set.speed_kmh} km/h`)
+    return parts.join(', ')
+  }
+
+  return `${set.weight}kg x ${set.reps}`
 }
 
 export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps) {
@@ -106,9 +129,7 @@ export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps
                 className="text-xs font-medium bg-white dark:bg-gray-700 px-2 py-1.5 rounded shadow-sm flex justify-between"
               >
                 <span className="text-gray-500 dark:text-gray-400">Set {idx + 1}</span>
-                <span className="text-gray-900 dark:text-gray-200">
-                  {s.weight}kg x {s.reps}
-                </span>
+                <span className="text-gray-900 dark:text-gray-200">{formatHistoricalSet(s)}</span>
               </div>
             ))}
           </div>

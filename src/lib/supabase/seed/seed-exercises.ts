@@ -16,6 +16,7 @@
 // always exactly mirrors the linked source.
 
 import { basename } from 'node:path'
+import { type ExerciseTrackingType, getTrackingType } from '../../utils/exercise-tracking'
 import { getSupabaseServiceRoleClient } from '../server'
 
 const DATASET_REPO = 'hasaneyldrm/exercises-dataset'
@@ -58,6 +59,7 @@ interface NormalizedExerciseRow {
   images: string[]
   gif_path: string | null
   preview_image_path: string | null
+  tracking_type: ExerciseTrackingType
 }
 
 function normalizeWhitespace(value: string): string {
@@ -154,6 +156,7 @@ function normalize(upstream: UpstreamExercise): {
       images: [],
       gif_path: toJsDelivrUrl('videos', upstream.gif_url),
       preview_image_path: toJsDelivrUrl('images', upstream.image),
+      tracking_type: getTrackingType({ categoryName, force: null }),
     },
   }
 }

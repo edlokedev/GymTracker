@@ -122,7 +122,7 @@ export default function SetEntry({
 
   const copyPreviousSet = () => {
     if (!previousSet) return
-    setValues(valuesFromSet(previousSet))
+    setValues({ ...valuesFromSet(previousSet), notes: '' })
     setValidationMessage(null)
     setShowDetails(Boolean(previousSet.rest_time))
     flashCopiedFields()

@@ -59,6 +59,7 @@ export interface Exercise {
   id: string
   name: string
   category_id: string
+  tracking_type?: 'strength' | 'cardio' | 'timed'
   force?: 'push' | 'pull' | 'static' | null
   level?: 'beginner' | 'intermediate' | 'advanced' | 'expert'
   mechanic?: 'compound' | 'isolation' | null
@@ -131,6 +132,7 @@ export interface WorkoutWithDetails extends WorkoutSession {
       equipment: string
       category_id: string
       category_name: string
+      tracking_type: 'strength' | 'cardio' | 'timed'
       force: 'push' | 'pull' | 'static' | null
       level: 'beginner' | 'intermediate' | 'advanced' | 'expert' | null
       mechanic: 'compound' | 'isolation' | null
@@ -257,6 +259,7 @@ export interface FreeExerciseDBExercise {
   instructions: string[]
   category: string
   images: string[]
+  tracking_type?: 'strength' | 'cardio' | 'timed'
 }
 
 // Migration types

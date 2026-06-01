@@ -45,6 +45,10 @@ type SetRow = {
   reps: number | null
   rest_time: number | null
   notes: string | null
+  duration_seconds: number | null
+  distance_km: number | null
+  incline: number | null
+  speed_kmh: number | null
   created_at: string
   updated_at: string
 }
@@ -69,7 +73,7 @@ function mapSession(row: SessionRow): WorkoutSession {
 const SESSION_COLUMNS =
   'id, user_id, name, date, start_time, end_time, notes, created_at, updated_at'
 const SET_COLUMNS =
-  'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, created_at, updated_at'
+  'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, duration_seconds, distance_km, incline, speed_kmh, created_at, updated_at'
 
 export const workoutSessionQueries = {
   // Paginated list of the authenticated user's workout sessions.
@@ -234,6 +238,10 @@ export const workoutSessionQueries = {
             reps: set.reps,
             rest_time: set.rest_time,
             notes: set.notes,
+            duration_seconds: set.duration_seconds,
+            distance_km: set.distance_km,
+            incline: set.incline,
+            speed_kmh: set.speed_kmh,
           })
           .select(SET_COLUMNS)
           .single()
@@ -259,9 +267,7 @@ export const workoutSessionQueries = {
 
     const { data: setsData, error: setsError } = await queryClient(supabase)
       .from('workout_sets')
-      .select(
-        'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, created_at, updated_at',
-      )
+      .select(SET_COLUMNS)
       .eq('workout_id', id)
       .order('set_number', { ascending: true })
       .order('created_at', { ascending: true })
@@ -275,6 +281,7 @@ export const workoutSessionQueries = {
       id: string
       name: string
       category_id: string
+      tracking_type: 'strength' | 'cardio' | 'timed'
       force: 'push' | 'pull' | 'static' | null
       level: 'beginner' | 'intermediate' | 'advanced' | 'expert' | null
       mechanic: 'compound' | 'isolation' | null
@@ -294,7 +301,7 @@ export const workoutSessionQueries = {
       const { data, error } = await queryClient(supabase)
         .from('exercises')
         .select(
-          'id, name, category_id, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)',
+          'id, name, category_id, tracking_type, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)',
         )
         .in('id', uniqueExerciseIds)
       assertPostgresOk(error)
@@ -330,6 +337,7 @@ export const workoutSessionQueries = {
           equipment: row?.equipment ?? '',
           category_id: row?.category_id ?? '',
           category_name: catName,
+          tracking_type: row?.tracking_type ?? 'strength',
           force: row?.force ?? null,
           level: row?.level ?? null,
           mechanic: row?.mechanic ?? null,
@@ -347,6 +355,10 @@ export const workoutSessionQueries = {
           reps: s.reps ?? undefined,
           rest_time: s.rest_time ?? undefined,
           notes: s.notes ?? undefined,
+          duration_seconds: s.duration_seconds ?? undefined,
+          distance_km: s.distance_km ?? undefined,
+          incline: s.incline ?? undefined,
+          speed_kmh: s.speed_kmh ?? undefined,
           created_at: new Date(s.created_at),
           updated_at: new Date(s.updated_at),
         })),

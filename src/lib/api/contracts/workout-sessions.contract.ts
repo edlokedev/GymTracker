@@ -23,6 +23,10 @@ const workoutSet = z.object({
   reps: z.number().optional(),
   rest_time: z.number().optional(),
   notes: z.string().optional(),
+  duration_seconds: z.number().optional(),
+  distance_km: z.number().optional(),
+  incline: z.number().optional(),
+  speed_kmh: z.number().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -39,6 +43,7 @@ const workoutWithDetails = workoutSession.extend({
         equipment: z.string(),
         category_id: z.string(),
         category_name: z.string(),
+        tracking_type: z.enum(['strength', 'cardio', 'timed']),
         force: z.enum(['push', 'pull', 'static']).nullable(),
         level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']).nullable(),
         mechanic: z.enum(['compound', 'isolation']).nullable(),

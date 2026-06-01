@@ -3,6 +3,22 @@ import dayjs from 'dayjs'
 import { type PrivateHandlerContext, privateMethod } from '../lib/api/define-private-route'
 import { badRequest } from '../lib/api/errors'
 import { getProgressData } from '../lib/supabase/queries/progress'
+import type { ProgressMetric } from '../lib/types/progress'
+
+const PROGRESS_METRICS: ProgressMetric[] = [
+  'weight',
+  'reps',
+  'volume',
+  'duration',
+  'distance',
+  'speed',
+]
+
+function parseMetric(value: string | null): ProgressMetric {
+  if (!value) return 'volume'
+  if (PROGRESS_METRICS.includes(value as ProgressMetric)) return value as ProgressMetric
+  badRequest('Invalid progress metric')
+}
 
 export const getProgress = async ({ user, supabase, url }: PrivateHandlerContext) => {
   const searchParams = url.searchParams
@@ -10,7 +26,7 @@ export const getProgress = async ({ user, supabase, url }: PrivateHandlerContext
   const startDate =
     searchParams.get('startDate') || dayjs().subtract(90, 'day').format('YYYY-MM-DD')
   const endDate = searchParams.get('endDate') || dayjs().format('YYYY-MM-DD')
-  const metric = (searchParams.get('metric') as 'weight' | 'reps' | 'volume') || 'volume'
+  const metric = parseMetric(searchParams.get('metric'))
   const limit = parseInt(searchParams.get('limit') || '1000', 10)
 
   if (dayjs(startDate).isAfter(dayjs(endDate))) {

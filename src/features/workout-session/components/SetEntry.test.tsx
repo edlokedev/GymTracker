@@ -88,6 +88,7 @@ describe('SetEntry', () => {
           reps: 8,
           weight: 100,
           rest_time: 90,
+          notes: 'do not carry this forward',
           created_at: new Date('2026-05-01T10:00:00.000Z'),
           updated_at: new Date('2026-05-01T10:00:00.000Z'),
         }}
@@ -100,5 +101,6 @@ describe('SetEntry', () => {
     expect(screen.getByLabelText('Reps *')).toHaveValue(8)
     expect(screen.getByLabelText('Weight (kg)')).toHaveValue(100)
     expect(screen.getByLabelText('Rest Time (seconds)')).toHaveValue(90)
+    expect(screen.getByLabelText('Notes')).toHaveValue('')
   })
 })

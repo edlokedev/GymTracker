@@ -43,6 +43,10 @@ function fixtures() {
         reps: 5,
         rest_time: null,
         notes: null,
+        duration_seconds: 1800,
+        distance_km: 3.5,
+        incline: 0,
+        speed_kmh: 7,
         created_at: '2026-05-20T10:00:00Z',
         updated_at: '2026-05-20T10:00:00Z',
       },
@@ -219,6 +223,10 @@ describe('/api/workout-sessions', () => {
       set_number: 1,
       weight: 100,
       reps: 5,
+      duration_seconds: 1800,
+      distance_km: 3.5,
+      incline: 0,
+      speed_kmh: 7,
     })
     expect(detail.exercises[0].sets[0].id).not.toBe('set-1')
   })

@@ -1,0 +1,14 @@
+node_modules/
+.output/
+.tanstack/
+dist/
+build/
+coverage/
+graphify-out/
+
+src/routeTree.gen.ts
+*.generated.*
+*.gen.*
+
+package-lock.json
+bun.lockb

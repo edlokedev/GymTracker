@@ -28,6 +28,10 @@ describe('GET /api/workout-details', () => {
             reps: 5,
             rest_time: null,
             notes: null,
+            duration_seconds: 1800,
+            distance_km: 3.5,
+            incline: 0,
+            speed_kmh: 7,
             created_at: '2026-05-23T10:00:00Z',
           },
         ],
@@ -49,6 +53,12 @@ describe('GET /api/workout-details', () => {
     expect(parsed[0].totalVolume).toBe(500)
     expect(parsed[0].exerciseCount).toBe(1)
     expect(parsed[0].sets[0].exerciseName).toBe('Bench Press')
+    expect(parsed[0].sets[0]).toMatchObject({
+      durationSeconds: 1800,
+      distanceKm: 3.5,
+      incline: 0,
+      speedKmh: 7,
+    })
   })
 
   it('returns 401 for anonymous requests', async () => {

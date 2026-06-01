@@ -76,6 +76,10 @@ export interface WorkoutSet {
   restTime?: number
   notes?: string
   exerciseName?: string
+  durationSeconds?: number
+  distanceKm?: number
+  incline?: number
+  speedKmh?: number
 }
 
 export interface CalendarState {
