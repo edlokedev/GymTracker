@@ -26,6 +26,10 @@ type SetRow = {
   reps: number | null
   rest_time: number | null
   notes: string | null
+  duration_seconds: number | null
+  distance_km: number | null
+  incline: number | null
+  speed_kmh: number | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +66,10 @@ function mapSet(row: SetRow): WorkoutSet {
     reps: row.reps ?? undefined,
     rest_time: row.rest_time ?? undefined,
     notes: row.notes ?? undefined,
+    duration_seconds: row.duration_seconds ?? undefined,
+    distance_km: row.distance_km ?? undefined,
+    incline: row.incline ?? undefined,
+    speed_kmh: row.speed_kmh ?? undefined,
     created_at: new Date(row.created_at),
     updated_at: new Date(row.updated_at),
   }
@@ -84,7 +92,7 @@ function mapHistorySet(row: HistoryRow): WorkoutSetHistoryItem {
 }
 
 const SET_COLUMNS =
-  'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, created_at, updated_at'
+  'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, duration_seconds, distance_km, incline, speed_kmh, created_at, updated_at'
 const HISTORY_COLUMNS = 'id, weight, reps, created_at, workout_sessions!inner(date, name, user_id)'
 
 export const WORKOUT_SET_HISTORY_DEFAULT_LIMIT = 50
@@ -160,6 +168,10 @@ export const workoutSetQueries = {
       weight: data.weight ?? null,
       rest_time: data.rest_time ?? null,
       notes: data.notes ?? null,
+      duration_seconds: data.duration_seconds ?? null,
+      distance_km: data.distance_km ?? null,
+      incline: data.incline ?? null,
+      speed_kmh: data.speed_kmh ?? null,
     }
 
     const { data: row, error } = await queryClient(supabase)
@@ -183,6 +195,10 @@ export const workoutSetQueries = {
     if (data.weight !== undefined) patch.weight = data.weight
     if (data.rest_time !== undefined) patch.rest_time = data.rest_time
     if (data.notes !== undefined) patch.notes = data.notes
+    if (data.duration_seconds !== undefined) patch.duration_seconds = data.duration_seconds
+    if (data.distance_km !== undefined) patch.distance_km = data.distance_km
+    if (data.incline !== undefined) patch.incline = data.incline
+    if (data.speed_kmh !== undefined) patch.speed_kmh = data.speed_kmh
 
     if (Object.keys(patch).length === 0) {
       return workoutSetQueries.getById(supabase, id)

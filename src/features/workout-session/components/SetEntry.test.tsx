@@ -13,7 +13,13 @@ describe('SetEntry', () => {
     const onSave = vi.fn()
 
     render(
-      <SetEntry exerciseId="bench-press" workoutId="session-1" setNumber={1} onSave={onSave} />,
+      <SetEntry
+        exerciseId="bench-press"
+        workoutId="session-1"
+        setNumber={1}
+        trackingType="strength"
+        onSave={onSave}
+      />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Save Set' }))
@@ -23,7 +29,7 @@ describe('SetEntry', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter a valid number of reps.')
   })
 
-  it('submits parsed set data for valid input', async () => {
+  it('submits parsed set data for valid strength input', async () => {
     const onSave = vi.fn(async () => ({
       id: 'set-1',
       workout_id: 'session-1',
@@ -36,7 +42,13 @@ describe('SetEntry', () => {
     }))
 
     render(
-      <SetEntry exerciseId="bench-press" workoutId="session-1" setNumber={1} onSave={onSave} />,
+      <SetEntry
+        exerciseId="bench-press"
+        workoutId="session-1"
+        setNumber={1}
+        trackingType="strength"
+        onSave={onSave}
+      />,
     )
 
     fireEvent.change(screen.getByLabelText('Reps *'), {
@@ -67,6 +79,7 @@ describe('SetEntry', () => {
         exerciseId="bench-press"
         workoutId="session-1"
         setNumber={2}
+        trackingType="strength"
         previousSet={{
           id: 'set-1',
           workout_id: 'session-1',

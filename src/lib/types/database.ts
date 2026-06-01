@@ -94,6 +94,10 @@ export interface WorkoutSet {
   reps?: number
   rest_time?: number // seconds
   notes?: string
+  duration_seconds?: number
+  distance_km?: number
+  incline?: number
+  speed_kmh?: number
   created_at: Date
   updated_at: Date
 }
@@ -171,6 +175,10 @@ export interface WorkoutSetInput {
   weight?: number // weight in kg
   rest_time?: number
   notes?: string
+  duration_seconds?: number
+  distance_km?: number
+  incline?: number
+  speed_kmh?: number
 }
 
 export interface CreateWorkoutInput {

@@ -2,7 +2,13 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { InlineError } from '@/components/ui/InlineError'
 import { TrashButton } from '@/components/ui/TrashButton'
 import type { WorkoutSet, WorkoutSetInput } from '@/lib/types/database'
-import { buildWorkoutSetInput, formatSetRestTime } from '../setEntry'
+import type { ExerciseTrackingType } from '@/lib/utils/exercise-tracking'
+import {
+  buildWorkoutSetInput,
+  formatDuration,
+  formatSetRestTime,
+  type SetEntryFormValues,
+} from '../setEntry'
 
 interface SetEntryProps {
   exerciseId?: string
@@ -10,9 +16,38 @@ interface SetEntryProps {
   existingSet?: WorkoutSet
   previousSet?: WorkoutSet
   setNumber: number
+  trackingType: ExerciseTrackingType
   onSave: (setData: WorkoutSetInput) => Promise<WorkoutSet | null>
   onDelete?: () => void
   className?: string
+}
+
+function emptyValues(): SetEntryFormValues {
+  return {
+    reps: '',
+    weight: '',
+    durationMin: '',
+    distanceKm: '',
+    incline: '',
+    speedKmh: '',
+    durationSec: '',
+    restTime: '',
+    notes: '',
+  }
+}
+
+function valuesFromSet(set: WorkoutSet): SetEntryFormValues {
+  return {
+    reps: set.reps?.toString() ?? '',
+    weight: set.weight?.toString() ?? '',
+    durationMin: set.duration_seconds ? String(set.duration_seconds / 60) : '',
+    distanceKm: set.distance_km?.toString() ?? '',
+    incline: set.incline?.toString() ?? '',
+    speedKmh: set.speed_kmh?.toString() ?? '',
+    durationSec: set.duration_seconds?.toString() ?? '',
+    restTime: set.rest_time?.toString() ?? '',
+    notes: set.notes ?? '',
+  }
 }
 
 export default function SetEntry({
@@ -21,15 +56,15 @@ export default function SetEntry({
   existingSet,
   previousSet,
   setNumber,
+  trackingType,
   onSave,
   onDelete,
   className = '',
 }: SetEntryProps) {
   const entryId = useId()
-  const [reps, setReps] = useState<string>(existingSet?.reps?.toString() || '')
-  const [weight, setWeight] = useState<string>(existingSet?.weight?.toString() || '')
-  const [restTime, setRestTime] = useState<string>(existingSet?.rest_time?.toString() || '')
-  const [notes, setNotes] = useState<string>(existingSet?.notes || '')
+  const [values, setValues] = useState<SetEntryFormValues>(
+    existingSet ? valuesFromSet(existingSet) : emptyValues(),
+  )
   const [isSaved, setIsSaved] = useState(!!existingSet)
   const [isEditing, setIsEditing] = useState(!existingSet)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -42,13 +77,12 @@ export default function SetEntry({
   const copyFlashTimeoutRef = useRef<number | null>(null)
   const saveFeedbackTimeoutRef = useRef<number | null>(null)
 
-  // Update form when existingSet changes
+  const set = (field: keyof SetEntryFormValues, value: string) =>
+    setValues((prev) => ({ ...prev, [field]: value }))
+
   useEffect(() => {
     if (existingSet) {
-      setReps(existingSet.reps?.toString() || '')
-      setWeight(existingSet.weight?.toString() || '')
-      setRestTime(existingSet.rest_time?.toString() || '')
-      setNotes(existingSet.notes || '')
+      setValues(valuesFromSet(existingSet))
       setIsSaved(true)
       setIsEditing(false)
       setValidationMessage(null)
@@ -58,20 +92,14 @@ export default function SetEntry({
 
   useEffect(() => {
     return () => {
-      if (copyFlashTimeoutRef.current) {
-        window.clearTimeout(copyFlashTimeoutRef.current)
-      }
-      if (saveFeedbackTimeoutRef.current) {
-        window.clearTimeout(saveFeedbackTimeoutRef.current)
-      }
+      if (copyFlashTimeoutRef.current) window.clearTimeout(copyFlashTimeoutRef.current)
+      if (saveFeedbackTimeoutRef.current) window.clearTimeout(saveFeedbackTimeoutRef.current)
     }
   }, [])
 
   const flashCopiedFields = () => {
     setCopyFlash(false)
-    if (copyFlashTimeoutRef.current) {
-      window.clearTimeout(copyFlashTimeoutRef.current)
-    }
+    if (copyFlashTimeoutRef.current) window.clearTimeout(copyFlashTimeoutRef.current)
     window.setTimeout(() => {
       setCopyFlash(true)
       copyFlashTimeoutRef.current = window.setTimeout(() => setCopyFlash(false), 560)
@@ -80,9 +108,7 @@ export default function SetEntry({
 
   const flashSavedState = () => {
     setSaveFeedback(false)
-    if (saveFeedbackTimeoutRef.current) {
-      window.clearTimeout(saveFeedbackTimeoutRef.current)
-    }
+    if (saveFeedbackTimeoutRef.current) window.clearTimeout(saveFeedbackTimeoutRef.current)
     window.setTimeout(() => {
       setSaveFeedback(true)
       saveFeedbackTimeoutRef.current = window.setTimeout(() => setSaveFeedback(false), 1200)
@@ -96,27 +122,21 @@ export default function SetEntry({
 
   const copyPreviousSet = () => {
     if (!previousSet) return
-
-    setReps(previousSet.reps?.toString() || '')
-    setWeight(previousSet.weight?.toString() || '')
-    setRestTime(previousSet.rest_time?.toString() || '')
-    setNotes('')
+    setValues(valuesFromSet(previousSet))
     setValidationMessage(null)
     setShowDetails(Boolean(previousSet.rest_time))
     flashCopiedFields()
   }
 
   const handleSave = async () => {
-    // Prevent duplicate submissions
-    if (isSaved && !existingSet) {
-      return
-    }
+    if (isSaved && !existingSet) return
 
     const result = buildWorkoutSetInput({
       exerciseId,
       workoutId,
       setNumber,
-      values: { reps, weight, restTime, notes },
+      trackingType,
+      values,
     })
 
     if (!result.ok) {
@@ -128,18 +148,12 @@ export default function SetEntry({
       setValidationMessage(null)
       setIsSubmitting(true)
       const savedSet = await onSave(result.data)
-
-      if (!savedSet) {
-        return
-      }
+      if (!savedSet) return
 
       flashSavedState()
 
       if (!existingSet) {
-        setReps('')
-        setWeight('')
-        setRestTime('')
-        setNotes('')
+        setValues(emptyValues())
         setIsSaved(false)
         setIsEditing(true)
       } else {
@@ -151,27 +165,39 @@ export default function SetEntry({
     }
   }
 
-  const handleEdit = () => {
-    setIsEditing(true)
-  }
-
   const handleCancel = () => {
     if (existingSet) {
-      // Revert to saved values
-      setReps(existingSet.reps?.toString() || '')
-      setWeight(existingSet.weight?.toString() || '')
-      setRestTime(existingSet.rest_time?.toString() || '')
-      setNotes(existingSet.notes || '')
+      setValues(valuesFromSet(existingSet))
       setValidationMessage(null)
       setIsEditing(false)
     } else {
-      // Clear new set
-      setReps('')
-      setWeight('')
-      setRestTime('')
-      setNotes('')
+      setValues(emptyValues())
       setValidationMessage(null)
     }
+  }
+
+  const inputClass = (flash = false) =>
+    `min-h-12 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-lg font-semibold text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400${flash ? ' motion-field-flash' : ''}`
+
+  const smallInputClass =
+    'min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400'
+
+  const previousCopyLabel = () => {
+    if (!previousSet) return ''
+    if (trackingType === 'cardio') {
+      const dur = previousSet.duration_seconds ? `${previousSet.duration_seconds / 60}min` : null
+      const dist = previousSet.distance_km ? `${previousSet.distance_km}km` : null
+      return [dur, dist].filter(Boolean).join(', ') || 'Same as last set'
+    }
+    if (trackingType === 'timed') {
+      return previousSet.duration_seconds
+        ? `Same as last: ${formatDuration(previousSet.duration_seconds)}`
+        : 'Same as last set'
+    }
+    const parts: string[] = []
+    if (previousSet.reps) parts.push(`${previousSet.reps} reps`)
+    if (previousSet.weight !== undefined) parts.push(`${previousSet.weight} kg`)
+    return parts.length ? `Same as last set: ${parts.join(' at ')}` : 'Same as last set'
   }
 
   return (
@@ -187,7 +213,7 @@ export default function SetEntry({
         {isSaved && !isEditing && (
           <div className="flex gap-2">
             <button
-              onClick={handleEdit}
+              onClick={() => setIsEditing(true)}
               className="motion-press min-h-10 rounded-lg px-3 py-2 text-sm text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300"
             >
               Edit
@@ -204,7 +230,6 @@ export default function SetEntry({
       </div>
 
       {isEditing ? (
-        /* Editing Mode */
         <div className="space-y-3">
           {!existingSet && previousSet && (
             <button
@@ -212,72 +237,46 @@ export default function SetEntry({
               onClick={copyPreviousSet}
               className="motion-press min-h-11 w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
             >
-              Same as last set: {previousSet.reps ?? '-'} reps
-              {previousSet.weight !== undefined ? ` at ${previousSet.weight} kg` : ''}
+              {previousCopyLabel()}
             </button>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            {/* Reps */}
-            <div>
-              <label
-                htmlFor={`${entryId}-reps`}
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Reps *
-              </label>
-              <input
-                id={`${entryId}-reps`}
-                type="number"
-                inputMode="numeric"
-                value={reps}
-                onChange={(e) => setReps(e.target.value)}
-                placeholder="0"
-                min="1"
-                max="100"
-                className={`min-h-12 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-lg font-semibold text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${copyFlash ? 'motion-field-flash' : ''}`}
-              />
-              <button
-                type="button"
-                onClick={() => setReps((current) => bumpNumber(current, 1))}
-                className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                +1 rep
-              </button>
-            </div>
+          {trackingType === 'strength' && (
+            <StrengthFields
+              values={values}
+              set={set}
+              copyFlash={copyFlash}
+              entryId={entryId}
+              bumpNumber={bumpNumber}
+              inputClass={inputClass}
+            />
+          )}
 
-            {/* Weight */}
-            <div>
-              <label
-                htmlFor={`${entryId}-weight`}
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Weight (kg)
-              </label>
-              <input
-                id={`${entryId}-weight`}
-                type="number"
-                inputMode="decimal"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="0.5"
-                className={`min-h-12 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-lg font-semibold text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${copyFlash ? 'motion-field-flash' : ''}`}
-              />
-              <button
-                type="button"
-                onClick={() => setWeight((current) => bumpNumber(current, 2.5))}
-                className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                +2.5 kg
-              </button>
-            </div>
-          </div>
+          {trackingType === 'cardio' && (
+            <CardioFields
+              values={values}
+              set={set}
+              copyFlash={copyFlash}
+              entryId={entryId}
+              bumpNumber={bumpNumber}
+              inputClass={inputClass}
+            />
+          )}
+
+          {trackingType === 'timed' && (
+            <TimedFields
+              values={values}
+              set={set}
+              copyFlash={copyFlash}
+              entryId={entryId}
+              bumpNumber={bumpNumber}
+              inputClass={inputClass}
+            />
+          )}
 
           <button
             type="button"
-            onClick={() => setShowDetails((current) => !current)}
+            onClick={() => setShowDetails((c) => !c)}
             className="motion-press min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
             aria-expanded={showDetails}
           >
@@ -286,7 +285,6 @@ export default function SetEntry({
 
           {showDetails && (
             <div className="space-y-3">
-              {/* Rest Time */}
               <div>
                 <label
                   htmlFor={`${entryId}-rest-time`}
@@ -298,16 +296,14 @@ export default function SetEntry({
                   id={`${entryId}-rest-time`}
                   type="number"
                   inputMode="numeric"
-                  value={restTime}
-                  onChange={(e) => setRestTime(e.target.value)}
+                  value={values.restTime}
+                  onChange={(e) => set('restTime', e.target.value)}
                   placeholder="60"
                   min="0"
                   step="5"
-                  className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  className={smallInputClass}
                 />
               </div>
-
-              {/* Notes */}
               <div>
                 <label
                   htmlFor={`${entryId}-notes`}
@@ -317,8 +313,8 @@ export default function SetEntry({
                 </label>
                 <textarea
                   id={`${entryId}-notes`}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  value={values.notes}
+                  onChange={(e) => set('notes', e.target.value)}
                   placeholder="Optional notes about this set..."
                   rows={2}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
@@ -334,7 +330,6 @@ export default function SetEntry({
             </p>
           )}
 
-          {/* Action Buttons */}
           <div className="flex flex-col gap-2 pt-2 sm:flex-row">
             <button
               onClick={handleSave}
@@ -353,38 +348,333 @@ export default function SetEntry({
           </div>
         </div>
       ) : (
-        /* Display Mode */
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Reps:</span>
-              <span className="ml-2 font-semibold text-gray-900 dark:text-white">{reps}</span>
-            </div>
-            {weight && (
-              <div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">Weight:</span>
-                <span className="ml-2 font-semibold text-gray-900 dark:text-white">
-                  {weight} kg
-                </span>
-              </div>
-            )}
-          </div>
+        <SetDisplay set={existingSet ?? null} values={values} trackingType={trackingType} />
+      )}
+    </div>
+  )
+}
 
-          {restTime && (
+// ─── Field groups ────────────────────────────────────────────────────────────
+
+interface FieldGroupProps {
+  values: SetEntryFormValues
+  set: (field: keyof SetEntryFormValues, value: string) => void
+  copyFlash: boolean
+  entryId: string
+  bumpNumber: (value: string, amount: number) => string
+  inputClass: (flash?: boolean) => string
+}
+
+function StrengthFields({
+  values,
+  set,
+  copyFlash,
+  entryId,
+  bumpNumber,
+  inputClass,
+}: FieldGroupProps) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label
+          htmlFor={`${entryId}-reps`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+        >
+          Reps *
+        </label>
+        <input
+          id={`${entryId}-reps`}
+          type="number"
+          inputMode="numeric"
+          value={values.reps}
+          onChange={(e) => set('reps', e.target.value)}
+          placeholder="0"
+          min="1"
+          max="100"
+          className={inputClass(copyFlash)}
+        />
+        <button
+          type="button"
+          onClick={() => set('reps', bumpNumber(values.reps, 1))}
+          className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+        >
+          +1 rep
+        </button>
+      </div>
+      <div>
+        <label
+          htmlFor={`${entryId}-weight`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+        >
+          Weight (kg)
+        </label>
+        <input
+          id={`${entryId}-weight`}
+          type="number"
+          inputMode="decimal"
+          value={values.weight}
+          onChange={(e) => set('weight', e.target.value)}
+          placeholder="0"
+          min="0"
+          step="0.5"
+          className={inputClass(copyFlash)}
+        />
+        <button
+          type="button"
+          onClick={() => set('weight', bumpNumber(values.weight, 2.5))}
+          className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+        >
+          +2.5 kg
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CardioFields({
+  values,
+  set,
+  copyFlash,
+  entryId,
+  bumpNumber,
+  inputClass,
+}: FieldGroupProps) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label
+            htmlFor={`${entryId}-duration-min`}
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
+            Duration (min) *
+          </label>
+          <input
+            id={`${entryId}-duration-min`}
+            type="number"
+            inputMode="decimal"
+            value={values.durationMin}
+            onChange={(e) => set('durationMin', e.target.value)}
+            placeholder="30"
+            min="0.5"
+            step="0.5"
+            className={inputClass(copyFlash)}
+          />
+          <button
+            type="button"
+            onClick={() => set('durationMin', bumpNumber(values.durationMin, 5))}
+            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            +5 min
+          </button>
+        </div>
+        <div>
+          <label
+            htmlFor={`${entryId}-distance`}
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
+            Distance (km)
+          </label>
+          <input
+            id={`${entryId}-distance`}
+            type="number"
+            inputMode="decimal"
+            value={values.distanceKm}
+            onChange={(e) => set('distanceKm', e.target.value)}
+            placeholder="0"
+            min="0"
+            step="0.1"
+            className={inputClass(copyFlash)}
+          />
+          <button
+            type="button"
+            onClick={() => set('distanceKm', bumpNumber(values.distanceKm, 0.5))}
+            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            +0.5 km
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label
+            htmlFor={`${entryId}-incline`}
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
+            Incline (level)
+          </label>
+          <input
+            id={`${entryId}-incline`}
+            type="number"
+            inputMode="decimal"
+            value={values.incline}
+            onChange={(e) => set('incline', e.target.value)}
+            placeholder="0"
+            min="0"
+            step="0.5"
+            className={inputClass(copyFlash)}
+          />
+          <button
+            type="button"
+            onClick={() => set('incline', bumpNumber(values.incline, 1))}
+            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            +1 level
+          </button>
+        </div>
+        <div>
+          <label
+            htmlFor={`${entryId}-speed`}
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
+            Speed (km/h)
+          </label>
+          <input
+            id={`${entryId}-speed`}
+            type="number"
+            inputMode="decimal"
+            value={values.speedKmh}
+            onChange={(e) => set('speedKmh', e.target.value)}
+            placeholder="0"
+            min="0"
+            step="0.5"
+            className={inputClass(copyFlash)}
+          />
+          <button
+            type="button"
+            onClick={() => set('speedKmh', bumpNumber(values.speedKmh, 0.5))}
+            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            +0.5 km/h
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TimedFields({ values, set, copyFlash, entryId, bumpNumber, inputClass }: FieldGroupProps) {
+  return (
+    <div>
+      <label
+        htmlFor={`${entryId}-duration-sec`}
+        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+      >
+        Duration (seconds) *
+      </label>
+      <input
+        id={`${entryId}-duration-sec`}
+        type="number"
+        inputMode="numeric"
+        value={values.durationSec}
+        onChange={(e) => set('durationSec', e.target.value)}
+        placeholder="60"
+        min="1"
+        step="5"
+        className={inputClass(copyFlash)}
+      />
+      <button
+        type="button"
+        onClick={() => set('durationSec', bumpNumber(values.durationSec, 5))}
+        className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+      >
+        +5 sec
+      </button>
+    </div>
+  )
+}
+
+// ─── Display mode ─────────────────────────────────────────────────────────────
+
+function SetDisplay({
+  set,
+  values,
+  trackingType,
+}: {
+  set: WorkoutSet | null
+  values: SetEntryFormValues
+  trackingType: ExerciseTrackingType
+}) {
+  return (
+    <div className="space-y-2">
+      {trackingType === 'strength' && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Reps:</span>
+            <span className="ml-2 font-semibold text-gray-900 dark:text-white">{values.reps}</span>
+          </div>
+          {values.weight && (
             <div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Rest:</span>
-              <span className="ml-2 text-gray-900 dark:text-white">
-                {formatSetRestTime(parseInt(restTime, 10))}
+              <span className="text-sm text-gray-600 dark:text-gray-400">Weight:</span>
+              <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                {values.weight} kg
               </span>
             </div>
           )}
+        </div>
+      )}
 
-          {notes && (
+      {trackingType === 'cardio' && (
+        <div className="grid grid-cols-2 gap-4">
+          {values.durationMin && (
             <div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Notes:</span>
-              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">{notes}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
+              <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                {values.durationMin} min
+              </span>
             </div>
           )}
+          {values.distanceKm && (
+            <div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Distance:</span>
+              <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                {values.distanceKm} km
+              </span>
+            </div>
+          )}
+          {values.incline && (
+            <div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Incline:</span>
+              <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                {values.incline}
+              </span>
+            </div>
+          )}
+          {values.speedKmh && (
+            <div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Speed:</span>
+              <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                {values.speedKmh} km/h
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {trackingType === 'timed' && (
+        <div>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
+          <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+            {set?.duration_seconds
+              ? formatDuration(set.duration_seconds)
+              : `${values.durationSec}s`}
+          </span>
+        </div>
+      )}
+
+      {values.restTime && (
+        <div>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Rest:</span>
+          <span className="ml-2 text-gray-900 dark:text-white">
+            {formatSetRestTime(Number.parseInt(values.restTime, 10))}
+          </span>
+        </div>
+      )}
+
+      {values.notes && (
+        <div>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Notes:</span>
+          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">{values.notes}</span>
         </div>
       )}
     </div>

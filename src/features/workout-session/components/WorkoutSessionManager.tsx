@@ -6,7 +6,9 @@ import { TrashButton } from '@/components/ui/TrashButton'
 import { ExerciseHistory } from '@/features/exercise-library/components/ExerciseHistory'
 import ExerciseSelector from '@/features/exercise-library/components/ExerciseSelector'
 import type { WorkoutSession, WorkoutSet } from '@/lib/types/database'
+import { type ExerciseTrackingType, getTrackingType } from '@/lib/utils/exercise-tracking'
 import { formatExerciseName } from '@/lib/utils/text'
+import { formatDuration, formatSetRestTime } from '../setEntry'
 import { useWorkoutSession } from '../useWorkoutSession'
 import SetEntry from './SetEntry'
 
@@ -299,6 +301,7 @@ export default function WorkoutSessionManager({
             const previousSet = exerciseInWorkout.sets[exerciseInWorkout.sets.length - 1]
             const exerciseId = exerciseInWorkout.exercise.id
             const exerciseName = formatExerciseName(exerciseInWorkout.exercise.name)
+            const trackingType = getTrackingType(exerciseInWorkout.exercise.category_name)
             const isExerciseComplete = completedExerciseIds.has(exerciseId)
             const exerciseVolume = exerciseInWorkout.sets.reduce(
               (total, set) => total + (set.weight || 0) * (set.reps || 0),
@@ -366,7 +369,7 @@ export default function WorkoutSessionManager({
                   </div>
                 ) : (
                   <>
-                    <LastSetSummary set={previousSet} />
+                    <LastSetSummary set={previousSet} trackingType={trackingType} />
 
                     <div className="mt-4">
                       <SetEntry
@@ -375,6 +378,7 @@ export default function WorkoutSessionManager({
                         workoutId={session?.id}
                         setNumber={actions.getNextSetNumber(exerciseInWorkout.sets)}
                         previousSet={previousSet}
+                        trackingType={trackingType}
                         onSave={(setData) => actions.saveSet(exerciseId, setData)}
                         className="border-blue-200 shadow-md dark:border-blue-800"
                       />
@@ -433,6 +437,7 @@ export default function WorkoutSessionManager({
                                   workoutId={session?.id}
                                   existingSet={set}
                                   setNumber={set.set_number}
+                                  trackingType={trackingType}
                                   onSave={(setData) =>
                                     actions.updateSet(exerciseId, set.id, setData)
                                   }
@@ -499,7 +504,13 @@ export default function WorkoutSessionManager({
   )
 }
 
-function LastSetSummary({ set }: { set?: WorkoutSet }) {
+function LastSetSummary({
+  set,
+  trackingType,
+}: {
+  set?: WorkoutSet
+  trackingType: ExerciseTrackingType
+}) {
   if (!set) {
     return (
       <div className="motion-enter rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 font-medium text-blue-700 text-sm dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300">
@@ -508,13 +519,29 @@ function LastSetSummary({ set }: { set?: WorkoutSet }) {
     )
   }
 
+  const stats: string[] = []
+
+  if (trackingType === 'strength') {
+    if (set.reps) stats.push(`${set.reps} reps`)
+    if (set.weight !== undefined) stats.push(`${set.weight} kg`)
+  } else if (trackingType === 'cardio') {
+    if (set.duration_seconds) stats.push(`${set.duration_seconds / 60} min`)
+    if (set.distance_km !== undefined) stats.push(`${set.distance_km} km`)
+    if (set.incline !== undefined) stats.push(`incline ${set.incline}`)
+    if (set.speed_kmh !== undefined) stats.push(`${set.speed_kmh} km/h`)
+  } else {
+    if (set.duration_seconds) stats.push(formatDuration(set.duration_seconds))
+  }
+
+  if (set.rest_time !== undefined) stats.push(formatSetRestTime(set.rest_time) + ' rest')
+
   return (
     <div className="motion-enter rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-3 text-white shadow-sm">
       <p className="font-semibold text-blue-100 text-xs uppercase">Last set</p>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-semibold text-sm">
-        <span>{set.reps} reps</span>
-        {set.weight !== undefined && <span>{set.weight} kg</span>}
-        {set.rest_time !== undefined && <span>{set.rest_time}s rest</span>}
+        {stats.map((s) => (
+          <span key={s}>{s}</span>
+        ))}
       </div>
     </div>
   )
