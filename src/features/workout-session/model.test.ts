@@ -3,6 +3,9 @@ import type { ExerciseWithParsedFields, WorkoutSet, WorkoutWithDetails } from '@
 import { makeExerciseFixture } from './__fixtures__/exercise'
 import {
   addExerciseToWorkout,
+  getActiveExerciseId,
+  getNextActiveExerciseId,
+  getNextSetDefaultsFromPreviousSet,
   getNextSetNumber,
   getSessionDuration,
   getTotalSets,
@@ -120,6 +123,38 @@ describe('workout session model', () => {
     expect(addExerciseToWorkout(exercises, newExercise)).toEqual({
       exercises: [...exercises, { exercise: newExercise, sets: [] }],
       added: true,
+    })
+  })
+
+  it('resolves active exercise and advances past completed exercises', () => {
+    const exercises = [
+      { exercise: makeExercise('bench-press', 'Bench Press'), sets: [] },
+      { exercise: makeExercise('squat', 'Squat'), sets: [] },
+      { exercise: makeExercise('row', 'Row'), sets: [] },
+    ]
+
+    expect(getActiveExerciseId(exercises, null)).toBe('bench-press')
+    expect(getActiveExerciseId(exercises, 'squat')).toBe('squat')
+    expect(getActiveExerciseId(exercises, 'missing')).toBe('bench-press')
+    expect(getNextActiveExerciseId(exercises, 'bench-press', new Set(['squat']))).toBe('row')
+    expect(getNextActiveExerciseId(exercises, 'row', new Set(['bench-press', 'squat']))).toBeNull()
+  })
+
+  it('derives next set defaults from the previous set without notes', () => {
+    expect(
+      getNextSetDefaultsFromPreviousSet({
+        ...makeSet('set-1', 1, 100, 8),
+        rest_time: 90,
+        notes: 'do not copy',
+      }),
+    ).toEqual({
+      reps: 8,
+      weight: 100,
+      rest_time: 90,
+      duration_seconds: undefined,
+      distance_km: undefined,
+      incline: undefined,
+      speed_kmh: undefined,
     })
   })
 })

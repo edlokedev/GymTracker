@@ -103,4 +103,73 @@ describe('SetEntry', () => {
     expect(screen.getByLabelText('Rest Time (seconds)')).toHaveValue(90)
     expect(screen.getByLabelText('Notes')).toHaveValue('')
   })
+
+  it('prefills new sets from the previous set without copying notes', () => {
+    render(
+      <SetEntry
+        exerciseId="bench-press"
+        workoutId="session-1"
+        setNumber={2}
+        trackingType="strength"
+        previousSet={{
+          id: 'set-1',
+          workout_id: 'session-1',
+          exercise_id: 'bench-press',
+          set_number: 1,
+          reps: 8,
+          weight: 100,
+          rest_time: 90,
+          notes: 'skip this',
+          created_at: new Date('2026-05-01T10:00:00.000Z'),
+          updated_at: new Date('2026-05-01T10:00:00.000Z'),
+        }}
+        onSave={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Reps *')).toHaveValue(8)
+    expect(screen.getByLabelText('Weight (kg)')).toHaveValue(100)
+    expect(screen.getByLabelText('Rest Time (seconds)')).toHaveValue(90)
+    expect(screen.getByLabelText('Notes')).toHaveValue('')
+  })
+
+  it('increments and decrements strength values without going invalid', () => {
+    render(
+      <SetEntry
+        exerciseId="bench-press"
+        workoutId="session-1"
+        setNumber={1}
+        trackingType="strength"
+        onSave={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase reps by 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Increase reps by 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease reps by 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease reps by 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease reps by 1' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase weight by 2.5 kilograms' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease weight by 2.5 kilograms' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease weight by 2.5 kilograms' }))
+
+    expect(screen.getByLabelText('Reps *')).toHaveValue(1)
+    expect(screen.getByLabelText('Weight (kg)')).toHaveValue(0)
+  })
+
+  it('hides inline new-set actions on mobile when sticky actions own saving', () => {
+    render(
+      <SetEntry
+        exerciseId="bench-press"
+        workoutId="session-1"
+        setNumber={1}
+        trackingType="strength"
+        useStickyMobileActions
+        onSave={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Save Set' }).parentElement).toHaveClass('hidden')
+  })
 })

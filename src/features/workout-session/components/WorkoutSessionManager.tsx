@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { InlineError } from '@/components/ui/InlineError'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -8,6 +8,7 @@ import ExerciseSelector from '@/features/exercise-library/components/ExerciseSel
 import type { WorkoutSession, WorkoutSet } from '@/lib/types/database'
 import { type ExerciseTrackingType, getTrackingType } from '@/lib/utils/exercise-tracking'
 import { formatExerciseName } from '@/lib/utils/text'
+import { getNextActiveExerciseId } from '../model'
 import { formatDuration, formatSetRestTime } from '../setEntry'
 import { useWorkoutSession } from '../useWorkoutSession'
 import SetEntry from './SetEntry'
@@ -40,6 +41,8 @@ export default function WorkoutSessionManager({
     sessionNotes,
     sessionDate,
     selectedExercise,
+    activeExerciseId,
+    activeExercise,
     isSessionStarted,
     loading,
     saveStatus,
@@ -69,6 +72,8 @@ export default function WorkoutSessionManager({
   })
   const [showWorkoutDetails, setShowWorkoutDetails] = useState(false)
   const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(() => new Set())
+  const [submitSignal, setSubmitSignal] = useState(0)
+  const exerciseRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const showWorkoutHeader =
     isSessionStarted ||
     Boolean(session) ||
@@ -81,6 +86,25 @@ export default function WorkoutSessionManager({
       setCompletedExerciseIds(new Set())
     }
   }, [session?.id])
+
+  const focusExercise = (exerciseId: string | null) => {
+    if (!exerciseId) return
+    window.requestAnimationFrame(() => {
+      exerciseRefs.current[exerciseId]?.focus({ preventScroll: true })
+    })
+  }
+
+  const selectExercise = (exerciseId: string) => {
+    actions.selectActiveExercise(exerciseId)
+    focusExercise(exerciseId)
+  }
+
+  const focusAddExercise = () => {
+    document.getElementById('workout-add-exercise')?.scrollIntoView?.({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
 
   const promptDeleteSession = () => {
     if (!session) return
@@ -127,7 +151,17 @@ export default function WorkoutSessionManager({
   }
 
   const completeExercise = (exerciseId: string) => {
-    setCompletedExerciseIds((current) => new Set(current).add(exerciseId))
+    setCompletedExerciseIds((current) => {
+      const nextCompletedExerciseIds = new Set(current).add(exerciseId)
+      const nextActiveExerciseId = getNextActiveExerciseId(
+        exercises,
+        exerciseId,
+        nextCompletedExerciseIds,
+      )
+      actions.selectActiveExercise(nextActiveExerciseId)
+      focusExercise(nextActiveExerciseId)
+      return nextCompletedExerciseIds
+    })
   }
 
   const resumeExercise = (exerciseId: string) => {
@@ -136,10 +170,25 @@ export default function WorkoutSessionManager({
       next.delete(exerciseId)
       return next
     })
+    actions.selectActiveExercise(exerciseId)
+    focusExercise(exerciseId)
   }
 
+  const activeExerciseName = activeExercise
+    ? formatExerciseName(activeExercise.exercise.name)
+    : 'No exercise'
+  const activeExerciseIsComplete = activeExerciseId
+    ? completedExerciseIds.has(activeExerciseId)
+    : false
+
   return (
-    <div className={`space-y-4 sm:space-y-6 ${className}`}>
+    <div
+      className={`space-y-4 sm:space-y-6 ${
+        isSessionStarted && !session?.end_time
+          ? 'pb-[calc(9rem+env(safe-area-inset-bottom))] sm:pb-0'
+          : ''
+      } ${className}`}
+    >
       <div className="motion-enter rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6">
         {showWorkoutHeader && (
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -297,6 +346,13 @@ export default function WorkoutSessionManager({
 
       {exercises.length > 0 && (
         <div className="space-y-4 sm:space-y-6">
+          <WorkoutExerciseRail
+            exercises={exercises}
+            activeExerciseId={activeExerciseId}
+            completedExerciseIds={completedExerciseIds}
+            onSelectExercise={selectExercise}
+          />
+
           {exercises.map((exerciseInWorkout) => {
             const previousSet = exerciseInWorkout.sets[exerciseInWorkout.sets.length - 1]
             const exerciseId = exerciseInWorkout.exercise.id
@@ -308,16 +364,27 @@ export default function WorkoutSessionManager({
             })
             const isExerciseComplete = completedExerciseIds.has(exerciseId)
             const completionStats = getExerciseCompletionStats(exerciseInWorkout.sets, trackingType)
+            const isActiveExercise = activeExerciseId === exerciseId
 
             return (
               <div
                 key={exerciseId}
-                className="motion-enter rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6"
+                id={`workout-exercise-${exerciseId}`}
+                ref={(node) => {
+                  exerciseRefs.current[exerciseId] = node
+                }}
+                tabIndex={-1}
+                aria-current={isActiveExercise ? 'true' : undefined}
+                className={`motion-enter rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 sm:p-6 ${
+                  isActiveExercise
+                    ? 'border-blue-300 dark:border-blue-700'
+                    : 'border-gray-200 dark:border-gray-700'
+                } ${isActiveExercise ? '' : 'hidden sm:block'}`}
               >
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-blue-600 text-xs uppercase dark:text-blue-400">
-                      Current exercise
+                      {isActiveExercise ? 'Current exercise' : 'Exercise'}
                     </p>
                     <h3 className="mt-1 font-bold text-gray-900 text-xl dark:text-white">
                       {exerciseName}
@@ -381,6 +448,9 @@ export default function WorkoutSessionManager({
                         previousSet={previousSet}
                         trackingType={trackingType}
                         onSave={(setData) => actions.saveSet(exerciseId, setData)}
+                        isActiveEntry={isActiveExercise}
+                        submitSignal={submitSignal}
+                        useStickyMobileActions={isActiveExercise}
                         className="border-blue-200 shadow-md dark:border-blue-800"
                       />
                     </div>
@@ -389,7 +459,9 @@ export default function WorkoutSessionManager({
                       type="button"
                       onClick={() => completeExercise(exerciseId)}
                       disabled={exerciseInWorkout.sets.length === 0}
-                      className="motion-press mt-3 min-h-12 w-full rounded-lg border border-green-300 bg-green-50 px-4 py-3 font-semibold text-green-700 transition-colors duration-200 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300 dark:hover:bg-green-900/50"
+                      className={`motion-press mt-3 min-h-12 w-full rounded-lg border border-green-300 bg-green-50 px-4 py-3 font-semibold text-green-700 transition-colors duration-200 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300 dark:hover:bg-green-900/50 ${
+                        isActiveExercise ? 'hidden sm:block' : ''
+                      }`}
                       aria-label={`Mark ${exerciseName} done`}
                     >
                       Done with Exercise
@@ -459,7 +531,10 @@ export default function WorkoutSessionManager({
       )}
 
       {isSessionStarted && (
-        <div className="motion-enter rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+        <div
+          id="workout-add-exercise"
+          className="motion-enter rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6"
+        >
           <h2 className="mb-4 font-semibold text-gray-900 text-lg dark:text-white">Add Exercise</h2>
           <ExerciseSelector
             onSelectExercise={actions.addExercise}
@@ -501,6 +576,171 @@ export default function WorkoutSessionManager({
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
+
+      {isSessionStarted && !session?.end_time && (
+        <MobileWorkoutActionBar
+          activeExerciseName={activeExerciseName}
+          totalSets={totalSets}
+          totalVolume={totalVolume}
+          hasActiveExercise={Boolean(activeExerciseId)}
+          activeExerciseIsComplete={activeExerciseIsComplete}
+          activeExerciseHasSets={
+            activeExercise?.sets.length ? activeExercise.sets.length > 0 : false
+          }
+          canCompleteWorkout={totalSets > 0}
+          loading={loading}
+          onDoneExercise={() => {
+            if (activeExerciseId) {
+              completeExercise(activeExerciseId)
+            }
+          }}
+          onPrimaryAction={() => {
+            if (!activeExerciseId) {
+              focusAddExercise()
+              return
+            }
+            if (activeExerciseIsComplete) {
+              resumeExercise(activeExerciseId)
+              return
+            }
+            setSubmitSignal((current) => current + 1)
+          }}
+          onCompleteWorkout={actions.completeSession}
+        />
+      )}
+    </div>
+  )
+}
+
+function WorkoutExerciseRail({
+  exercises,
+  activeExerciseId,
+  completedExerciseIds,
+  onSelectExercise,
+}: {
+  exercises: ReturnType<typeof useWorkoutSession>['exercises']
+  activeExerciseId: string | null
+  completedExerciseIds: Set<string>
+  onSelectExercise: (exerciseId: string) => void
+}) {
+  const useTwoRows = exercises.length > 2
+
+  return (
+    <nav
+      aria-label="Workout exercises"
+      className={`scrollbar-none motion-enter sticky top-0 z-20 max-w-full gap-2 overflow-x-auto overscroll-x-contain rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900 sm:hidden ${
+        useTwoRows
+          ? 'grid auto-cols-[minmax(9.5rem,calc(50vw-1.5rem))] grid-flow-col grid-rows-2'
+          : 'flex'
+      }`}
+    >
+      {exercises.map((exerciseInWorkout) => {
+        const exerciseId = exerciseInWorkout.exercise.id
+        const exerciseName = formatExerciseName(exerciseInWorkout.exercise.name)
+        const isActive = activeExerciseId === exerciseId
+        const isComplete = completedExerciseIds.has(exerciseId)
+
+        return (
+          <button
+            key={exerciseId}
+            type="button"
+            onClick={() => onSelectExercise(exerciseId)}
+            aria-pressed={isActive}
+            aria-label={`${exerciseName}, ${exerciseInWorkout.sets.length} sets${
+              isComplete ? ', done' : ''
+            }`}
+            className={`motion-press inline-flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2 font-semibold text-sm transition-colors ${
+              useTwoRows ? '' : 'w-[min(18rem,calc(100vw-4rem))] shrink-0'
+            } ${
+              isActive
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            <span className="truncate">{exerciseName}</span>
+            <span className="ml-2 rounded bg-black/10 px-1.5 py-0.5 text-xs">
+              {exerciseInWorkout.sets.length}
+            </span>
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+function MobileWorkoutActionBar({
+  activeExerciseName,
+  totalSets,
+  totalVolume,
+  hasActiveExercise,
+  activeExerciseIsComplete,
+  activeExerciseHasSets,
+  canCompleteWorkout,
+  loading,
+  onDoneExercise,
+  onPrimaryAction,
+  onCompleteWorkout,
+}: {
+  activeExerciseName: string
+  totalSets: number
+  totalVolume: number
+  hasActiveExercise: boolean
+  activeExerciseIsComplete: boolean
+  activeExerciseHasSets: boolean
+  canCompleteWorkout: boolean
+  loading: boolean
+  onDoneExercise: () => void
+  onPrimaryAction: () => void
+  onCompleteWorkout: () => void
+}) {
+  const primaryLabel = hasActiveExercise
+    ? activeExerciseIsComplete
+      ? 'Resume'
+      : 'Save Set'
+    : 'Add Exercise'
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-gray-200 border-t bg-white px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] shadow-2xl dark:border-gray-700 dark:bg-gray-900 sm:hidden">
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-gray-900 text-sm dark:text-white">
+              {activeExerciseName}
+            </p>
+            <p className="text-gray-500 text-xs dark:text-gray-400">
+              {totalSets} sets · {totalVolume.toLocaleString()} kg
+            </p>
+          </div>
+          {hasActiveExercise && !activeExerciseIsComplete && activeExerciseHasSets && (
+            <button
+              type="button"
+              onClick={onDoneExercise}
+              disabled={loading}
+              className="motion-press min-h-11 shrink-0 rounded-lg border border-green-300 bg-green-50 px-3 py-2 font-semibold text-green-700 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300"
+            >
+              Done Exercise
+            </button>
+          )}
+          {!hasActiveExercise && canCompleteWorkout && (
+            <button
+              type="button"
+              onClick={onCompleteWorkout}
+              disabled={loading}
+              className="motion-press min-h-11 shrink-0 rounded-lg border border-green-300 bg-green-50 px-3 py-2 font-semibold text-green-700 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300"
+            >
+              Complete Workout
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onPrimaryAction}
+          disabled={loading}
+          className="motion-press min-h-12 w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {primaryLabel}
+        </button>
+      </div>
     </div>
   )
 }

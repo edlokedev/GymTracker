@@ -85,6 +85,7 @@ describe('useWorkoutSession', () => {
     expect(result.current.exercises[0].sets).toHaveLength(1)
     expect(result.current.totalSets).toBe(1)
     expect(result.current.totalVolume).toBe(800)
+    expect(result.current.activeExerciseId).toBe('bench-press')
   })
 
   it('starts a new session and calls onSessionSave', async () => {
@@ -214,11 +215,23 @@ describe('useWorkoutSession', () => {
       result.current.actions.addExercise(makeExercise())
     })
     expect(result.current.exercises).toHaveLength(1)
+    expect(result.current.activeExerciseId).toBe('bench-press')
+
+    act(() => {
+      result.current.actions.addExercise(makeExercise('squat'))
+    })
+    expect(result.current.exercises).toHaveLength(2)
+    expect(result.current.activeExerciseId).toBe('squat')
+
+    act(() => {
+      result.current.actions.selectActiveExercise('bench-press')
+    })
+    expect(result.current.activeExerciseId).toBe('bench-press')
 
     act(() => {
       result.current.actions.addExercise(makeExercise())
     })
-    expect(result.current.exercises).toHaveLength(1)
+    expect(result.current.exercises).toHaveLength(2)
     expect(result.current.commandStatus).toBe('error')
     expect(result.current.commandError).toBe('This exercise is already in your workout.')
 
@@ -251,7 +264,8 @@ describe('useWorkoutSession', () => {
     await act(async () => {
       await result.current.actions.removeExercise('bench-press')
     })
-    expect(result.current.exercises).toHaveLength(0)
+    expect(result.current.exercises).toHaveLength(1)
+    expect(result.current.activeExerciseId).toBe('squat')
   })
 
   it('completes and deletes sessions through callbacks', async () => {

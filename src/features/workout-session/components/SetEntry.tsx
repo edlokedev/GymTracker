@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { InlineError } from '@/components/ui/InlineError'
 import { TrashButton } from '@/components/ui/TrashButton'
 import type { WorkoutSet, WorkoutSetInput } from '@/lib/types/database'
@@ -19,6 +19,9 @@ interface SetEntryProps {
   trackingType: ExerciseTrackingType
   onSave: (setData: WorkoutSetInput) => Promise<WorkoutSet | null>
   onDelete?: () => void
+  isActiveEntry?: boolean
+  submitSignal?: number
+  useStickyMobileActions?: boolean
   className?: string
 }
 
@@ -36,7 +39,10 @@ function emptyValues(): SetEntryFormValues {
   }
 }
 
-function valuesFromSet(set: WorkoutSet): SetEntryFormValues {
+function valuesFromSet(
+  set: WorkoutSet,
+  { carryNotes = true }: { carryNotes?: boolean } = {},
+): SetEntryFormValues {
   return {
     reps: set.reps?.toString() ?? '',
     weight: set.weight?.toString() ?? '',
@@ -46,8 +52,14 @@ function valuesFromSet(set: WorkoutSet): SetEntryFormValues {
     speedKmh: set.speed_kmh?.toString() ?? '',
     durationSec: set.duration_seconds?.toString() ?? '',
     restTime: set.rest_time?.toString() ?? '',
-    notes: set.notes ?? '',
+    notes: carryNotes ? (set.notes ?? '') : '',
   }
+}
+
+function initialValues(existingSet?: WorkoutSet, previousSet?: WorkoutSet): SetEntryFormValues {
+  if (existingSet) return valuesFromSet(existingSet)
+  if (previousSet) return valuesFromSet(previousSet, { carryNotes: false })
+  return emptyValues()
 }
 
 export default function SetEntry({
@@ -59,12 +71,13 @@ export default function SetEntry({
   trackingType,
   onSave,
   onDelete,
+  isActiveEntry = false,
+  submitSignal = 0,
+  useStickyMobileActions = false,
   className = '',
 }: SetEntryProps) {
   const entryId = useId()
-  const [values, setValues] = useState<SetEntryFormValues>(
-    existingSet ? valuesFromSet(existingSet) : emptyValues(),
-  )
+  const [values, setValues] = useState<SetEntryFormValues>(initialValues(existingSet, previousSet))
   const [isSaved, setIsSaved] = useState(!!existingSet)
   const [isEditing, setIsEditing] = useState(!existingSet)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -76,6 +89,7 @@ export default function SetEntry({
   )
   const copyFlashTimeoutRef = useRef<number | null>(null)
   const saveFeedbackTimeoutRef = useRef<number | null>(null)
+  const submitSignalRef = useRef(submitSignal)
 
   const set = (field: keyof SetEntryFormValues, value: string) =>
     setValues((prev) => ({ ...prev, [field]: value }))
@@ -89,6 +103,14 @@ export default function SetEntry({
       setShowDetails(Boolean(existingSet.rest_time || existingSet.notes))
     }
   }, [existingSet])
+
+  useEffect(() => {
+    if (!existingSet) {
+      setValues(initialValues(undefined, previousSet))
+      setValidationMessage(null)
+      setShowDetails(Boolean(previousSet?.rest_time))
+    }
+  }, [existingSet, previousSet])
 
   useEffect(() => {
     return () => {
@@ -106,29 +128,31 @@ export default function SetEntry({
     }, 0)
   }
 
-  const flashSavedState = () => {
+  const flashSavedState = useCallback(() => {
     setSaveFeedback(false)
     if (saveFeedbackTimeoutRef.current) window.clearTimeout(saveFeedbackTimeoutRef.current)
     window.setTimeout(() => {
       setSaveFeedback(true)
       saveFeedbackTimeoutRef.current = window.setTimeout(() => setSaveFeedback(false), 1200)
     }, 0)
-  }
+  }, [])
 
-  const bumpNumber = (value: string, amount: number) => {
+  const bumpNumber = (value: string, amount: number, min = 0) => {
     const current = Number.parseFloat(value || '0')
-    return Number.isFinite(current) ? String(current + amount) : String(amount)
+    const nextValue = Number.isFinite(current) ? current + amount : amount
+    const clamped = Math.max(min, nextValue)
+    return Number.isInteger(clamped) ? String(clamped) : String(Number(clamped.toFixed(2)))
   }
 
   const copyPreviousSet = () => {
     if (!previousSet) return
-    setValues({ ...valuesFromSet(previousSet), notes: '' })
+    setValues(valuesFromSet(previousSet, { carryNotes: false }))
     setValidationMessage(null)
     setShowDetails(Boolean(previousSet.rest_time))
     flashCopiedFields()
   }
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (isSaved && !existingSet) return
 
     const result = buildWorkoutSetInput({
@@ -153,7 +177,7 @@ export default function SetEntry({
       flashSavedState()
 
       if (!existingSet) {
-        setValues(emptyValues())
+        setValues(valuesFromSet(savedSet, { carryNotes: false }))
         setIsSaved(false)
         setIsEditing(true)
       } else {
@@ -163,7 +187,17 @@ export default function SetEntry({
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [
+    exerciseId,
+    existingSet,
+    flashSavedState,
+    isSaved,
+    onSave,
+    setNumber,
+    trackingType,
+    values,
+    workoutId,
+  ])
 
   const handleCancel = () => {
     if (existingSet) {
@@ -175,6 +209,14 @@ export default function SetEntry({
       setValidationMessage(null)
     }
   }
+
+  useEffect(() => {
+    if (submitSignalRef.current === submitSignal) return
+    submitSignalRef.current = submitSignal
+    if (isActiveEntry && !existingSet) {
+      void handleSave()
+    }
+  }, [existingSet, handleSave, isActiveEntry, submitSignal])
 
   const inputClass = (flash = false) =>
     `min-h-12 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-lg font-semibold text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400${flash ? ' motion-field-flash' : ''}`
@@ -330,7 +372,11 @@ export default function SetEntry({
             </p>
           )}
 
-          <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+          <div
+            className={`flex-col gap-2 pt-2 sm:flex sm:flex-row ${
+              useStickyMobileActions && !existingSet ? 'hidden' : 'flex'
+            }`}
+          >
             <button
               onClick={handleSave}
               disabled={isSubmitting}
@@ -361,7 +407,7 @@ interface FieldGroupProps {
   set: (field: keyof SetEntryFormValues, value: string) => void
   copyFlash: boolean
   entryId: string
-  bumpNumber: (value: string, amount: number) => string
+  bumpNumber: (value: string, amount: number, min?: number) => string
   inputClass: (flash?: boolean) => string
 }
 
@@ -393,13 +439,24 @@ function StrengthFields({
           max="100"
           className={inputClass(copyFlash)}
         />
-        <button
-          type="button"
-          onClick={() => set('reps', bumpNumber(values.reps, 1))}
-          className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-        >
-          +1 rep
-        </button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => set('reps', bumpNumber(values.reps, -1, 1))}
+            className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            aria-label="Decrease reps by 1"
+          >
+            -1
+          </button>
+          <button
+            type="button"
+            onClick={() => set('reps', bumpNumber(values.reps, 1, 1))}
+            className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            aria-label="Increase reps by 1"
+          >
+            +1
+          </button>
+        </div>
       </div>
       <div>
         <label
@@ -419,13 +476,24 @@ function StrengthFields({
           step="0.5"
           className={inputClass(copyFlash)}
         />
-        <button
-          type="button"
-          onClick={() => set('weight', bumpNumber(values.weight, 2.5))}
-          className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-        >
-          +2.5 kg
-        </button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => set('weight', bumpNumber(values.weight, -2.5, 0))}
+            className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            aria-label="Decrease weight by 2.5 kilograms"
+          >
+            -2.5
+          </button>
+          <button
+            type="button"
+            onClick={() => set('weight', bumpNumber(values.weight, 2.5, 0))}
+            className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            aria-label="Increase weight by 2.5 kilograms"
+          >
+            +2.5
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -460,13 +528,24 @@ function CardioFields({
             step="0.5"
             className={inputClass(copyFlash)}
           />
-          <button
-            type="button"
-            onClick={() => set('durationMin', bumpNumber(values.durationMin, 5))}
-            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-          >
-            +5 min
-          </button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => set('durationMin', bumpNumber(values.durationMin, -5, 0.5))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Decrease duration by 5 minutes"
+            >
+              -5
+            </button>
+            <button
+              type="button"
+              onClick={() => set('durationMin', bumpNumber(values.durationMin, 5, 0.5))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Increase duration by 5 minutes"
+            >
+              +5
+            </button>
+          </div>
         </div>
         <div>
           <label
@@ -486,13 +565,24 @@ function CardioFields({
             step="0.1"
             className={inputClass(copyFlash)}
           />
-          <button
-            type="button"
-            onClick={() => set('distanceKm', bumpNumber(values.distanceKm, 0.5))}
-            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-          >
-            +0.5 km
-          </button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => set('distanceKm', bumpNumber(values.distanceKm, -0.5, 0))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Decrease distance by 0.5 kilometers"
+            >
+              -0.5
+            </button>
+            <button
+              type="button"
+              onClick={() => set('distanceKm', bumpNumber(values.distanceKm, 0.5, 0))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Increase distance by 0.5 kilometers"
+            >
+              +0.5
+            </button>
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -514,13 +604,24 @@ function CardioFields({
             step="0.5"
             className={inputClass(copyFlash)}
           />
-          <button
-            type="button"
-            onClick={() => set('incline', bumpNumber(values.incline, 1))}
-            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-          >
-            +1 level
-          </button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => set('incline', bumpNumber(values.incline, -1, 0))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Decrease incline by 1 level"
+            >
+              -1
+            </button>
+            <button
+              type="button"
+              onClick={() => set('incline', bumpNumber(values.incline, 1, 0))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Increase incline by 1 level"
+            >
+              +1
+            </button>
+          </div>
         </div>
         <div>
           <label
@@ -540,13 +641,24 @@ function CardioFields({
             step="0.5"
             className={inputClass(copyFlash)}
           />
-          <button
-            type="button"
-            onClick={() => set('speedKmh', bumpNumber(values.speedKmh, 0.5))}
-            className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-          >
-            +0.5 km/h
-          </button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => set('speedKmh', bumpNumber(values.speedKmh, -0.5, 0))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Decrease speed by 0.5 kilometers per hour"
+            >
+              -0.5
+            </button>
+            <button
+              type="button"
+              onClick={() => set('speedKmh', bumpNumber(values.speedKmh, 0.5, 0))}
+              className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              aria-label="Increase speed by 0.5 kilometers per hour"
+            >
+              +0.5
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -573,13 +685,24 @@ function TimedFields({ values, set, copyFlash, entryId, bumpNumber, inputClass }
         step="5"
         className={inputClass(copyFlash)}
       />
-      <button
-        type="button"
-        onClick={() => set('durationSec', bumpNumber(values.durationSec, 5))}
-        className="motion-press mt-2 min-h-10 w-full rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-      >
-        +5 sec
-      </button>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => set('durationSec', bumpNumber(values.durationSec, -5, 1))}
+          className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          aria-label="Decrease duration by 5 seconds"
+        >
+          -5
+        </button>
+        <button
+          type="button"
+          onClick={() => set('durationSec', bumpNumber(values.durationSec, 5, 1))}
+          className="motion-press min-h-11 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          aria-label="Increase duration by 5 seconds"
+        >
+          +5
+        </button>
+      </div>
     </div>
   )
 }

@@ -21,6 +21,7 @@ import {
   addExerciseToWorkout,
   appendSetToExercise,
   type ExerciseInWorkout,
+  getActiveExerciseId,
   getNextSetNumber,
   getSessionDuration,
   getTotalSets,
@@ -72,6 +73,7 @@ export function useWorkoutSession({
   const [sessionNotes, setSessionNotes] = useState(existingSession?.notes || '')
   const [sessionDate, setSessionDate] = useState(existingSession?.date || todayString())
   const [selectedExercise, setSelectedExercise] = useState<ExerciseWithParsedFields | null>(null)
+  const [activeExerciseId, setActiveExerciseId] = useState<string | null>(null)
   const [sessionStartTime, setSessionStartTime] = useState(
     existingSession?.start_time || nowISOString(),
   )
@@ -106,6 +108,7 @@ export function useWorkoutSession({
     setSessionNotes('')
     setSessionDate(todayString())
     setSelectedExercise(null)
+    setActiveExerciseId(null)
     setSessionStartTime(nowISOString())
     setSaveStatus('idle')
     setCommandStatus('idle')
@@ -124,7 +127,11 @@ export function useWorkoutSession({
         setSessionNotes(workout.notes || '')
         setSessionDate(workout.date)
         setSessionStartTime(workout.start_time)
-        setExercises(mapWorkoutDetailsToExercises(workout))
+        const loadedExercises = mapWorkoutDetailsToExercises(workout)
+        setExercises(loadedExercises)
+        setActiveExerciseId((currentActiveExerciseId) =>
+          getActiveExerciseId(loadedExercises, currentActiveExerciseId),
+        )
         finishCommand()
       } catch (error) {
         console.error('Failed to load session data:', error)
@@ -303,6 +310,7 @@ export function useWorkoutSession({
 
       setCommandStatus('success')
       setCommandError(null)
+      setActiveExerciseId(exercise.id)
       return result.exercises
     })
     setSelectedExercise(null)
@@ -316,7 +324,16 @@ export function useWorkoutSession({
           await removeExerciseSets(session.id, exerciseId)
         }
 
-        setExercises((currentExercises) => removeExerciseFromWorkout(currentExercises, exerciseId))
+        setExercises((currentExercises) => {
+          const nextExercises = removeExerciseFromWorkout(currentExercises, exerciseId)
+          setActiveExerciseId((currentActiveExerciseId) =>
+            getActiveExerciseId(
+              nextExercises,
+              currentActiveExerciseId === exerciseId ? null : currentActiveExerciseId,
+            ),
+          )
+          return nextExercises
+        })
         finishCommand()
         return true
       } catch (error) {
@@ -394,6 +411,17 @@ export function useWorkoutSession({
   const totalSets = useMemo(() => getTotalSets(exercises), [exercises])
   const totalVolume = useMemo(() => getTotalVolume(exercises), [exercises])
   const sessionDuration = useMemo(() => getSessionDuration(session), [session])
+  const resolvedActiveExerciseId = useMemo(
+    () => getActiveExerciseId(exercises, activeExerciseId),
+    [activeExerciseId, exercises],
+  )
+  const activeExercise = useMemo(
+    () =>
+      resolvedActiveExerciseId
+        ? (exercises.find((exercise) => exercise.exercise.id === resolvedActiveExerciseId) ?? null)
+        : null,
+    [exercises, resolvedActiveExerciseId],
+  )
 
   return {
     session,
@@ -402,6 +430,8 @@ export function useWorkoutSession({
     sessionNotes,
     sessionDate,
     selectedExercise,
+    activeExerciseId: resolvedActiveExerciseId,
+    activeExercise,
     sessionStartTime,
     isSessionStarted: Boolean(session),
     loading,
@@ -421,6 +451,7 @@ export function useWorkoutSession({
       completeSession,
       deleteSession,
       addExercise,
+      selectActiveExercise: setActiveExerciseId,
       removeExercise,
       saveSet,
       updateSet,

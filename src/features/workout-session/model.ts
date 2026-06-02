@@ -62,6 +62,60 @@ export function getNextSetNumber(sets: WorkoutSet[]): number {
   return sets.reduce((maxSetNumber, set) => Math.max(maxSetNumber, set.set_number), 0) + 1
 }
 
+export function getActiveExerciseId(
+  exercises: ExerciseInWorkout[],
+  activeExerciseId: string | null,
+): string | null {
+  if (activeExerciseId && exercises.some((exercise) => exercise.exercise.id === activeExerciseId)) {
+    return activeExerciseId
+  }
+
+  return exercises[0]?.exercise.id ?? null
+}
+
+export function getNextActiveExerciseId(
+  exercises: ExerciseInWorkout[],
+  currentExerciseId: string,
+  completedExerciseIds: Set<string> = new Set(),
+): string | null {
+  const currentIndex = exercises.findIndex((exercise) => exercise.exercise.id === currentExerciseId)
+
+  if (currentIndex === -1) {
+    return getActiveExerciseId(exercises, null)
+  }
+
+  const orderedExercises = [
+    ...exercises.slice(currentIndex + 1),
+    ...exercises.slice(0, currentIndex),
+  ]
+
+  return (
+    orderedExercises.find((exercise) => !completedExerciseIds.has(exercise.exercise.id))?.exercise
+      .id ?? null
+  )
+}
+
+export function getNextSetDefaultsFromPreviousSet(
+  previousSet?: WorkoutSet,
+): Partial<
+  Pick<
+    WorkoutSet,
+    'reps' | 'weight' | 'rest_time' | 'duration_seconds' | 'distance_km' | 'incline' | 'speed_kmh'
+  >
+> {
+  if (!previousSet) return {}
+
+  return {
+    reps: previousSet.reps,
+    weight: previousSet.weight,
+    rest_time: previousSet.rest_time,
+    duration_seconds: previousSet.duration_seconds,
+    distance_km: previousSet.distance_km,
+    incline: previousSet.incline,
+    speed_kmh: previousSet.speed_kmh,
+  }
+}
+
 export function getSessionDuration(
   session: WorkoutSession | null,
   now = new Date(),
