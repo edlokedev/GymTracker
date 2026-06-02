@@ -412,7 +412,10 @@ export function useWorkoutSession({
   const totalVolume = useMemo(() => getTotalVolume(exercises), [exercises])
   const sessionDuration = useMemo(() => getSessionDuration(session), [session])
   const resolvedActiveExerciseId = useMemo(
-    () => getActiveExerciseId(exercises, activeExerciseId),
+    () =>
+      activeExerciseId && exercises.some((exercise) => exercise.exercise.id === activeExerciseId)
+        ? activeExerciseId
+        : null,
     [activeExerciseId, exercises],
   )
   const activeExercise = useMemo(

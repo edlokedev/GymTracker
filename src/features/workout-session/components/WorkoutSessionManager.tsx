@@ -84,7 +84,9 @@ export default function WorkoutSessionManager({
   useEffect(() => {
     if (session?.id) {
       setCompletedExerciseIds(new Set())
+      return
     }
+    setCompletedExerciseIds(new Set())
   }, [session?.id])
 
   const focusExercise = (exerciseId: string | null) => {
@@ -137,11 +139,21 @@ export default function WorkoutSessionManager({
       description: `Are you sure you want to remove "${exerciseName}" and all its sets from your workout?`,
       confirmLabel: 'Remove',
       onConfirm: async () => {
+        const remainingExercises = exercises.filter((e) => e.exercise.id !== exerciseId)
         const didRemove = await actions.removeExercise(exerciseId)
         if (didRemove) {
           setCompletedExerciseIds((current) => {
             const next = new Set(current)
             next.delete(exerciseId)
+            if (activeExerciseId === exerciseId) {
+              const nextActiveExerciseId = getNextActiveExerciseId(
+                remainingExercises,
+                exerciseId,
+                next,
+              )
+              actions.selectActiveExercise(nextActiveExerciseId)
+              focusExercise(nextActiveExerciseId)
+            }
             return next
           })
           setConfirmModal((prev) => ({ ...prev, isOpen: false }))
@@ -151,6 +163,9 @@ export default function WorkoutSessionManager({
   }
 
   const completeExercise = (exerciseId: string) => {
+    const exerciseToComplete = exercises.find((exercise) => exercise.exercise.id === exerciseId)
+    if (!exerciseToComplete || exerciseToComplete.sets.length === 0) return
+
     setCompletedExerciseIds((current) => {
       const nextCompletedExerciseIds = new Set(current).add(exerciseId)
       const nextActiveExerciseId = getNextActiveExerciseId(
@@ -365,6 +380,7 @@ export default function WorkoutSessionManager({
             const isExerciseComplete = completedExerciseIds.has(exerciseId)
             const completionStats = getExerciseCompletionStats(exerciseInWorkout.sets, trackingType)
             const isActiveExercise = activeExerciseId === exerciseId
+            const showOnMobile = isActiveExercise || isExerciseComplete || !activeExerciseId
 
             return (
               <div
@@ -379,7 +395,7 @@ export default function WorkoutSessionManager({
                   isActiveExercise
                     ? 'border-blue-300 dark:border-blue-700'
                     : 'border-gray-200 dark:border-gray-700'
-                } ${isActiveExercise ? '' : 'hidden sm:block'}`}
+                } ${showOnMobile ? '' : 'hidden sm:block'}`}
               >
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -464,7 +480,7 @@ export default function WorkoutSessionManager({
                       }`}
                       aria-label={`Mark ${exerciseName} done`}
                     >
-                      Done with Exercise
+                      Done Exercise
                     </button>
 
                     <details className="mt-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40">
@@ -658,8 +674,15 @@ function WorkoutExerciseRail({
             }`}
           >
             <span className="truncate">{exerciseName}</span>
-            <span className="ml-2 rounded bg-black/10 px-1.5 py-0.5 text-xs">
-              {exerciseInWorkout.sets.length}
+            <span className="ml-2 inline-flex shrink-0 items-center gap-1">
+              <span className="rounded bg-black/10 px-1.5 py-0.5 text-xs">
+                {exerciseInWorkout.sets.length}
+              </span>
+              {isComplete && (
+                <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-700 text-xs dark:bg-green-900/50 dark:text-green-200">
+                  Done
+                </span>
+              )}
             </span>
           </button>
         )

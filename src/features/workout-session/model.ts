@@ -81,7 +81,10 @@ export function getNextActiveExerciseId(
   const currentIndex = exercises.findIndex((exercise) => exercise.exercise.id === currentExerciseId)
 
   if (currentIndex === -1) {
-    return getActiveExerciseId(exercises, null)
+    return (
+      exercises.find((exercise) => !completedExerciseIds.has(exercise.exercise.id))?.exercise.id ??
+      null
+    )
   }
 
   const orderedExercises = [

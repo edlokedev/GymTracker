@@ -140,6 +140,16 @@ describe('workout session model', () => {
     expect(getNextActiveExerciseId(exercises, 'row', new Set(['bench-press', 'squat']))).toBeNull()
   })
 
+  it('does not fall back to a completed exercise when the current exercise is gone', () => {
+    const exercises = [
+      { exercise: makeExercise('bench-press', 'Bench Press'), sets: [] },
+      { exercise: makeExercise('row', 'Row'), sets: [] },
+    ]
+
+    expect(getNextActiveExerciseId(exercises, 'squat', new Set(['bench-press']))).toBe('row')
+    expect(getNextActiveExerciseId(exercises, 'squat', new Set(['bench-press', 'row']))).toBeNull()
+  })
+
   it('derives next set defaults from the previous set without notes', () => {
     expect(
       getNextSetDefaultsFromPreviousSet({

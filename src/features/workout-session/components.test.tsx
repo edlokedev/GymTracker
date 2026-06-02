@@ -51,6 +51,7 @@ const makeSession = (overrides: Partial<WorkoutSession> = {}): WorkoutSession =>
 })
 
 const makeWorkoutDetails = ({
+  includeBenchSet = true,
   includeSecondExercise = false,
   includeCrowdedRail = false,
 } = {}): WorkoutWithDetails => ({
@@ -66,18 +67,20 @@ const makeWorkoutDetails = ({
         gif_path: null,
         preview_image_path: null,
       }),
-      sets: [
-        {
-          id: 'set-1',
-          workout_id: 'session-1',
-          exercise_id: 'bench-press',
-          set_number: 1,
-          reps: 8,
-          weight: 100,
-          created_at: new Date('2026-05-01T10:00:00.000Z'),
-          updated_at: new Date('2026-05-01T10:00:00.000Z'),
-        },
-      ],
+      sets: includeBenchSet
+        ? [
+            {
+              id: 'set-1',
+              workout_id: 'session-1',
+              exercise_id: 'bench-press',
+              set_number: 1,
+              reps: 8,
+              weight: 100,
+              created_at: new Date('2026-05-01T10:00:00.000Z'),
+              updated_at: new Date('2026-05-01T10:00:00.000Z'),
+            },
+          ]
+        : [],
     },
     ...(includeSecondExercise
       ? [
@@ -211,6 +214,72 @@ describe('WorkoutSessionManager', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume Bench Press' }))
 
+    expect(screen.getByText('Set 2')).toBeInTheDocument()
+  })
+
+  it('keeps exercise completion disabled until the exercise has a set', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ success: true, data: makeWorkoutDetails({ includeBenchSet: false }) }),
+      ),
+    )
+
+    render(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+
+    expect(screen.getByRole('button', { name: 'Mark Bench Press done' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Done Exercise' })).not.toBeInTheDocument()
+  })
+
+  it('moves through incomplete exercises and offers workout completion when all are done', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ success: true, data: makeWorkoutDetails({ includeSecondExercise: true }) }),
+      ),
+    )
+
+    render(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Bench Press done' }))
+
+    expect(screen.getByRole('button', { name: /Bench Press, 1 sets, done/i })).toHaveTextContent(
+      'Done',
+    )
+    expect(screen.getByRole('heading', { name: 'Squat' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Squat done' }))
+
+    expect(screen.getByRole('button', { name: 'Add Exercise' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Complete Workout' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Exercise done')).toHaveLength(2)
+  })
+
+  it('resets completed exercise summaries when loading another session', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
+    )
+
+    const { rerender } = render(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Bench Press done' }))
+    expect(screen.getByText('Exercise done')).toBeInTheDocument()
+
+    rerender(<WorkoutSessionManager existingSession={makeSession({ id: 'session-2' })} />)
+
+    await waitFor(() => expect(screen.queryByText('Exercise done')).not.toBeInTheDocument())
     expect(screen.getByText('Set 2')).toBeInTheDocument()
   })
 
