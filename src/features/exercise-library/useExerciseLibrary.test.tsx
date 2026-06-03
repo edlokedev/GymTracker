@@ -38,6 +38,15 @@ describe('useExerciseLibrary', () => {
       if (url === '/api/muscle-groups') {
         return Response.json({ data: ['chest'] })
       }
+      if (url === '/api/exercise-favorites') {
+        return Response.json({
+          success: true,
+          data: { items: [], exerciseIds: [] },
+        })
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return Response.json({ success: true, data: { items: [] } })
+      }
       if (url.startsWith('/api/exercises/search')) {
         expect(url).toContain('category_id=strength')
         expect(url).toContain('equipment=barbell')
@@ -85,6 +94,15 @@ describe('useExerciseLibrary', () => {
       if (url === '/api/exercise-categories') return Response.json({ data: [] })
       if (url === '/api/equipment-types') return Response.json({ data: [] })
       if (url === '/api/muscle-groups') return Response.json({ data: [] })
+      if (url === '/api/exercise-favorites') {
+        return Response.json({
+          success: true,
+          data: { items: [], exerciseIds: [] },
+        })
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return Response.json({ success: true, data: { items: [] } })
+      }
 
       const searchUrl = new URL(url, 'http://localhost')
       const offset = searchUrl.searchParams.get('offset')
@@ -159,5 +177,98 @@ describe('useExerciseLibrary', () => {
     })
     expect(result.current.filters.query).toBe('')
     expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat'])
+  })
+
+  it('loads quick-pick lists and toggles favorites without changing search filters', async () => {
+    const benchPress = makeExercise('bench-press', 'Bench Press')
+    const squat = makeExercise('squat', 'Squat')
+    const pushUp = makeExercise('push-up', 'Push-Up')
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url === '/api/exercise-categories') return Response.json({ data: [] })
+      if (url === '/api/equipment-types') return Response.json({ data: [] })
+      if (url === '/api/muscle-groups') return Response.json({ data: [] })
+      if (url.startsWith('/api/exercises/search')) {
+        return Response.json({
+          success: true,
+          data: {
+            items: [benchPress],
+            total: 1,
+            page: 1,
+            totalPages: 1,
+            hasMore: false,
+          },
+        })
+      }
+      if (url === '/api/exercise-favorites' && init?.method === 'POST') {
+        expect(JSON.parse(String(init.body))).toEqual({ exerciseId: 'push-up' })
+        return Response.json({
+          success: true,
+          data: { exerciseId: 'push-up', isFavorite: true },
+        })
+      }
+      if (url === '/api/exercise-favorites') {
+        return Response.json({
+          success: true,
+          data: { items: [squat], exerciseIds: ['squat'] },
+        })
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return Response.json({
+          success: true,
+          data: {
+            items: [{ exercise: benchPress, lastUsedAt: '2026-06-01T00:00:00.000Z', useCount: 2 }],
+          },
+        })
+      }
+      if (url.startsWith('/api/exercises/suggested')) {
+        expect(url).toContain('exerciseId=bench-press')
+        return Response.json({
+          success: true,
+          data: {
+            items: [{ exercise: pushUp, score: 12, reasons: ['same primary muscle'] }],
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() =>
+      useExerciseLibrary({
+        initialSearch: {
+          category_id: [],
+          equipment: [],
+          muscle_group: [],
+          query: 'bench',
+        },
+      }),
+    )
+
+    await waitFor(() => expect(result.current.quickPickLists.favorites).toHaveLength(1))
+    expect(result.current.favoriteExerciseIds).toEqual(['squat'])
+    expect(result.current.favoriteExerciseIdSet.has('squat')).toBe(true)
+    expect(result.current.quickPickLists.recent[0].exercise.id).toBe('bench-press')
+
+    await act(async () => {
+      await result.current.actions.loadSuggestedExercises({ exerciseId: 'bench-press', limit: 5 })
+    })
+    expect(result.current.quickPickLists.suggested[0]).toMatchObject({
+      exercise: { id: 'push-up' },
+      score: 12,
+    })
+
+    await act(async () => {
+      await result.current.actions.toggleFavorite('push-up')
+    })
+    expect(result.current.favoriteExerciseIds).toEqual(['squat'])
+    expect(result.current.filters.query).toBe('bench')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/exercise-favorites',
+      expect.objectContaining({ method: 'POST' }),
+    )
   })
 })

@@ -7,6 +7,7 @@
 //   .order() / .range() / .limit()
 //   .single() / .maybeSingle()
 //   .insert(row).select(cols).single()
+//   .upsert(row, { onConflict }).select(cols).single()
 //   .update(patch).eq().select(cols).maybeSingle()
 //   .delete().eq().select(cols)
 //
@@ -42,8 +43,9 @@ interface QueryState {
   rangeTo: number | null
   limitN: number | null
   // mutation state
-  mode: 'select' | 'insert' | 'update' | 'delete'
+  mode: 'select' | 'insert' | 'upsert' | 'update' | 'delete'
   insertRow: StubRow | null
+  upsertConflict: string | null
   updatePatch: StubRow | null
 }
 
@@ -73,6 +75,7 @@ function freshState(table: string): QueryState {
     limitN: null,
     mode: 'select',
     insertRow: null,
+    upsertConflict: null,
     updatePatch: null,
   }
 }
@@ -195,7 +198,7 @@ export function stubSupabase(tables: StubTables, options: StubOptions = {}) {
       async single() {
         const rows = data[table] ?? []
         const { data: out } = terminal(rows)
-        if (state.mode === 'insert' && state.insertRow) {
+        if ((state.mode === 'insert' || state.mode === 'upsert') && state.insertRow) {
           // RLS on insert: if the row carries a user_id, it must match.
           if (
             userId != null &&
@@ -203,6 +206,16 @@ export function stubSupabase(tables: StubTables, options: StubOptions = {}) {
             state.insertRow.user_id !== userId
           ) {
             return { data: null, error: RLS_42501, count: null }
+          }
+          if (state.mode === 'upsert' && state.upsertConflict) {
+            const keys = state.upsertConflict.split(',').map((key) => key.trim())
+            const existing = (data[table] ?? []).find((row) =>
+              keys.every((key) => row[key] === state.insertRow?.[key]),
+            )
+            if (existing) {
+              Object.assign(existing, state.insertRow, { updated_at: new Date().toISOString() })
+              return { data: existing, error: null, count: null }
+            }
           }
           const inserted = { ...state.insertRow }
           // Auto-fill id / created_at / updated_at if missing.
@@ -241,6 +254,12 @@ export function stubSupabase(tables: StubTables, options: StubOptions = {}) {
       insert(row: StubRow) {
         state.mode = 'insert'
         state.insertRow = row
+        return builder
+      },
+      upsert(row: StubRow, opts?: { onConflict?: string }) {
+        state.mode = 'upsert'
+        state.insertRow = row
+        state.upsertConflict = opts?.onConflict ?? null
         return builder
       },
       update(patch: StubRow) {

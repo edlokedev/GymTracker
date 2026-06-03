@@ -102,7 +102,7 @@ function asStringArray(value: unknown): string[] {
   return []
 }
 
-function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
+export function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
   const cat = Array.isArray(row.exercise_categories)
     ? (row.exercise_categories[0] ?? null)
     : row.exercise_categories
@@ -126,7 +126,7 @@ function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
   }
 }
 
-const EXERCISE_SELECT =
+export const EXERCISE_SELECT =
   'id, name, category_id, tracking_type, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)'
 
 export const exerciseCatalogQueries = {

@@ -5,11 +5,28 @@ import { useExerciseLibrary } from '../useExerciseLibrary'
 import ExerciseSelectorModal from './ExerciseSelectorModal'
 import { EmptyExerciseSelector, SelectedExercisePanel } from './ExerciseSelectorPanel'
 
+export interface RecentExerciseQuickPick {
+  exercise: ExerciseWithParsedFields
+  lastUsedAt?: string
+  useCount?: number
+}
+
+export interface SuggestedExerciseQuickPick {
+  exercise: ExerciseWithParsedFields
+  score?: number
+  reasons?: string[]
+}
+
 interface ExerciseSelectorProps {
   onSelectExercise: (exercise: ExerciseWithParsedFields) => void
   selectedExercise?: ExerciseWithParsedFields | null
   onClearExercise?: () => void
   className?: string
+  favoriteExercises?: ExerciseWithParsedFields[]
+  favoriteExerciseIds?: string[]
+  recentlyUsedExercises?: RecentExerciseQuickPick[]
+  suggestedExercises?: SuggestedExerciseQuickPick[]
+  onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
 }
 
 export default function ExerciseSelector({
@@ -17,6 +34,11 @@ export default function ExerciseSelector({
   selectedExercise,
   onClearExercise,
   className = '',
+  favoriteExercises = [],
+  favoriteExerciseIds = [],
+  recentlyUsedExercises = [],
+  suggestedExercises = [],
+  onToggleFavorite,
 }: ExerciseSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [inputQuery, setInputQuery] = useState('')
@@ -27,11 +49,41 @@ export default function ExerciseSelector({
 
   const selectedCategory = library.filters.categoryIds[0] || ''
   const selectedEquipment = library.filters.equipment[0] || ''
+  const effectiveFavoriteExercises =
+    favoriteExercises.length > 0 ? favoriteExercises : library.quickPickLists.favorites
+  const effectiveFavoriteExerciseIds =
+    favoriteExerciseIds.length > 0 ? favoriteExerciseIds : library.favoriteExerciseIds
+  const effectiveRecentlyUsedExercises =
+    recentlyUsedExercises.length > 0 ? recentlyUsedExercises : library.quickPickLists.recent
+  const effectiveSuggestedExercises =
+    suggestedExercises.length > 0 ? suggestedExercises : library.quickPickLists.suggested
+  const effectiveToggleFavorite =
+    onToggleFavorite ??
+    ((exercise: ExerciseWithParsedFields) => library.actions.toggleFavorite(exercise.id))
+  const loadSuggestedExercises = library.actions.loadSuggestedExercises
+  const clearSuggestedExercises = library.actions.clearSuggestedExercises
 
   // Sync display value when filter is reset externally
   useEffect(() => {
     setInputQuery(library.filters.query)
   }, [library.filters.query])
+
+  useEffect(() => {
+    if (!isOpen || effectiveSuggestedExercises.length > 0) return
+
+    if (selectedExercise) {
+      void loadSuggestedExercises({ exerciseId: selectedExercise.id, limit: 6 })
+      return
+    }
+
+    void clearSuggestedExercises()
+  }, [
+    clearSuggestedExercises,
+    effectiveSuggestedExercises.length,
+    isOpen,
+    loadSuggestedExercises,
+    selectedExercise,
+  ])
 
   const handleQueryChange = (query: string) => {
     setInputQuery(query)
@@ -76,6 +128,10 @@ export default function ExerciseSelector({
         isLoading={library.isLoading}
         isLoadingMore={library.isLoadingMore}
         hasMore={library.hasMore}
+        favoriteExercises={effectiveFavoriteExercises}
+        favoriteExerciseIds={effectiveFavoriteExerciseIds}
+        recentlyUsedExercises={effectiveRecentlyUsedExercises}
+        suggestedExercises={effectiveSuggestedExercises}
         onClose={() => setIsOpen(false)}
         onQueryChange={handleQueryChange}
         onCategoryChange={(categoryId) => {
@@ -89,6 +145,7 @@ export default function ExerciseSelector({
           })
         }}
         onSelectExercise={handleSelectExercise}
+        onToggleFavorite={effectiveToggleFavorite}
         onLoadMore={() => void library.actions.loadMore()}
       />
     </div>

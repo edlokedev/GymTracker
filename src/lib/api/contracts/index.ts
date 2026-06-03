@@ -2,8 +2,12 @@
 // so consumers can pull it from a single specifier.
 export { calendarDataContract } from './calendar-data.contract'
 export { equipmentTypesContract } from './equipment-types.contract'
+export { catalogExerciseSchema } from './exercise.schema'
 export { exerciseCategoriesContract } from './exercise-categories.contract'
+export { exerciseFavoritesContract } from './exercise-favorites.contract'
+export { exercisesRecentContract } from './exercises.recent.contract'
 export { exercisesSearchContract } from './exercises.search.contract'
+export { exercisesSuggestedContract } from './exercises.suggested.contract'
 export { muscleGroupsContract } from './muscle-groups.contract'
 export { progressContract } from './progress.contract'
 export { workoutDetailsContract } from './workout-details.contract'

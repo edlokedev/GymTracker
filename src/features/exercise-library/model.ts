@@ -40,6 +40,42 @@ export interface ExerciseFacetCatalog {
   muscleGroups: string[]
 }
 
+export interface FavoriteExercisesResult {
+  items: ExerciseWithParsedFields[]
+  exerciseIds: string[]
+}
+
+export interface ToggleFavoriteResult {
+  exerciseId: string
+  isFavorite: boolean
+}
+
+export interface RecentExerciseItem {
+  exercise: ExerciseWithParsedFields
+  lastUsedAt: string
+  useCount: number
+}
+
+export interface RecentExercisesResult {
+  items: RecentExerciseItem[]
+}
+
+export interface SuggestedExerciseItem {
+  exercise: ExerciseWithParsedFields
+  score: number
+  reasons: string[]
+}
+
+export interface SuggestedExercisesResult {
+  items: SuggestedExerciseItem[]
+}
+
+export interface ExerciseQuickPickLists {
+  favorites: ExerciseWithParsedFields[]
+  recent: RecentExerciseItem[]
+  suggested: SuggestedExerciseItem[]
+}
+
 export type ActiveExerciseFilterType = 'category' | 'equipment' | 'muscle' | 'query'
 
 export interface ActiveExerciseFilterChip {
@@ -58,6 +94,24 @@ export const emptyExerciseLibrarySearch: ExerciseLibrarySearch = {
 
 export function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)))
+}
+
+export function favoriteIdsFromResult(result: FavoriteExercisesResult): string[] {
+  return uniqueValues(
+    result.exerciseIds.length > 0 ? result.exerciseIds : result.items.map((item) => item.id),
+  )
+}
+
+export function buildExerciseQuickPickLists({
+  favorites,
+  recent,
+  suggested,
+}: ExerciseQuickPickLists): ExerciseQuickPickLists {
+  return {
+    favorites,
+    recent,
+    suggested,
+  }
 }
 
 export function filtersFromRouteSearch(search: ExerciseLibrarySearch): ExerciseLibraryFilters {

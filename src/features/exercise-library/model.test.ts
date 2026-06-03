@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildActiveFilterChips,
+  buildExerciseQuickPickLists,
+  favoriteIdsFromResult,
   filtersFromRouteSearch,
   routeSearchKey,
   routeSearchToNavigateSearch,
@@ -89,6 +91,44 @@ describe('exercise library model', () => {
       equipment: ['barbell'],
       muscle_group: undefined,
       query: undefined,
+    })
+  })
+
+  it('dedupes favorite ids from explicit ids or favorite items', () => {
+    expect(
+      favoriteIdsFromResult({
+        exerciseIds: ['bench-press', 'bench-press', 'squat'],
+        items: [],
+      }),
+    ).toEqual(['bench-press', 'squat'])
+
+    expect(
+      favoriteIdsFromResult({
+        exerciseIds: [],
+        items: [{ id: 'bench-press' }, { id: 'bench-press' }, { id: 'squat' }] as never,
+      }),
+    ).toEqual(['bench-press', 'squat'])
+  })
+
+  it('builds quick-pick lists without altering ranked metadata', () => {
+    const quickPicks = buildExerciseQuickPickLists({
+      favorites: [{ id: 'bench-press' }] as never,
+      recent: [
+        { exercise: { id: 'squat' }, lastUsedAt: '2026-06-01T00:00:00.000Z', useCount: 3 },
+      ] as never,
+      suggested: [{ exercise: { id: 'push-up' }, score: 42, reasons: ['same muscle'] }] as never,
+    })
+
+    expect(quickPicks.favorites).toEqual([{ id: 'bench-press' }])
+    expect(quickPicks.recent[0]).toEqual({
+      exercise: { id: 'squat' },
+      lastUsedAt: '2026-06-01T00:00:00.000Z',
+      useCount: 3,
+    })
+    expect(quickPicks.suggested[0]).toEqual({
+      exercise: { id: 'push-up' },
+      score: 42,
+      reasons: ['same muscle'],
     })
   })
 })

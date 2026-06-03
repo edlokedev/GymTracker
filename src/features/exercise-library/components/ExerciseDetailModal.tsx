@@ -2,15 +2,26 @@ import { useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
+import { FavoriteStarButton } from './ExerciseCard'
 import { ExerciseHistory } from './ExerciseHistory'
 import ExerciseMediaFrame from './ExerciseMediaFrame'
 import { DifficultyBadge, MuscleChips } from './ExerciseMeta'
+
+export interface SimilarExerciseItem {
+  exercise: ExerciseWithParsedFields
+  score?: number
+  reasons?: string[]
+}
 
 interface ExerciseDetailModalProps {
   exercise: ExerciseWithParsedFields
   isOpen: boolean
   onClose: () => void
   onSelectExercise?: (exercise: ExerciseWithParsedFields) => void
+  isFavorite?: boolean
+  onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
+  similarExercises?: SimilarExerciseItem[]
+  onSelectSimilarExercise?: (exercise: ExerciseWithParsedFields) => void
 }
 
 export default function ExerciseDetailModal({
@@ -18,6 +29,10 @@ export default function ExerciseDetailModal({
   isOpen,
   onClose,
   onSelectExercise,
+  isFavorite = false,
+  onToggleFavorite,
+  similarExercises = [],
+  onSelectSimilarExercise,
 }: ExerciseDetailModalProps) {
   const { user } = useAuth()
 
@@ -54,24 +69,36 @@ export default function ExerciseDetailModal({
             className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 
                         sticky top-0 bg-white dark:bg-gray-800 z-10"
           >
-            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white pr-2">
-              {exerciseTitle}
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 
+            <div className="min-w-0 flex-1 pr-2">
+              <h2 className="truncate text-lg font-bold text-gray-900 dark:text-white sm:text-2xl">
+                {exerciseTitle}
+              </h2>
+            </div>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              {onToggleFavorite && (
+                <FavoriteStarButton
+                  exerciseTitle={exerciseTitle}
+                  isFavorite={isFavorite}
+                  onClick={() => onToggleFavorite(exercise)}
+                />
+              )}
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
                        p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
                        min-h-[44px] min-w-[44px] flex items-center justify-center"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+                aria-label="Close exercise detail"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-y-auto max-h-[calc(100vh-140px)] sm:max-h-[calc(90vh-200px)]">
@@ -195,6 +222,49 @@ export default function ExerciseDetailModal({
                       </li>
                     ))}
                   </ol>
+                </div>
+              )}
+
+              {similarExercises.length > 0 && (
+                <div className="space-y-3 border-gray-200 border-t pt-4 dark:border-gray-700 sm:space-y-4">
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">
+                    Similar exercises
+                  </h3>
+                  <div className="space-y-2">
+                    {similarExercises.map((item, index) => (
+                      <button
+                        key={item.exercise.id}
+                        type="button"
+                        onClick={() =>
+                          (onSelectSimilarExercise || onSelectExercise)?.(item.exercise)
+                        }
+                        className="min-h-14 w-full rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-blue-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600 dark:hover:bg-gray-700"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 text-sm font-medium dark:bg-gray-700 dark:text-gray-300">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {formatExerciseName(item.exercise.name)}
+                            </div>
+                            {item.reasons && item.reasons.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {item.reasons.slice(0, 3).map((reason) => (
+                                  <span
+                                    key={reason}
+                                    className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600 text-xs dark:bg-gray-700 dark:text-gray-300"
+                                  >
+                                    {reason}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

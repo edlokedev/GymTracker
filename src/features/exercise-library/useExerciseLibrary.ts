@@ -1,18 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
-import { fetchExerciseFacetCatalog, searchExerciseLibrary } from './client'
+import {
+  fetchExerciseFacetCatalog,
+  fetchFavoriteExercises,
+  fetchRecentExercises,
+  fetchSuggestedExercises,
+  searchExerciseLibrary,
+  toggleFavoriteExercise,
+} from './client'
 import {
   type ActiveExerciseFilterType,
   buildActiveFilterChips,
+  buildExerciseQuickPickLists,
   type ExerciseCategory,
   type ExerciseLibraryFilters,
   type ExerciseLibrarySearch,
   type ExerciseSearchResult,
   emptyExerciseLibrarySearch,
+  favoriteIdsFromResult,
   filtersFromRouteSearch,
   getActiveFilterCount,
+  type RecentExerciseItem,
   routeSearchFromFilters,
   routeSearchKey,
+  type SuggestedExerciseItem,
   toggleFilterValue,
   uniqueValues,
 } from './model'
@@ -36,6 +47,12 @@ interface ExerciseLibraryState {
   totalPages: number
   total: number
   hasMore: boolean
+  isLoadingQuickPicks: boolean
+  favoriteExerciseIds: string[]
+  favoriteExercises: ExerciseWithParsedFields[]
+  recentExercises: RecentExerciseItem[]
+  suggestedExercises: SuggestedExerciseItem[]
+  togglingFavoriteId: string | null
 }
 
 type FilterUpdates = Partial<ExerciseLibraryFilters>
@@ -78,6 +95,12 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     totalPages: 1,
     total: 0,
     hasMore: false,
+    isLoadingQuickPicks: false,
+    favoriteExerciseIds: [],
+    favoriteExercises: [],
+    recentExercises: [],
+    suggestedExercises: [],
+    togglingFavoriteId: null,
   })
 
   const runSearch = useCallback(
@@ -130,9 +153,13 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
   useEffect(() => {
     let isMounted = true
 
-    async function loadFacets() {
+    async function loadCatalogSupport() {
       try {
-        const catalog = await fetchExerciseFacetCatalog()
+        const [catalog, favorites, recent] = await Promise.all([
+          fetchExerciseFacetCatalog(),
+          fetchFavoriteExercises().catch(() => ({ items: [], exerciseIds: [] })),
+          fetchRecentExercises(10).catch(() => ({ items: [] })),
+        ])
         if (!isMounted) return
 
         setState((prev) => ({
@@ -140,13 +167,27 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
           categories: catalog.categories,
           equipmentTypes: catalog.equipmentTypes,
           muscleGroups: catalog.muscleGroups,
+          favoriteExerciseIds: favoriteIdsFromResult(favorites),
+          favoriteExercises: favorites.items,
+          recentExercises: recent.items,
+          isLoadingQuickPicks: false,
         }))
       } catch (error) {
-        console.error('Failed to load exercise facets:', error)
+        console.error('Failed to load exercise catalog support:', error)
+        if (!isMounted) return
+
+        setState((prev) => ({
+          ...prev,
+          isLoadingQuickPicks: false,
+        }))
       }
     }
 
-    loadFacets()
+    setState((prev) => ({
+      ...prev,
+      isLoadingQuickPicks: true,
+    }))
+    loadCatalogSupport()
 
     return () => {
       isMounted = false
@@ -261,6 +302,97 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     })
   }, [runSearch, state.hasMore, state.isLoadingMore])
 
+  const refreshQuickPicks = useCallback(async () => {
+    setState((prev) => ({
+      ...prev,
+      isLoadingQuickPicks: true,
+    }))
+
+    try {
+      const [favorites, recent] = await Promise.all([
+        fetchFavoriteExercises(),
+        fetchRecentExercises(10),
+      ])
+
+      setState((prev) => ({
+        ...prev,
+        favoriteExerciseIds: favoriteIdsFromResult(favorites),
+        favoriteExercises: favorites.items,
+        recentExercises: recent.items,
+        isLoadingQuickPicks: false,
+      }))
+    } catch (error) {
+      console.error('Failed to refresh exercise quick picks:', error)
+      setState((prev) => ({
+        ...prev,
+        isLoadingQuickPicks: false,
+      }))
+    }
+  }, [])
+
+  const toggleFavorite = useCallback(
+    async (exerciseId: string) => {
+      const wasFavorite = state.favoriteExerciseIds.includes(exerciseId)
+
+      setState((prev) => ({
+        ...prev,
+        togglingFavoriteId: exerciseId,
+        favoriteExerciseIds: wasFavorite
+          ? prev.favoriteExerciseIds.filter((id) => id !== exerciseId)
+          : uniqueValues([...prev.favoriteExerciseIds, exerciseId]),
+      }))
+
+      try {
+        const result = await toggleFavoriteExercise(exerciseId, wasFavorite)
+        const favorites = await fetchFavoriteExercises()
+
+        setState((prev) => ({
+          ...prev,
+          favoriteExerciseIds: favoriteIdsFromResult(favorites),
+          favoriteExercises: favorites.items,
+          togglingFavoriteId:
+            prev.togglingFavoriteId === result.exerciseId ? null : prev.togglingFavoriteId,
+        }))
+      } catch (error) {
+        console.error('Failed to toggle favorite exercise:', error)
+        setState((prev) => ({
+          ...prev,
+          favoriteExerciseIds: wasFavorite
+            ? uniqueValues([...prev.favoriteExerciseIds, exerciseId])
+            : prev.favoriteExerciseIds.filter((id) => id !== exerciseId),
+          togglingFavoriteId: null,
+        }))
+      }
+    },
+    [state.favoriteExerciseIds],
+  )
+
+  const loadSuggestedExercises = useCallback(
+    async (options: { exerciseId?: string; muscle?: string; limit?: number }) => {
+      try {
+        const result = await fetchSuggestedExercises(options)
+        setState((prev) => ({
+          ...prev,
+          suggestedExercises: result.items,
+        }))
+      } catch (error) {
+        console.error('Failed to load suggested exercises:', error)
+        setState((prev) => ({
+          ...prev,
+          suggestedExercises: [],
+        }))
+      }
+    },
+    [],
+  )
+
+  const clearSuggestedExercises = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      suggestedExercises: [],
+    }))
+  }, [])
+
   const categoryLabelById = useMemo(
     () => new Map(state.categories.map((category) => [category.id, category.name])),
     [state.categories],
@@ -271,12 +403,27 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     () => buildActiveFilterChips(state.filters, categoryLabelById),
     [categoryLabelById, state.filters],
   )
+  const favoriteExerciseIdSet = useMemo(
+    () => new Set(state.favoriteExerciseIds),
+    [state.favoriteExerciseIds],
+  )
+  const quickPickLists = useMemo(
+    () =>
+      buildExerciseQuickPickLists({
+        favorites: state.favoriteExercises,
+        recent: state.recentExercises,
+        suggested: state.suggestedExercises,
+      }),
+    [state.favoriteExercises, state.recentExercises, state.suggestedExercises],
+  )
 
   return {
     ...state,
     categoryLabelById,
+    favoriteExerciseIdSet,
     activeFilterCount,
     activeFilterChips,
+    quickPickLists,
     actions: {
       applyFilters,
       updateFilters,
@@ -296,6 +443,10 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
       removeFilter,
       resetFilters,
       loadMore,
+      toggleFavorite,
+      refreshQuickPicks,
+      loadSuggestedExercises,
+      clearSuggestedExercises,
       refresh: () => runSearch(filtersRef.current),
     },
   }

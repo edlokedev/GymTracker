@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
 import ExerciseMediaFrame from './ExerciseMediaFrame'
@@ -6,9 +7,16 @@ import { DifficultyBadge, ForceIcon, MuscleChips } from './ExerciseMeta'
 interface ExerciseCardProps {
   exercise: ExerciseWithParsedFields
   onSelect: (exercise: ExerciseWithParsedFields) => void
+  isFavorite?: boolean
+  onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
 }
 
-export default function ExerciseCard({ exercise, onSelect }: ExerciseCardProps) {
+export default function ExerciseCard({
+  exercise,
+  onSelect,
+  isFavorite = false,
+  onToggleFavorite,
+}: ExerciseCardProps) {
   const exerciseTitle = formatExerciseName(exercise.name)
 
   return (
@@ -19,13 +27,26 @@ export default function ExerciseCard({ exercise, onSelect }: ExerciseCardProps) 
                  hover:scale-[1.02] hover:border-blue-300 dark:hover:border-blue-600
                  group active:scale-[0.98] h-full flex flex-col"
     >
-      <ExerciseMediaFrame
-        exercise={exercise}
-        alt={exerciseTitle}
-        frameClassName="relative aspect-video flex-shrink-0 overflow-hidden rounded-t-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500"
-        imageClassName="absolute inset-0 z-10 h-full w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 object-cover transition-transform duration-200 group-hover:scale-105 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500"
-        iconClassName="absolute inset-0 flex items-center justify-center text-gray-400 transition-transform duration-200 group-hover:scale-105 dark:text-gray-500"
-      />
+      <div className="relative">
+        <ExerciseMediaFrame
+          exercise={exercise}
+          alt={exerciseTitle}
+          frameClassName="relative aspect-video flex-shrink-0 overflow-hidden rounded-t-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500"
+          imageClassName="absolute inset-0 z-10 h-full w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 object-cover transition-transform duration-200 group-hover:scale-105 dark:from-gray-700 dark:via-gray-600 dark:to-gray-500"
+          iconClassName="absolute inset-0 flex items-center justify-center text-gray-400 transition-transform duration-200 group-hover:scale-105 dark:text-gray-500"
+        />
+        {onToggleFavorite && (
+          <FavoriteStarButton
+            exerciseTitle={exerciseTitle}
+            isFavorite={isFavorite}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleFavorite(exercise)
+            }}
+            className="absolute top-2 right-2 z-20"
+          />
+        )}
+      </div>
 
       <div className="p-4 space-y-3 flex flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
@@ -91,5 +112,44 @@ export default function ExerciseCard({ exercise, onSelect }: ExerciseCardProps) 
         </button>
       </div>
     </div>
+  )
+}
+
+export function FavoriteStarButton({
+  exerciseTitle,
+  isFavorite,
+  onClick,
+  className = '',
+}: {
+  exerciseTitle: string
+  isFavorite: boolean
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={isFavorite}
+      aria-label={
+        isFavorite ? `Remove ${exerciseTitle} from favorites` : `Add ${exerciseTitle} to favorites`
+      }
+      className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-gray-200 bg-white/95 text-gray-500 shadow-sm transition-colors hover:bg-gray-50 hover:text-amber-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-amber-400 ${isFavorite ? 'text-amber-500 dark:text-amber-400' : ''} ${className}`}
+    >
+      <svg
+        className="h-5 w-5"
+        viewBox="0 0 24 24"
+        fill={isFavorite ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.8}
+          d="M11.48 3.5a.58.58 0 0 1 1.04 0l2.36 4.78 5.27.77a.58.58 0 0 1 .32.99l-3.82 3.72.9 5.25a.58.58 0 0 1-.84.61L12 17.14l-4.71 2.48a.58.58 0 0 1-.84-.61l.9-5.25-3.82-3.72a.58.58 0 0 1 .32-.99l5.27-.77 2.36-4.78Z"
+        />
+      </svg>
+    </button>
   )
 }

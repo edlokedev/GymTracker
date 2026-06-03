@@ -22,10 +22,13 @@ import { ServerRoute as ApiWorkoutSessionsServerRouteImport } from './routes/api
 import { ServerRoute as ApiWorkoutDetailsServerRouteImport } from './routes/api.workout-details'
 import { ServerRoute as ApiProgressServerRouteImport } from './routes/api.progress'
 import { ServerRoute as ApiMuscleGroupsServerRouteImport } from './routes/api.muscle-groups'
+import { ServerRoute as ApiExerciseFavoritesServerRouteImport } from './routes/api.exercise-favorites'
 import { ServerRoute as ApiExerciseCategoriesServerRouteImport } from './routes/api.exercise-categories'
 import { ServerRoute as ApiEquipmentTypesServerRouteImport } from './routes/api.equipment-types'
 import { ServerRoute as ApiCalendarDataServerRouteImport } from './routes/api.calendar-data'
+import { ServerRoute as ApiExercisesSuggestedServerRouteImport } from './routes/api.exercises.suggested'
 import { ServerRoute as ApiExercisesSearchServerRouteImport } from './routes/api.exercises.search'
+import { ServerRoute as ApiExercisesRecentServerRouteImport } from './routes/api.exercises.recent'
 
 const rootServerRouteImport = createServerRootRoute()
 
@@ -85,6 +88,12 @@ const ApiMuscleGroupsServerRoute = ApiMuscleGroupsServerRouteImport.update({
   path: '/api/muscle-groups',
   getParentRoute: () => rootServerRouteImport,
 } as any)
+const ApiExerciseFavoritesServerRoute =
+  ApiExerciseFavoritesServerRouteImport.update({
+    id: '/api/exercise-favorites',
+    path: '/api/exercise-favorites',
+    getParentRoute: () => rootServerRouteImport,
+  } as any)
 const ApiExerciseCategoriesServerRoute =
   ApiExerciseCategoriesServerRouteImport.update({
     id: '/api/exercise-categories',
@@ -101,10 +110,22 @@ const ApiCalendarDataServerRoute = ApiCalendarDataServerRouteImport.update({
   path: '/api/calendar-data',
   getParentRoute: () => rootServerRouteImport,
 } as any)
+const ApiExercisesSuggestedServerRoute =
+  ApiExercisesSuggestedServerRouteImport.update({
+    id: '/api/exercises/suggested',
+    path: '/api/exercises/suggested',
+    getParentRoute: () => rootServerRouteImport,
+  } as any)
 const ApiExercisesSearchServerRoute =
   ApiExercisesSearchServerRouteImport.update({
     id: '/api/exercises/search',
     path: '/api/exercises/search',
+    getParentRoute: () => rootServerRouteImport,
+  } as any)
+const ApiExercisesRecentServerRoute =
+  ApiExercisesRecentServerRouteImport.update({
+    id: '/api/exercises/recent',
+    path: '/api/exercises/recent',
     getParentRoute: () => rootServerRouteImport,
   } as any)
 
@@ -149,38 +170,47 @@ export interface FileServerRoutesByFullPath {
   '/api/calendar-data': typeof ApiCalendarDataServerRoute
   '/api/equipment-types': typeof ApiEquipmentTypesServerRoute
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
+  '/api/exercise-favorites': typeof ApiExerciseFavoritesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
+  '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
+  '/api/exercises/suggested': typeof ApiExercisesSuggestedServerRoute
 }
 export interface FileServerRoutesByTo {
   '/api/calendar-data': typeof ApiCalendarDataServerRoute
   '/api/equipment-types': typeof ApiEquipmentTypesServerRoute
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
+  '/api/exercise-favorites': typeof ApiExerciseFavoritesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
+  '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
+  '/api/exercises/suggested': typeof ApiExercisesSuggestedServerRoute
 }
 export interface FileServerRoutesById {
   __root__: typeof rootServerRouteImport
   '/api/calendar-data': typeof ApiCalendarDataServerRoute
   '/api/equipment-types': typeof ApiEquipmentTypesServerRoute
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
+  '/api/exercise-favorites': typeof ApiExerciseFavoritesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
+  '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
+  '/api/exercises/suggested': typeof ApiExercisesSuggestedServerRoute
 }
 export interface FileServerRouteTypes {
   fileServerRoutesByFullPath: FileServerRoutesByFullPath
@@ -188,50 +218,62 @@ export interface FileServerRouteTypes {
     | '/api/calendar-data'
     | '/api/equipment-types'
     | '/api/exercise-categories'
+    | '/api/exercise-favorites'
     | '/api/muscle-groups'
     | '/api/progress'
     | '/api/workout-details'
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/auth/callback'
+    | '/api/exercises/recent'
     | '/api/exercises/search'
+    | '/api/exercises/suggested'
   fileServerRoutesByTo: FileServerRoutesByTo
   to:
     | '/api/calendar-data'
     | '/api/equipment-types'
     | '/api/exercise-categories'
+    | '/api/exercise-favorites'
     | '/api/muscle-groups'
     | '/api/progress'
     | '/api/workout-details'
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/auth/callback'
+    | '/api/exercises/recent'
     | '/api/exercises/search'
+    | '/api/exercises/suggested'
   id:
     | '__root__'
     | '/api/calendar-data'
     | '/api/equipment-types'
     | '/api/exercise-categories'
+    | '/api/exercise-favorites'
     | '/api/muscle-groups'
     | '/api/progress'
     | '/api/workout-details'
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/auth/callback'
+    | '/api/exercises/recent'
     | '/api/exercises/search'
+    | '/api/exercises/suggested'
   fileServerRoutesById: FileServerRoutesById
 }
 export interface RootServerRouteChildren {
   ApiCalendarDataServerRoute: typeof ApiCalendarDataServerRoute
   ApiEquipmentTypesServerRoute: typeof ApiEquipmentTypesServerRoute
   ApiExerciseCategoriesServerRoute: typeof ApiExerciseCategoriesServerRoute
+  ApiExerciseFavoritesServerRoute: typeof ApiExerciseFavoritesServerRoute
   ApiMuscleGroupsServerRoute: typeof ApiMuscleGroupsServerRoute
   ApiProgressServerRoute: typeof ApiProgressServerRoute
   ApiWorkoutDetailsServerRoute: typeof ApiWorkoutDetailsServerRoute
   ApiWorkoutSessionsServerRoute: typeof ApiWorkoutSessionsServerRoute
   ApiWorkoutSetsServerRoute: typeof ApiWorkoutSetsServerRoute
   AuthCallbackServerRoute: typeof AuthCallbackServerRoute
+  ApiExercisesRecentServerRoute: typeof ApiExercisesRecentServerRoute
   ApiExercisesSearchServerRoute: typeof ApiExercisesSearchServerRoute
+  ApiExercisesSuggestedServerRoute: typeof ApiExercisesSuggestedServerRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -317,6 +359,13 @@ declare module '@tanstack/react-start/server' {
       preLoaderRoute: typeof ApiMuscleGroupsServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
+    '/api/exercise-favorites': {
+      id: '/api/exercise-favorites'
+      path: '/api/exercise-favorites'
+      fullPath: '/api/exercise-favorites'
+      preLoaderRoute: typeof ApiExerciseFavoritesServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
     '/api/exercise-categories': {
       id: '/api/exercise-categories'
       path: '/api/exercise-categories'
@@ -338,11 +387,25 @@ declare module '@tanstack/react-start/server' {
       preLoaderRoute: typeof ApiCalendarDataServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
+    '/api/exercises/suggested': {
+      id: '/api/exercises/suggested'
+      path: '/api/exercises/suggested'
+      fullPath: '/api/exercises/suggested'
+      preLoaderRoute: typeof ApiExercisesSuggestedServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
     '/api/exercises/search': {
       id: '/api/exercises/search'
       path: '/api/exercises/search'
       fullPath: '/api/exercises/search'
       preLoaderRoute: typeof ApiExercisesSearchServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
+    '/api/exercises/recent': {
+      id: '/api/exercises/recent'
+      path: '/api/exercises/recent'
+      fullPath: '/api/exercises/recent'
+      preLoaderRoute: typeof ApiExercisesRecentServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
   }
@@ -362,13 +425,16 @@ const rootServerRouteChildren: RootServerRouteChildren = {
   ApiCalendarDataServerRoute: ApiCalendarDataServerRoute,
   ApiEquipmentTypesServerRoute: ApiEquipmentTypesServerRoute,
   ApiExerciseCategoriesServerRoute: ApiExerciseCategoriesServerRoute,
+  ApiExerciseFavoritesServerRoute: ApiExerciseFavoritesServerRoute,
   ApiMuscleGroupsServerRoute: ApiMuscleGroupsServerRoute,
   ApiProgressServerRoute: ApiProgressServerRoute,
   ApiWorkoutDetailsServerRoute: ApiWorkoutDetailsServerRoute,
   ApiWorkoutSessionsServerRoute: ApiWorkoutSessionsServerRoute,
   ApiWorkoutSetsServerRoute: ApiWorkoutSetsServerRoute,
   AuthCallbackServerRoute: AuthCallbackServerRoute,
+  ApiExercisesRecentServerRoute: ApiExercisesRecentServerRoute,
   ApiExercisesSearchServerRoute: ApiExercisesSearchServerRoute,
+  ApiExercisesSuggestedServerRoute: ApiExercisesSuggestedServerRoute,
 }
 export const serverRouteTree = rootServerRouteImport
   ._addFileChildren(rootServerRouteChildren)

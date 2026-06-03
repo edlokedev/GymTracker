@@ -1,24 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from '../define-contract'
-
-const catalogExercise = z.object({
-  id: z.string(),
-  name: z.string(),
-  category_id: z.string(),
-  tracking_type: z.enum(['strength', 'cardio', 'timed']),
-  force: z.string().nullable(),
-  level: z.string().nullable(),
-  mechanic: z.string().nullable(),
-  equipment: z.string().nullable(),
-  primary_muscles: z.array(z.string()),
-  secondary_muscles: z.array(z.string()),
-  instructions: z.array(z.string()),
-  gif_path: z.string().nullable(),
-  preview_image_path: z.string().nullable(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  category_name: z.string(),
-})
+import { catalogExerciseSchema } from './exercise.schema'
 
 export const exercisesSearchContract = defineContract({
   path: '/api/exercises/search',
@@ -34,7 +16,7 @@ export const exercisesSearchContract = defineContract({
         offset: z.string().optional(),
       }),
       response: z.object({
-        items: z.array(catalogExercise),
+        items: z.array(catalogExerciseSchema),
         total: z.number(),
         page: z.number(),
         totalPages: z.number(),
