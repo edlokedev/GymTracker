@@ -11,16 +11,22 @@
 import { createServerRootRoute } from '@tanstack/react-start/server'
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkoutsRouteImport } from './routes/workouts'
 import { Route as WorkoutRouteImport } from './routes/workout'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as ExercisesRouteImport } from './routes/exercises'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WorkoutsIndexRouteImport } from './routes/workouts.index'
+import { Route as WorkoutsNewRouteImport } from './routes/workouts.new'
+import { Route as WorkoutsTemplateIdEditRouteImport } from './routes/workouts.$templateId.edit'
 import { ServerRoute as AuthCallbackServerRouteImport } from './routes/auth.callback'
+import { ServerRoute as ApiWorkoutTemplatesServerRouteImport } from './routes/api.workout-templates'
 import { ServerRoute as ApiWorkoutSetsServerRouteImport } from './routes/api.workout-sets'
 import { ServerRoute as ApiWorkoutSessionsServerRouteImport } from './routes/api.workout-sessions'
 import { ServerRoute as ApiWorkoutDetailsServerRouteImport } from './routes/api.workout-details'
 import { ServerRoute as ApiProgressServerRouteImport } from './routes/api.progress'
+import { ServerRoute as ApiNextWorkoutServerRouteImport } from './routes/api.next-workout'
 import { ServerRoute as ApiMuscleGroupsServerRouteImport } from './routes/api.muscle-groups'
 import { ServerRoute as ApiExerciseFavoritesServerRouteImport } from './routes/api.exercise-favorites'
 import { ServerRoute as ApiExerciseCategoriesServerRouteImport } from './routes/api.exercise-categories'
@@ -32,6 +38,11 @@ import { ServerRoute as ApiExercisesRecentServerRouteImport } from './routes/api
 
 const rootServerRouteImport = createServerRootRoute()
 
+const WorkoutsRoute = WorkoutsRouteImport.update({
+  id: '/workouts',
+  path: '/workouts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorkoutRoute = WorkoutRouteImport.update({
   id: '/workout',
   path: '/workout',
@@ -57,11 +68,32 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorkoutsIndexRoute = WorkoutsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => WorkoutsRoute,
+} as any)
+const WorkoutsNewRoute = WorkoutsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => WorkoutsRoute,
+} as any)
+const WorkoutsTemplateIdEditRoute = WorkoutsTemplateIdEditRouteImport.update({
+  id: '/$templateId/edit',
+  path: '/$templateId/edit',
+  getParentRoute: () => WorkoutsRoute,
+} as any)
 const AuthCallbackServerRoute = AuthCallbackServerRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
   getParentRoute: () => rootServerRouteImport,
 } as any)
+const ApiWorkoutTemplatesServerRoute =
+  ApiWorkoutTemplatesServerRouteImport.update({
+    id: '/api/workout-templates',
+    path: '/api/workout-templates',
+    getParentRoute: () => rootServerRouteImport,
+  } as any)
 const ApiWorkoutSetsServerRoute = ApiWorkoutSetsServerRouteImport.update({
   id: '/api/workout-sets',
   path: '/api/workout-sets',
@@ -81,6 +113,11 @@ const ApiWorkoutDetailsServerRoute = ApiWorkoutDetailsServerRouteImport.update({
 const ApiProgressServerRoute = ApiProgressServerRouteImport.update({
   id: '/api/progress',
   path: '/api/progress',
+  getParentRoute: () => rootServerRouteImport,
+} as any)
+const ApiNextWorkoutServerRoute = ApiNextWorkoutServerRouteImport.update({
+  id: '/api/next-workout',
+  path: '/api/next-workout',
   getParentRoute: () => rootServerRouteImport,
 } as any)
 const ApiMuscleGroupsServerRoute = ApiMuscleGroupsServerRouteImport.update({
@@ -135,6 +172,10 @@ export interface FileRoutesByFullPath {
   '/history': typeof HistoryRoute
   '/progress': typeof ProgressRoute
   '/workout': typeof WorkoutRoute
+  '/workouts': typeof WorkoutsRouteWithChildren
+  '/workouts/new': typeof WorkoutsNewRoute
+  '/workouts/': typeof WorkoutsIndexRoute
+  '/workouts/$templateId/edit': typeof WorkoutsTemplateIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -142,6 +183,9 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/progress': typeof ProgressRoute
   '/workout': typeof WorkoutRoute
+  '/workouts/new': typeof WorkoutsNewRoute
+  '/workouts': typeof WorkoutsIndexRoute
+  '/workouts/$templateId/edit': typeof WorkoutsTemplateIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -150,13 +194,44 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/progress': typeof ProgressRoute
   '/workout': typeof WorkoutRoute
+  '/workouts': typeof WorkoutsRouteWithChildren
+  '/workouts/new': typeof WorkoutsNewRoute
+  '/workouts/': typeof WorkoutsIndexRoute
+  '/workouts/$templateId/edit': typeof WorkoutsTemplateIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/exercises' | '/history' | '/progress' | '/workout'
+  fullPaths:
+    | '/'
+    | '/exercises'
+    | '/history'
+    | '/progress'
+    | '/workout'
+    | '/workouts'
+    | '/workouts/new'
+    | '/workouts/'
+    | '/workouts/$templateId/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/exercises' | '/history' | '/progress' | '/workout'
-  id: '__root__' | '/' | '/exercises' | '/history' | '/progress' | '/workout'
+  to:
+    | '/'
+    | '/exercises'
+    | '/history'
+    | '/progress'
+    | '/workout'
+    | '/workouts/new'
+    | '/workouts'
+    | '/workouts/$templateId/edit'
+  id:
+    | '__root__'
+    | '/'
+    | '/exercises'
+    | '/history'
+    | '/progress'
+    | '/workout'
+    | '/workouts'
+    | '/workouts/new'
+    | '/workouts/'
+    | '/workouts/$templateId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -165,6 +240,7 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   ProgressRoute: typeof ProgressRoute
   WorkoutRoute: typeof WorkoutRoute
+  WorkoutsRoute: typeof WorkoutsRouteWithChildren
 }
 export interface FileServerRoutesByFullPath {
   '/api/calendar-data': typeof ApiCalendarDataServerRoute
@@ -172,10 +248,12 @@ export interface FileServerRoutesByFullPath {
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
   '/api/exercise-favorites': typeof ApiExerciseFavoritesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
+  '/api/next-workout': typeof ApiNextWorkoutServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
+  '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
   '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
@@ -187,10 +265,12 @@ export interface FileServerRoutesByTo {
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
   '/api/exercise-favorites': typeof ApiExerciseFavoritesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
+  '/api/next-workout': typeof ApiNextWorkoutServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
+  '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
   '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
@@ -203,10 +283,12 @@ export interface FileServerRoutesById {
   '/api/exercise-categories': typeof ApiExerciseCategoriesServerRoute
   '/api/exercise-favorites': typeof ApiExerciseFavoritesServerRoute
   '/api/muscle-groups': typeof ApiMuscleGroupsServerRoute
+  '/api/next-workout': typeof ApiNextWorkoutServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
+  '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
   '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
@@ -220,10 +302,12 @@ export interface FileServerRouteTypes {
     | '/api/exercise-categories'
     | '/api/exercise-favorites'
     | '/api/muscle-groups'
+    | '/api/next-workout'
     | '/api/progress'
     | '/api/workout-details'
     | '/api/workout-sessions'
     | '/api/workout-sets'
+    | '/api/workout-templates'
     | '/auth/callback'
     | '/api/exercises/recent'
     | '/api/exercises/search'
@@ -235,10 +319,12 @@ export interface FileServerRouteTypes {
     | '/api/exercise-categories'
     | '/api/exercise-favorites'
     | '/api/muscle-groups'
+    | '/api/next-workout'
     | '/api/progress'
     | '/api/workout-details'
     | '/api/workout-sessions'
     | '/api/workout-sets'
+    | '/api/workout-templates'
     | '/auth/callback'
     | '/api/exercises/recent'
     | '/api/exercises/search'
@@ -250,10 +336,12 @@ export interface FileServerRouteTypes {
     | '/api/exercise-categories'
     | '/api/exercise-favorites'
     | '/api/muscle-groups'
+    | '/api/next-workout'
     | '/api/progress'
     | '/api/workout-details'
     | '/api/workout-sessions'
     | '/api/workout-sets'
+    | '/api/workout-templates'
     | '/auth/callback'
     | '/api/exercises/recent'
     | '/api/exercises/search'
@@ -266,10 +354,12 @@ export interface RootServerRouteChildren {
   ApiExerciseCategoriesServerRoute: typeof ApiExerciseCategoriesServerRoute
   ApiExerciseFavoritesServerRoute: typeof ApiExerciseFavoritesServerRoute
   ApiMuscleGroupsServerRoute: typeof ApiMuscleGroupsServerRoute
+  ApiNextWorkoutServerRoute: typeof ApiNextWorkoutServerRoute
   ApiProgressServerRoute: typeof ApiProgressServerRoute
   ApiWorkoutDetailsServerRoute: typeof ApiWorkoutDetailsServerRoute
   ApiWorkoutSessionsServerRoute: typeof ApiWorkoutSessionsServerRoute
   ApiWorkoutSetsServerRoute: typeof ApiWorkoutSetsServerRoute
+  ApiWorkoutTemplatesServerRoute: typeof ApiWorkoutTemplatesServerRoute
   AuthCallbackServerRoute: typeof AuthCallbackServerRoute
   ApiExercisesRecentServerRoute: typeof ApiExercisesRecentServerRoute
   ApiExercisesSearchServerRoute: typeof ApiExercisesSearchServerRoute
@@ -278,6 +368,13 @@ export interface RootServerRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workouts': {
+      id: '/workouts'
+      path: '/workouts'
+      fullPath: '/workouts'
+      preLoaderRoute: typeof WorkoutsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/workout': {
       id: '/workout'
       path: '/workout'
@@ -313,6 +410,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/workouts/': {
+      id: '/workouts/'
+      path: '/'
+      fullPath: '/workouts/'
+      preLoaderRoute: typeof WorkoutsIndexRouteImport
+      parentRoute: typeof WorkoutsRoute
+    }
+    '/workouts/new': {
+      id: '/workouts/new'
+      path: '/new'
+      fullPath: '/workouts/new'
+      preLoaderRoute: typeof WorkoutsNewRouteImport
+      parentRoute: typeof WorkoutsRoute
+    }
+    '/workouts/$templateId/edit': {
+      id: '/workouts/$templateId/edit'
+      path: '/$templateId/edit'
+      fullPath: '/workouts/$templateId/edit'
+      preLoaderRoute: typeof WorkoutsTemplateIdEditRouteImport
+      parentRoute: typeof WorkoutsRoute
+    }
   }
 }
 declare module '@tanstack/react-start/server' {
@@ -322,6 +440,13 @@ declare module '@tanstack/react-start/server' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
+    '/api/workout-templates': {
+      id: '/api/workout-templates'
+      path: '/api/workout-templates'
+      fullPath: '/api/workout-templates'
+      preLoaderRoute: typeof ApiWorkoutTemplatesServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
     '/api/workout-sets': {
@@ -350,6 +475,13 @@ declare module '@tanstack/react-start/server' {
       path: '/api/progress'
       fullPath: '/api/progress'
       preLoaderRoute: typeof ApiProgressServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
+    '/api/next-workout': {
+      id: '/api/next-workout'
+      path: '/api/next-workout'
+      fullPath: '/api/next-workout'
+      preLoaderRoute: typeof ApiNextWorkoutServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
     '/api/muscle-groups': {
@@ -411,12 +543,29 @@ declare module '@tanstack/react-start/server' {
   }
 }
 
+interface WorkoutsRouteChildren {
+  WorkoutsNewRoute: typeof WorkoutsNewRoute
+  WorkoutsIndexRoute: typeof WorkoutsIndexRoute
+  WorkoutsTemplateIdEditRoute: typeof WorkoutsTemplateIdEditRoute
+}
+
+const WorkoutsRouteChildren: WorkoutsRouteChildren = {
+  WorkoutsNewRoute: WorkoutsNewRoute,
+  WorkoutsIndexRoute: WorkoutsIndexRoute,
+  WorkoutsTemplateIdEditRoute: WorkoutsTemplateIdEditRoute,
+}
+
+const WorkoutsRouteWithChildren = WorkoutsRoute._addFileChildren(
+  WorkoutsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ExercisesRoute: ExercisesRoute,
   HistoryRoute: HistoryRoute,
   ProgressRoute: ProgressRoute,
   WorkoutRoute: WorkoutRoute,
+  WorkoutsRoute: WorkoutsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
@@ -427,10 +576,12 @@ const rootServerRouteChildren: RootServerRouteChildren = {
   ApiExerciseCategoriesServerRoute: ApiExerciseCategoriesServerRoute,
   ApiExerciseFavoritesServerRoute: ApiExerciseFavoritesServerRoute,
   ApiMuscleGroupsServerRoute: ApiMuscleGroupsServerRoute,
+  ApiNextWorkoutServerRoute: ApiNextWorkoutServerRoute,
   ApiProgressServerRoute: ApiProgressServerRoute,
   ApiWorkoutDetailsServerRoute: ApiWorkoutDetailsServerRoute,
   ApiWorkoutSessionsServerRoute: ApiWorkoutSessionsServerRoute,
   ApiWorkoutSetsServerRoute: ApiWorkoutSetsServerRoute,
+  ApiWorkoutTemplatesServerRoute: ApiWorkoutTemplatesServerRoute,
   AuthCallbackServerRoute: AuthCallbackServerRoute,
   ApiExercisesRecentServerRoute: ApiExercisesRecentServerRoute,
   ApiExercisesSearchServerRoute: ApiExercisesSearchServerRoute,

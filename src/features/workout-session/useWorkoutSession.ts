@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ExerciseWithParsedFields,
   WorkoutSession,
@@ -14,6 +14,7 @@ import {
   loadWorkoutSessionDetails,
   loadWorkoutSetHistory,
   removeExerciseSets,
+  startWorkoutSessionFromTemplate,
   updateWorkoutSession,
   updateWorkoutSet,
   type WorkoutSessionWriteInput,
@@ -30,6 +31,7 @@ import {
   getTotalVolume,
   hasExerciseInWorkout,
   mapWorkoutDetailsToExercises,
+  mapWorkoutTemplateToExercises,
   removeExerciseFromWorkout,
   removeSetFromExercise,
   replaceSetInExercise,
@@ -40,6 +42,7 @@ type WorkoutCommandStatus = 'idle' | 'running' | 'success' | 'error'
 
 interface UseWorkoutSessionOptions {
   existingSession?: WorkoutSession
+  initialTemplateId?: string
   onSessionSave?: (session: WorkoutSession) => void
   onSessionComplete?: (session: WorkoutSession) => void
   onSessionDelete?: (sessionId: string) => void | Promise<void>
@@ -59,6 +62,7 @@ function commandErrorMessage(error: unknown, fallback: string): string {
 
 export function useWorkoutSession({
   existingSession,
+  initialTemplateId,
   onSessionSave,
   onSessionComplete,
   onSessionDelete,
@@ -87,6 +91,7 @@ export function useWorkoutSession({
   const [lastPerformanceByExerciseId, setLastPerformanceByExerciseId] = useState<
     Record<string, WorkoutSet | undefined>
   >({})
+  const startedTemplateIdRef = useRef<string | null>(null)
 
   const beginCommand = useCallback(() => {
     setCommandStatus('running')
@@ -252,6 +257,40 @@ export function useWorkoutSession({
     sessionNotes,
     sessionStartTime,
   ])
+
+  const startSessionFromTemplate = useCallback(
+    async (templateId: string) => {
+      try {
+        setLoading(true)
+        beginCommand()
+        const result = await startWorkoutSessionFromTemplate(templateId)
+        const plannedExercises = mapWorkoutTemplateToExercises(result.template)
+
+        setSession(result.session)
+        setSessionName(result.session.name || '')
+        setSessionNotes(result.session.notes || '')
+        setSessionDate(result.session.date)
+        setSessionStartTime(result.session.start_time)
+        setExercises(plannedExercises)
+        setActiveExerciseId(getActiveExerciseId(plannedExercises, null))
+        onSessionSave?.(result.session)
+        finishCommand()
+      } catch (error) {
+        console.error('Failed to start workout from template:', error)
+        failCommand(error, 'Failed to start workout from template')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [beginCommand, failCommand, finishCommand, onSessionSave],
+  )
+
+  useEffect(() => {
+    if (!initialTemplateId || existingSessionId || session?.id) return
+    if (startedTemplateIdRef.current === initialTemplateId) return
+    startedTemplateIdRef.current = initialTemplateId
+    void startSessionFromTemplate(initialTemplateId)
+  }, [existingSessionId, initialTemplateId, session?.id, startSessionFromTemplate])
 
   const saveSession = useCallback(async () => {
     if (!session) return
@@ -499,6 +538,7 @@ export function useWorkoutSession({
     setSessionStartTime,
     actions: {
       startSession,
+      startSessionFromTemplate,
       saveSession,
       completeSession,
       deleteSession,

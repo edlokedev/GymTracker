@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from '../define-contract'
+import { startFromTemplateResponse } from './workout-templates.contract'
 
 // WorkoutSession on the wire. Dates serialize to ISO strings via JSON.stringify.
 const workoutSession = z.object({
@@ -85,6 +86,16 @@ const duplicateSessionQuery = z.object({
   duplicateId: z.string().trim().min(1),
 })
 
+const startFromTemplateQuery = z.object({
+  action: z.literal('startFromTemplate'),
+})
+
+const startFromTemplateBody = z
+  .object({
+    templateId: z.string().trim().min(1),
+  })
+  .strict()
+
 export const workoutSessionsContract = defineContract({
   path: '/api/workout-sessions',
   methods: {
@@ -102,9 +113,9 @@ export const workoutSessionsContract = defineContract({
       response: z.union([workoutSession, workoutWithDetails, paginatedSessions]),
     },
     POST: {
-      query: z.union([duplicateSessionQuery, createSessionQuery]),
-      body: sessionInput.optional(),
-      response: workoutSession,
+      query: z.union([duplicateSessionQuery, startFromTemplateQuery, createSessionQuery]),
+      body: z.union([sessionInput, startFromTemplateBody]).optional(),
+      response: z.union([workoutSession, startFromTemplateResponse]),
     },
     PATCH: {
       query: z.object({ id: z.string(), action: z.literal('complete').optional() }),

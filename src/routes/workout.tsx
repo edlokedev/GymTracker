@@ -6,6 +6,7 @@ import type { WorkoutSession } from '../lib/types/database'
 
 interface WorkoutSearch {
   sessionId?: string
+  templateId?: string
 }
 
 export const Route = createFileRoute('/workout')({
@@ -15,14 +16,18 @@ export const Route = createFileRoute('/workout')({
   // silently dropped the param and always opened the "New Workout" form.
   validateSearch: (raw: Record<string, unknown>): WorkoutSearch => {
     const id = raw.sessionId
-    return typeof id === 'string' && id.length > 0 ? { sessionId: id } : {}
+    const templateId = raw.templateId
+    return {
+      ...(typeof id === 'string' && id.length > 0 ? { sessionId: id } : {}),
+      ...(typeof templateId === 'string' && templateId.length > 0 ? { templateId } : {}),
+    }
   },
   component: WorkoutPage,
 })
 
 function WorkoutPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
-  const { sessionId } = Route.useSearch()
+  const { sessionId, templateId } = Route.useSearch()
   const [currentSession, setCurrentSession] = useState<WorkoutSession | null>(null)
 
   // When the page is opened with ?sessionId=... we seed `currentSession`
@@ -85,13 +90,14 @@ function WorkoutPage() {
 
   // Heading reflects whether this is a new session or an editor view.
   const isEditing = Boolean(sessionId)
+  const isStartingTemplate = Boolean(templateId && !sessionId)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto px-3 py-4 sm:px-4 sm:py-6 lg:px-8 lg:py-8">
         <div className="mb-4 sm:mb-6 lg:mb-8">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white leading-tight">
-            {isEditing ? 'Edit Workout' : 'Log Workout'}
+            {isEditing ? 'Edit Workout' : isStartingTemplate ? 'Start Template' : 'Log Workout'}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">
             Track your exercises, sets, reps, and weights
@@ -100,6 +106,7 @@ function WorkoutPage() {
 
         <WorkoutSessionManager
           existingSession={currentSession || undefined}
+          initialTemplateId={isStartingTemplate ? templateId : undefined}
           onSessionSave={handleSessionSave}
           onSessionComplete={handleSessionComplete}
         />

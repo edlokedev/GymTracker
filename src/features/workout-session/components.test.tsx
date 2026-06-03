@@ -54,8 +54,9 @@ const makeWorkoutDetails = ({
   includeBenchSet = true,
   includeSecondExercise = false,
   includeCrowdedRail = false,
+  endTime,
 } = {}): WorkoutWithDetails => ({
-  ...makeSession(),
+  ...makeSession({ end_time: endTime }),
   exercises: [
     {
       exercise: makeExerciseFixture({
@@ -191,6 +192,86 @@ describe('WorkoutSessionManager', () => {
     )
     expect(screen.getByText('Set 1')).toBeInTheDocument()
     expect(screen.getByText('8')).toBeInTheDocument()
+  })
+
+  it('keeps completed workout template save feedback visible after success', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.startsWith('/api/workout-templates')) {
+        return Response.json({
+          success: true,
+          data: {
+            id: 'template-1',
+            user_id: 'user-1',
+            name: 'Push Day',
+            is_archived: false,
+            created_at: '2026-05-01T10:00:00.000Z',
+            updated_at: '2026-05-01T10:00:00.000Z',
+            exercises: [],
+          },
+        })
+      }
+      return Response.json({
+        success: true,
+        data: makeWorkoutDetails({ endTime: '2026-05-01T11:00:00.000Z' }),
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <WorkoutSessionManager
+        existingSession={makeSession({ end_time: '2026-05-01T11:00:00.000Z' })}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Workout' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Workout Saved' })).toBeDisabled(),
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Saved to Workouts.')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/workout-templates',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ sourceSessionId: 'session-1', name: 'Push Day' }),
+      }),
+    )
+  })
+
+  it('shows template save failures instead of silently returning to idle', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.startsWith('/api/workout-templates')) {
+          return Response.json({ success: false, error: 'Could not save workout' }, { status: 500 })
+        }
+        return Response.json({
+          success: true,
+          data: makeWorkoutDetails({ endTime: '2026-05-01T11:00:00.000Z' }),
+        })
+      }),
+    )
+
+    render(
+      <WorkoutSessionManager
+        existingSession={makeSession({ end_time: '2026-05-01T11:00:00.000Z' })}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Workout' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not save workout'),
+    )
+    expect(screen.getByRole('button', { name: 'Save as Workout' })).toBeEnabled()
   })
 
   it('lets a logged exercise be marked done and resumed', async () => {

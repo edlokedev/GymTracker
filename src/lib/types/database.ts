@@ -103,6 +103,55 @@ export interface WorkoutSet {
   updated_at: Date
 }
 
+export interface WorkoutTemplateExercise {
+  id: string
+  template_id: string
+  exercise_id: string
+  position: number
+  target_sets?: number
+  notes?: string
+  created_at: Date
+}
+
+export interface WorkoutTemplate {
+  id: string
+  user_id: string
+  name: string
+  notes?: string
+  source_session_id?: string
+  is_archived: boolean
+  last_used_at?: string
+  created_at: Date
+  updated_at: Date
+}
+
+export interface WorkoutTemplateWithExercises extends WorkoutTemplate {
+  exercises: {
+    templateExercise: WorkoutTemplateExercise
+    exercise: ExerciseWithParsedFields
+  }[]
+}
+
+export type NextWorkoutRecommendationType = 'template' | 'repeat-last' | 'starter' | 'empty'
+
+export interface NextWorkoutRecommendation {
+  type: NextWorkoutRecommendationType
+  title: string
+  reason: string
+  ctaLabel: string
+  templateId?: string
+  sessionId?: string
+}
+
+export interface NextWorkoutResponse {
+  recommendation: NextWorkoutRecommendation
+}
+
+export interface StartFromTemplateResult {
+  session: WorkoutSession
+  template: WorkoutTemplateWithExercises
+}
+
 // API/Application types (with parsed JSON fields)
 export interface ExerciseWithParsedFields
   extends Omit<Exercise, 'primary_muscles' | 'secondary_muscles' | 'instructions' | 'images'> {

@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { TrashButton } from '@/components/ui/TrashButton'
 import { ExerciseHistory } from '@/features/exercise-library/components/ExerciseHistory'
 import ExerciseSelector from '@/features/exercise-library/components/ExerciseSelector'
+import { createWorkoutTemplateFromSession } from '@/features/workout-templates/client'
 import type { WorkoutSession, WorkoutSet } from '@/lib/types/database'
 import { type ExerciseTrackingType, getTrackingType } from '@/lib/utils/exercise-tracking'
 import { formatExerciseName } from '@/lib/utils/text'
@@ -15,6 +16,7 @@ import SetEntry from './SetEntry'
 
 interface WorkoutSessionManagerProps {
   existingSession?: WorkoutSession
+  initialTemplateId?: string
   onSessionSave?: (session: WorkoutSession) => void
   onSessionComplete?: (session: WorkoutSession) => void
   onSessionDelete?: (sessionId: string) => void | Promise<void>
@@ -23,6 +25,7 @@ interface WorkoutSessionManagerProps {
 
 export default function WorkoutSessionManager({
   existingSession,
+  initialTemplateId,
   onSessionSave,
   onSessionComplete,
   onSessionDelete,
@@ -30,6 +33,7 @@ export default function WorkoutSessionManager({
 }: WorkoutSessionManagerProps) {
   const workout = useWorkoutSession({
     existingSession,
+    initialTemplateId,
     onSessionSave,
     onSessionComplete,
     onSessionDelete,
@@ -71,6 +75,10 @@ export default function WorkoutSessionManager({
     onConfirm: () => {},
   })
   const [showWorkoutDetails, setShowWorkoutDetails] = useState(false)
+  const [templateSaveStatus, setTemplateSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle')
+  const [templateSaveError, setTemplateSaveError] = useState<string | null>(null)
   const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(() => new Set())
   const [submitSignal, setSubmitSignal] = useState(0)
   const exerciseRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -84,9 +92,13 @@ export default function WorkoutSessionManager({
   useEffect(() => {
     if (session?.id) {
       setCompletedExerciseIds(new Set())
+      setTemplateSaveStatus('idle')
+      setTemplateSaveError(null)
       return
     }
     setCompletedExerciseIds(new Set())
+    setTemplateSaveStatus('idle')
+    setTemplateSaveError(null)
   }, [session?.id])
 
   const focusExercise = (exerciseId: string | null) => {
@@ -196,6 +208,26 @@ export default function WorkoutSessionManager({
     ? completedExerciseIds.has(activeExerciseId)
     : false
 
+  const saveCompletedWorkoutAsTemplate = async () => {
+    if (!session?.id) return
+
+    try {
+      setTemplateSaveStatus('saving')
+      setTemplateSaveError(null)
+      await createWorkoutTemplateFromSession({
+        sourceSessionId: session.id,
+        name: session.name?.trim() || 'Saved Workout',
+      })
+      setTemplateSaveStatus('saved')
+    } catch (error) {
+      console.error('Failed to save workout as template:', error)
+      setTemplateSaveError(
+        error instanceof Error && error.message ? error.message : 'Failed to save workout',
+      )
+      setTemplateSaveStatus('error')
+    }
+  }
+
   return (
     <div
       className={`space-y-4 sm:space-y-6 ${
@@ -244,6 +276,7 @@ export default function WorkoutSessionManager({
         )}
 
         <InlineError message={commandError} className="mb-4" />
+        <InlineError message={templateSaveError} className="mb-4" />
 
         <div className="space-y-4">
           {isSessionStarted && (
@@ -355,6 +388,26 @@ export default function WorkoutSessionManager({
             >
               {loading ? 'Completing...' : 'Complete Workout'}
             </button>
+          ) : totalSets > 0 ? (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={saveCompletedWorkoutAsTemplate}
+                disabled={templateSaveStatus === 'saving' || templateSaveStatus === 'saved'}
+                className="motion-press rounded-xl border border-blue-300 bg-blue-50 px-6 py-3 font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              >
+                {templateSaveStatus === 'saving'
+                  ? 'Saving...'
+                  : templateSaveStatus === 'saved'
+                    ? 'Workout Saved'
+                    : 'Save as Workout'}
+              </button>
+              {templateSaveStatus === 'saved' && (
+                <p className="text-green-700 text-sm dark:text-green-300" role="status">
+                  Saved to Workouts.
+                </p>
+              )}
+            </div>
           ) : null}
         </div>
       </div>

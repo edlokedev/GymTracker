@@ -43,16 +43,20 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: /gymmie/i })).toHaveAttribute('href', '/')
     expect(container.querySelector('img[src="/gymmie-icon.svg"]')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Dashboard' })[0]).toHaveAttribute('href', '/')
-    expect(screen.getAllByRole('link', { name: 'Log' })[0]).toHaveAttribute('href', '/workout')
-    expect(screen.getAllByRole('link', { name: 'History' })[0]).toHaveAttribute('href', '/history')
+    expect(screen.getAllByRole('link', { name: 'Workouts' })[0]).toHaveAttribute(
+      'href',
+      '/workouts',
+    )
     expect(screen.getAllByRole('link', { name: 'Exercises' })[0]).toHaveAttribute(
       'href',
       '/exercises',
     )
+    expect(screen.getAllByRole('link', { name: 'History' })[0]).toHaveAttribute('href', '/history')
     expect(screen.getAllByRole('link', { name: 'Progress' })[0]).toHaveAttribute(
       'href',
       '/progress',
     )
+    expect(screen.queryByRole('link', { name: 'Log' })).not.toBeInTheDocument()
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Sign Out' })[0])

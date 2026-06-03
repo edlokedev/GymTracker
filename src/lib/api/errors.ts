@@ -16,6 +16,10 @@
 //                state-based policies (e.g. "can't edit a completed workout")
 //                can throw ForbiddenError directly from the query module to
 //                opt back into 403.
+//   - 42P01    (Postgres undefined_table)               -> BadRequestError -> 400
+//                Local/dev database is behind migrations. Do not collapse this
+//                to a generic 500 because the UI can tell the operator exactly
+//                what to fix.
 //   - anything else                                     -> 500 with server log
 
 export class NotFoundError extends Error {
@@ -69,6 +73,9 @@ export function classifyPostgresError(error: PostgresLikeError): Error | null {
   if (code === 'PGRST116') return new NotFoundError(error.message ?? 'Not found')
   if (code === '23503') return new NotFoundError(error.message ?? 'Not found')
   if (code === '42501') return new NotFoundError(error.message ?? 'Not found')
+  if (code === '42P01') {
+    return new BadRequestError('Workout template database tables are missing. Run migrations.')
+  }
   return null
 }
 

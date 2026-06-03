@@ -3,9 +3,9 @@ import { useAuth } from '@/lib/auth'
 
 const AUTH_NAV_ITEMS = [
   { to: '/', label: 'Dashboard' },
-  { to: '/workout', label: 'Log' },
-  { to: '/history', label: 'History' },
+  { to: '/workouts', label: 'Workouts' },
   { to: '/exercises', label: 'Exercises' },
+  { to: '/history', label: 'History' },
   { to: '/progress', label: 'Progress' },
 ] as const
 

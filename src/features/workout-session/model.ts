@@ -2,6 +2,7 @@ import type {
   ExerciseWithParsedFields,
   WorkoutSession,
   WorkoutSet,
+  WorkoutTemplateWithExercises,
   WorkoutWithDetails,
 } from '@/lib/types/database'
 
@@ -41,6 +42,17 @@ export function mapWorkoutDetailsToExercises(workout: WorkoutWithDetails): Exerc
       sets: exerciseInWorkout.sets,
     }
   })
+}
+
+export function mapWorkoutTemplateToExercises(
+  template: WorkoutTemplateWithExercises,
+): ExerciseInWorkout[] {
+  return [...template.exercises]
+    .sort((a, b) => a.templateExercise.position - b.templateExercise.position)
+    .map(({ exercise }) => ({
+      exercise,
+      sets: [],
+    }))
 }
 
 export function getTotalSets(exercises: ExerciseInWorkout[]): number {

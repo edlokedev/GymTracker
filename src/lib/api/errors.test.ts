@@ -34,6 +34,12 @@ describe('classifyPostgresError', () => {
     expect(e).toBeInstanceOf(NotFoundError)
   })
 
+  it('maps missing migration tables to an actionable bad request', () => {
+    const e = classifyPostgresError({ code: '42P01', message: 'relation does not exist' })
+    expect(e).toBeInstanceOf(BadRequestError)
+    expect(e?.message).toBe('Workout template database tables are missing. Run migrations.')
+  })
+
   it('returns null for unknown codes', () => {
     expect(classifyPostgresError({ code: '99999', message: 'who knows' })).toBeNull()
   })

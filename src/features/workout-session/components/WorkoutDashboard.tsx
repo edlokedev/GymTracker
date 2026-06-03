@@ -4,8 +4,10 @@ import { useMemo } from 'react'
 import { WorkoutHistoryList } from '@/features/workout-history'
 import { getTimeSinceLastWorkout } from '@/features/workout-history/model'
 import { useWorkoutHistory } from '@/features/workout-history/useWorkoutHistory'
+import { useNextWorkout } from '@/features/workout-templates/useNextWorkout'
 import { useAuth } from '@/lib/auth'
 import type { CalendarState } from '@/lib/types/calendar'
+import type { NextWorkoutRecommendation } from '@/lib/types/database'
 
 interface WorkoutDashboardProps {
   className?: string
@@ -191,6 +193,8 @@ function WorkoutDashboardOverviewContent({
   isSummaryLoading?: boolean
 }) {
   const lastSession = history.sessions[0]
+  const navigate = useNavigate()
+  const nextWorkout = useNextWorkout()
   const totalWorkouts = summaryStats?.totalWorkouts ?? history.sessions.length
   const currentStreak = summaryStats?.currentStreak ?? 0
   const workoutsThisMonth = summaryStats?.workoutsThisMonth ?? 0
@@ -198,6 +202,26 @@ function WorkoutDashboardOverviewContent({
   const repeatLastWorkout = () => {
     if (!lastSession || history.duplicatingId) return
     history.actions.duplicateSession(lastSession.id)
+  }
+
+  const startRecommendedWorkout = () => {
+    const recommendation = nextWorkout.recommendation
+    if (!recommendation) {
+      navigate({ to: '/workout' })
+      return
+    }
+
+    if (recommendation.type === 'template' && recommendation.templateId) {
+      navigate({ to: '/workout', search: { templateId: recommendation.templateId } })
+      return
+    }
+
+    if (recommendation.type === 'repeat-last' && recommendation.sessionId) {
+      history.actions.duplicateSession(recommendation.sessionId)
+      return
+    }
+
+    navigate({ to: '/workout' })
   }
 
   return (
@@ -214,6 +238,13 @@ function WorkoutDashboardOverviewContent({
           )}
         </p>
       </div>
+
+      <NextWorkoutCard
+        recommendation={nextWorkout.recommendation}
+        isLoading={nextWorkout.isLoading}
+        isStarting={Boolean(history.duplicatingId)}
+        onStart={startRecommendedWorkout}
+      />
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[1.15fr_1fr_1fr]">
         {lastSession ? (
@@ -290,6 +321,60 @@ function WorkoutDashboardOverviewContent({
         />
       </div>
     </section>
+  )
+}
+
+function NextWorkoutCard({
+  recommendation,
+  isLoading,
+  isStarting,
+  onStart,
+}: {
+  recommendation: NextWorkoutRecommendation | null
+  isLoading: boolean
+  isStarting: boolean
+  onStart: () => void
+}) {
+  const title = recommendation?.title ?? 'Create your first workout'
+  const reason = recommendation?.reason ?? 'Save a completed workout to make repeat sessions fast.'
+  const showBrowse = recommendation?.type === 'template'
+
+  return (
+    <div className="mb-2 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:mb-3 sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-semibold text-blue-600 text-xs uppercase dark:text-blue-400">
+            Next Workout
+          </p>
+          {isLoading ? (
+            <div className="mt-2 h-7 w-56 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+          ) : (
+            <h2 className="mt-1 truncate font-bold text-gray-900 text-xl dark:text-white">
+              {title}
+            </h2>
+          )}
+          <p className="mt-1 line-clamp-2 text-gray-600 text-sm dark:text-gray-400">{reason}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {showBrowse && (
+            <Link
+              to="/workouts"
+              className="motion-press inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Change
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={isLoading || isStarting}
+            className="motion-press inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 font-semibold text-sm text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isStarting ? 'Starting...' : recommendation?.ctaLabel || 'Start Workout'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

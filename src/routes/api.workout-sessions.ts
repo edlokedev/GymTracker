@@ -2,6 +2,7 @@ import { createServerFileRoute } from '@tanstack/react-start/server'
 import { type PrivateHandlerContext, privateMethod } from '../lib/api/define-private-route'
 import { badRequest, notFound } from '../lib/api/errors'
 import { workoutSessionQueries } from '../lib/supabase/queries/workout-sessions'
+import { workoutTemplateQueries } from '../lib/supabase/queries/workout-templates'
 import type { WorkoutSessionInput } from '../lib/types/database'
 
 // Private workout-session CRUD. Identity is derived from the Supabase session
@@ -40,6 +41,15 @@ export const createWorkoutSession = async ({ user, supabase, request }: PrivateH
     const session = await workoutSessionQueries.duplicate(supabase, user.id, duplicateId)
     if (!session) notFound('Session not found')
     return session
+  }
+  if (action === 'startFromTemplate') {
+    const body = (await request.json()) as { templateId?: string }
+    const templateId = body.templateId?.trim()
+    if (!templateId) badRequest('templateId is required')
+
+    const result = await workoutTemplateQueries.startFromTemplate(supabase, user.id, templateId)
+    if (!result) notFound('Template not found')
+    return result
   }
   if (action) badRequest('Unsupported workout session action')
 

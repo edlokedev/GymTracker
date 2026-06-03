@@ -1,5 +1,6 @@
 import { buildSearchParams, readApiData, readApiSuccess } from '@/lib/api'
 import type {
+  StartFromTemplateResult,
   WorkoutSession,
   WorkoutSessionInput,
   WorkoutSet,
@@ -38,6 +39,19 @@ export async function createWorkoutSession(
   })
 
   return readApiData(response, `Failed to create session: ${response.status}`)
+}
+
+export async function startWorkoutSessionFromTemplate(
+  templateId: string,
+): Promise<StartFromTemplateResult> {
+  const params = buildSearchParams({ action: 'startFromTemplate' })
+  const response = await fetch(`/api/workout-sessions?${params.toString()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ templateId }),
+  })
+
+  return readApiData(response, `Failed to start template workout: ${response.status}`)
 }
 
 export async function updateWorkoutSession(
