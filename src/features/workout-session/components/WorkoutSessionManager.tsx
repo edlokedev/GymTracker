@@ -371,6 +371,8 @@ export default function WorkoutSessionManager({
           {exercises.map((exerciseInWorkout) => {
             const previousSet = exerciseInWorkout.sets[exerciseInWorkout.sets.length - 1]
             const exerciseId = exerciseInWorkout.exercise.id
+            const lastPerformanceSet = workout.lastPerformanceByExerciseId[exerciseId]
+            const setDefaults = previousSet ?? lastPerformanceSet
             const exerciseName = formatExerciseName(exerciseInWorkout.exercise.name)
             const trackingType = getTrackingType({
               trackingType: exerciseInWorkout.exercise.tracking_type,
@@ -453,7 +455,11 @@ export default function WorkoutSessionManager({
                   </div>
                 ) : (
                   <>
-                    <LastSetSummary set={previousSet} trackingType={trackingType} />
+                    <LastSetSummary
+                      set={setDefaults}
+                      trackingType={trackingType}
+                      source={previousSet ? 'current-workout' : 'history'}
+                    />
 
                     <div className="mt-4">
                       <SetEntry
@@ -461,7 +467,7 @@ export default function WorkoutSessionManager({
                         exerciseId={exerciseId}
                         workoutId={session?.id}
                         setNumber={actions.getNextSetNumber(exerciseInWorkout.sets)}
-                        previousSet={previousSet}
+                        previousSet={setDefaults}
                         trackingType={trackingType}
                         onSave={(setData) => actions.saveSet(exerciseId, setData)}
                         isActiveEntry={isActiveExercise}
@@ -771,9 +777,11 @@ function MobileWorkoutActionBar({
 function LastSetSummary({
   set,
   trackingType,
+  source = 'current-workout',
 }: {
   set?: WorkoutSet
   trackingType: ExerciseTrackingType
+  source?: 'current-workout' | 'history'
 }) {
   if (!set) {
     return (
@@ -801,7 +809,9 @@ function LastSetSummary({
 
   return (
     <div className="motion-enter rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-3 text-white shadow-sm">
-      <p className="font-semibold text-blue-100 text-xs uppercase">Last set</p>
+      <p className="font-semibold text-blue-100 text-xs uppercase">
+        {source === 'history' ? 'Last performance' : 'Last set'}
+      </p>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-semibold text-sm">
         {stats.map((s) => (
           <span key={s}>{s}</span>

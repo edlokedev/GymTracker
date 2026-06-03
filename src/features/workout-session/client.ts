@@ -9,6 +9,19 @@ import type {
 
 export type WorkoutSessionWriteInput = Omit<WorkoutSessionInput, 'user_id'>
 
+export interface WorkoutSetHistoryItem {
+  id: string
+  set_number: number
+  reps: number
+  weight: number
+  duration_seconds?: number
+  distance_km?: number
+  incline?: number
+  speed_kmh?: number
+  session_date: string
+  session_name: string | null
+}
+
 export async function loadWorkoutSessionDetails(sessionId: string): Promise<WorkoutWithDetails> {
   const params = buildSearchParams({ id: sessionId, includeDetails: true })
   const response = await fetch(`/api/workout-sessions?${params.toString()}`)
@@ -93,4 +106,20 @@ export async function deleteWorkoutSet(id: string): Promise<void> {
   })
 
   await readApiSuccess(response, `Failed to delete set: ${response.status}`)
+}
+
+export async function loadWorkoutSetHistory(
+  exerciseId: string,
+  limit = 1,
+): Promise<WorkoutSetHistoryItem[]> {
+  const params = buildSearchParams({
+    action: 'history',
+    exerciseId,
+    limit,
+  })
+  const response = await fetch(`/api/workout-sets?${params.toString()}`)
+
+  return readApiData(response, `Failed to load set history: ${response.status}`, {
+    fallbackData: [],
+  })
 }

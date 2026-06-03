@@ -82,14 +82,13 @@ export default function SetEntry({
   const [isEditing, setIsEditing] = useState(!existingSet)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
-  const [copyFlash, setCopyFlash] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState(false)
   const [showDetails, setShowDetails] = useState(
     Boolean(existingSet?.rest_time || existingSet?.notes),
   )
-  const copyFlashTimeoutRef = useRef<number | null>(null)
   const saveFeedbackTimeoutRef = useRef<number | null>(null)
   const submitSignalRef = useRef(submitSignal)
+  const copyFlash = false
 
   const set = (field: keyof SetEntryFormValues, value: string) =>
     setValues((prev) => ({ ...prev, [field]: value }))
@@ -114,19 +113,9 @@ export default function SetEntry({
 
   useEffect(() => {
     return () => {
-      if (copyFlashTimeoutRef.current) window.clearTimeout(copyFlashTimeoutRef.current)
       if (saveFeedbackTimeoutRef.current) window.clearTimeout(saveFeedbackTimeoutRef.current)
     }
   }, [])
-
-  const flashCopiedFields = () => {
-    setCopyFlash(false)
-    if (copyFlashTimeoutRef.current) window.clearTimeout(copyFlashTimeoutRef.current)
-    window.setTimeout(() => {
-      setCopyFlash(true)
-      copyFlashTimeoutRef.current = window.setTimeout(() => setCopyFlash(false), 560)
-    }, 0)
-  }
 
   const flashSavedState = useCallback(() => {
     setSaveFeedback(false)
@@ -142,14 +131,6 @@ export default function SetEntry({
     const nextValue = Number.isFinite(current) ? current + amount : amount
     const clamped = Math.max(min, nextValue)
     return Number.isInteger(clamped) ? String(clamped) : String(Number(clamped.toFixed(2)))
-  }
-
-  const copyPreviousSet = () => {
-    if (!previousSet) return
-    setValues(valuesFromSet(previousSet, { carryNotes: false }))
-    setValidationMessage(null)
-    setShowDetails(Boolean(previousSet.rest_time))
-    flashCopiedFields()
   }
 
   const handleSave = useCallback(async () => {
@@ -224,24 +205,6 @@ export default function SetEntry({
   const smallInputClass =
     'min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400'
 
-  const previousCopyLabel = () => {
-    if (!previousSet) return ''
-    if (trackingType === 'cardio') {
-      const dur = previousSet.duration_seconds ? `${previousSet.duration_seconds / 60}min` : null
-      const dist = previousSet.distance_km ? `${previousSet.distance_km}km` : null
-      return [dur, dist].filter(Boolean).join(', ') || 'Same as last set'
-    }
-    if (trackingType === 'timed') {
-      return previousSet.duration_seconds
-        ? `Same as last: ${formatDuration(previousSet.duration_seconds)}`
-        : 'Same as last set'
-    }
-    const parts: string[] = []
-    if (previousSet.reps) parts.push(`${previousSet.reps} reps`)
-    if (previousSet.weight !== undefined) parts.push(`${previousSet.weight} kg`)
-    return parts.length ? `Same as last set: ${parts.join(' at ')}` : 'Same as last set'
-  }
-
   return (
     <div
       className={`border rounded-xl p-4 transition-all duration-200 ${
@@ -273,16 +236,6 @@ export default function SetEntry({
 
       {isEditing ? (
         <div className="space-y-3">
-          {!existingSet && previousSet && (
-            <button
-              type="button"
-              onClick={copyPreviousSet}
-              className="motion-press min-h-11 w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
-            >
-              {previousCopyLabel()}
-            </button>
-          )}
-
           {trackingType === 'strength' && (
             <StrengthFields
               values={values}

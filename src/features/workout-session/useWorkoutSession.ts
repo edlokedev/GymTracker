@@ -12,10 +12,12 @@ import {
   deleteWorkoutSession,
   deleteWorkoutSet,
   loadWorkoutSessionDetails,
+  loadWorkoutSetHistory,
   removeExerciseSets,
   updateWorkoutSession,
   updateWorkoutSet,
   type WorkoutSessionWriteInput,
+  type WorkoutSetHistoryItem,
 } from './client'
 import {
   addExerciseToWorkout,
@@ -26,6 +28,7 @@ import {
   getSessionDuration,
   getTotalSets,
   getTotalVolume,
+  hasExerciseInWorkout,
   mapWorkoutDetailsToExercises,
   removeExerciseFromWorkout,
   removeSetFromExercise,
@@ -81,6 +84,9 @@ export function useWorkoutSession({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [commandStatus, setCommandStatus] = useState<WorkoutCommandStatus>('idle')
   const [commandError, setCommandError] = useState<string | null>(null)
+  const [lastPerformanceByExerciseId, setLastPerformanceByExerciseId] = useState<
+    Record<string, WorkoutSet | undefined>
+  >({})
 
   const beginCommand = useCallback(() => {
     setCommandStatus('running')
@@ -113,7 +119,43 @@ export function useWorkoutSession({
     setSaveStatus('idle')
     setCommandStatus('idle')
     setCommandError(null)
+    setLastPerformanceByExerciseId({})
   }, [])
+
+  const mapHistoryItemToWorkoutSet = useCallback(
+    (exerciseId: string, item: WorkoutSetHistoryItem): WorkoutSet => ({
+      id: item.id,
+      workout_id: '',
+      exercise_id: exerciseId,
+      set_number: item.set_number,
+      reps: item.reps > 0 ? item.reps : undefined,
+      weight: item.weight >= 0 ? item.weight : undefined,
+      duration_seconds: item.duration_seconds,
+      distance_km: item.distance_km,
+      incline: item.incline,
+      speed_kmh: item.speed_kmh,
+      created_at: new Date(`${item.session_date}T00:00:00.000Z`),
+      updated_at: new Date(`${item.session_date}T00:00:00.000Z`),
+    }),
+    [],
+  )
+
+  const loadLastPerformanceDefaults = useCallback(
+    async (exerciseId: string) => {
+      try {
+        const [lastSet] = await loadWorkoutSetHistory(exerciseId, 1)
+        if (!lastSet) return
+
+        setLastPerformanceByExerciseId((current) => ({
+          ...current,
+          [exerciseId]: mapHistoryItemToWorkoutSet(exerciseId, lastSet),
+        }))
+      } catch (error) {
+        console.error('Failed to load last performance defaults:', error)
+      }
+    },
+    [mapHistoryItemToWorkoutSet],
+  )
 
   const loadSessionData = useCallback(
     async (sessionId: string) => {
@@ -298,23 +340,29 @@ export function useWorkoutSession({
     }
   }, [beginCommand, failCommand, finishCommand, onSessionDelete, resetSession, session])
 
-  const addExercise = useCallback((exercise: ExerciseWithParsedFields) => {
-    setExercises((currentExercises) => {
-      const result = addExerciseToWorkout(currentExercises, exercise)
-
-      if (!result.added) {
+  const addExercise = useCallback(
+    (exercise: ExerciseWithParsedFields) => {
+      if (hasExerciseInWorkout(exercises, exercise.id)) {
         setCommandStatus('error')
         setCommandError('This exercise is already in your workout.')
-        return currentExercises
+        setSelectedExercise(null)
+        return
       }
 
-      setCommandStatus('success')
-      setCommandError(null)
-      setActiveExerciseId(exercise.id)
-      return result.exercises
-    })
-    setSelectedExercise(null)
-  }, [])
+      setExercises((currentExercises) => {
+        const result = addExerciseToWorkout(currentExercises, exercise)
+
+        setCommandStatus('success')
+        setCommandError(null)
+        setActiveExerciseId(exercise.id)
+        return result.exercises
+      })
+
+      void loadLastPerformanceDefaults(exercise.id)
+      setSelectedExercise(null)
+    },
+    [exercises, loadLastPerformanceDefaults],
+  )
 
   const removeExercise = useCallback(
     async (exerciseId: string) => {
@@ -443,6 +491,7 @@ export function useWorkoutSession({
     commandError,
     totalSets,
     totalVolume,
+    lastPerformanceByExerciseId,
     sessionDuration,
     setSessionName,
     setSessionNotes,

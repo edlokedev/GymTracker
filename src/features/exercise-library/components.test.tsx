@@ -4,6 +4,7 @@ import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import ExerciseBrowser from './components/ExerciseBrowser'
 import { MobileFilterDrawer } from './components/ExerciseBrowserFilters'
 import ExerciseCard from './components/ExerciseCard'
+import { ExerciseHistory } from './components/ExerciseHistory'
 import ExerciseSelector from './components/ExerciseSelector'
 
 const navigateMock = vi.hoisted(() => vi.fn())
@@ -192,6 +193,57 @@ describe('Exercise Library components', () => {
       'aria-expanded',
       'true',
     )
+  })
+
+  it('renders exercise history in recorded set order', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          data: [
+            {
+              id: 'hist-set-3',
+              set_number: 3,
+              reps: 10,
+              weight: 42.5,
+              session_date: '2026-06-02',
+              session_name: 'Casual office gym day',
+            },
+            {
+              id: 'hist-set-1',
+              set_number: 1,
+              reps: 10,
+              weight: 35,
+              session_date: '2026-06-02',
+              session_name: 'Casual office gym day',
+            },
+            {
+              id: 'hist-set-2',
+              set_number: 2,
+              reps: 10,
+              weight: 42.5,
+              session_date: '2026-06-02',
+              session_name: 'Casual office gym day',
+            },
+          ],
+        }),
+      ),
+    )
+
+    render(<ExerciseHistory exerciseId="lever-front-pulldown" />)
+
+    await waitFor(() => expect(screen.getByText('Set 1')).toBeInTheDocument())
+
+    const setOne = screen.getByText('Set 1').parentElement
+    const setTwo = screen.getByText('Set 2').parentElement
+    const setThree = screen.getByText('Set 3').parentElement
+
+    expect(setOne).toHaveTextContent('35kg x 10')
+    expect(setTwo).toHaveTextContent('42.5kg x 10')
+    expect(setThree).toHaveTextContent('42.5kg x 10')
+    expect(setOne?.compareDocumentPosition(setTwo as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(setTwo?.compareDocumentPosition(setThree as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
   it('toggles favorites from an accessible star without selecting the card', () => {

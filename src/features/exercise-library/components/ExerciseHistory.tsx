@@ -7,6 +7,7 @@ export interface ExerciseHistoryProps {
 
 interface HistoricalSet {
   id: string
+  set_number: number
   reps: number
   weight: number
   duration_seconds?: number
@@ -97,6 +98,10 @@ export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps
     {} as Record<string, HistoricalSet[]>,
   )
 
+  const sessionGroups = Object.entries(grouped)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, sets]) => [date, [...sets].sort((a, b) => a.set_number - b.set_number)] as const)
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
@@ -107,7 +112,7 @@ export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps
 
   return (
     <div className="space-y-3 mt-2">
-      {Object.entries(grouped).map(([date, sets]) => (
+      {sessionGroups.map(([date, sets]) => (
         <div
           key={date}
           className="bg-gray-50 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
@@ -123,12 +128,12 @@ export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps
             )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {sets.map((s, idx) => (
+            {sets.map((s) => (
               <div
                 key={s.id}
                 className="text-xs font-medium bg-white dark:bg-gray-700 px-2 py-1.5 rounded shadow-sm flex justify-between"
               >
-                <span className="text-gray-500 dark:text-gray-400">Set {idx + 1}</span>
+                <span className="text-gray-500 dark:text-gray-400">Set {s.set_number}</span>
                 <span className="text-gray-900 dark:text-gray-200">{formatHistoricalSet(s)}</span>
               </div>
             ))}

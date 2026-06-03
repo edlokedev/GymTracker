@@ -144,6 +144,10 @@ describe('useWorkoutSession', () => {
         })
       }
 
+      if (url.includes('action=history')) {
+        return Response.json({ success: true, data: [] })
+      }
+
       if (init?.method === 'PATCH') {
         return Response.json({
           success: true,
@@ -266,6 +270,56 @@ describe('useWorkoutSession', () => {
     })
     expect(result.current.exercises).toHaveLength(1)
     expect(result.current.activeExerciseId).toBe('squat')
+  })
+
+  it('loads latest performance defaults when adding an exercise', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url.includes('includeDetails=true')) {
+        return Response.json({
+          success: true,
+          data: { ...makeSession(), exercises: [] },
+        })
+      }
+
+      if (url.includes('action=history') && url.includes('exerciseId=bench-press')) {
+        return Response.json({
+          success: true,
+          data: [
+            {
+              id: 'hist-set-1',
+              set_number: 1,
+              reps: 6,
+              weight: 42.5,
+              session_date: '2026-05-30',
+              session_name: 'Push Day',
+            },
+          ],
+        })
+      }
+
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => {
+      result.current.actions.addExercise(makeExercise())
+    })
+
+    await waitFor(() =>
+      expect(result.current.lastPerformanceByExerciseId['bench-press']).toMatchObject({
+        id: 'hist-set-1',
+        exercise_id: 'bench-press',
+        set_number: 1,
+        reps: 6,
+        weight: 42.5,
+      }),
+    )
   })
 
   it('completes and deletes sessions through callbacks', async () => {

@@ -37,6 +37,7 @@ const workoutSetInput = z.object({
 
 const workoutSetHistoryItem = z.object({
   id: z.string(),
+  set_number: z.number(),
   reps: z.number(),
   weight: z.number(),
   duration_seconds: z.number().optional(),

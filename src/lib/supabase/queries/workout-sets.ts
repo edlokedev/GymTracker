@@ -42,6 +42,7 @@ type HistorySessionRow = {
 
 type HistoryRow = {
   id: string
+  set_number: number
   weight: number | null
   reps: number | null
   duration_seconds: number | null
@@ -54,6 +55,7 @@ type HistoryRow = {
 
 export type WorkoutSetHistoryItem = {
   id: string
+  set_number: number
   reps: number
   weight: number
   duration_seconds?: number
@@ -92,6 +94,7 @@ function mapHistorySet(row: HistoryRow): WorkoutSetHistoryItem {
   const session = getHistorySession(row)
   return {
     id: row.id,
+    set_number: row.set_number,
     reps: row.reps ?? 0,
     weight: row.weight ?? 0,
     duration_seconds: row.duration_seconds ?? undefined,
@@ -106,7 +109,7 @@ function mapHistorySet(row: HistoryRow): WorkoutSetHistoryItem {
 const SET_COLUMNS =
   'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, duration_seconds, distance_km, incline, speed_kmh, created_at, updated_at'
 const HISTORY_COLUMNS =
-  'id, weight, reps, duration_seconds, distance_km, incline, speed_kmh, created_at, workout_sessions!inner(date, name, user_id)'
+  'id, set_number, weight, reps, duration_seconds, distance_km, incline, speed_kmh, created_at, workout_sessions!inner(date, name, user_id)'
 
 export const WORKOUT_SET_HISTORY_DEFAULT_LIMIT = 50
 export const WORKOUT_SET_HISTORY_MAX_LIMIT = 100
@@ -160,8 +163,8 @@ export const workoutSetQueries = {
       .eq('exercise_id', exerciseId)
       .eq('workout_sessions.user_id', userId)
       .order('date', { ascending: false, foreignTable: 'workout_sessions' })
-      .order('created_at', { ascending: false })
       .order('set_number', { ascending: true })
+      .order('created_at', { ascending: true })
       .limit(boundedLimit)
 
     assertPostgresOk(error)

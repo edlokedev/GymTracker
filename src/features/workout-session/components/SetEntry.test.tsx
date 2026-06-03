@@ -73,7 +73,7 @@ describe('SetEntry', () => {
     await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument())
   })
 
-  it('can copy the previous set for fast repeated entry', () => {
+  it('does not render a redundant copy button when values are already prefilled', () => {
     render(
       <SetEntry
         exerciseId="bench-press"
@@ -96,12 +96,11 @@ describe('SetEntry', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /same as last set/i }))
-
     expect(screen.getByLabelText('Reps *')).toHaveValue(8)
     expect(screen.getByLabelText('Weight (kg)')).toHaveValue(100)
     expect(screen.getByLabelText('Rest Time (seconds)')).toHaveValue(90)
     expect(screen.getByLabelText('Notes')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: /same as last/i })).not.toBeInTheDocument()
   })
 
   it('prefills new sets from the previous set without copying notes', () => {
