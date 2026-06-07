@@ -137,9 +137,11 @@ describe('useWorkoutHistory', () => {
     expect(result.current.selectedWorkout?.id).toBe('session-1')
     expect(result.current.isModalOpen).toBe(true)
 
+    let duplicated: WorkoutSession | null = null
     await act(async () => {
-      await result.current.actions.duplicateSession('session-1')
+      duplicated = await result.current.actions.duplicateSession('session-1')
     })
+    expect(duplicated).toEqual(expect.objectContaining({ id: 'duplicated-session' }))
     expect(onDuplicated).toHaveBeenCalledWith(expect.objectContaining({ id: 'duplicated-session' }))
 
     await act(async () => {
@@ -148,5 +150,44 @@ describe('useWorkoutHistory', () => {
     expect(result.current.sessions).toEqual([])
     expect(result.current.selectedWorkout).toBeNull()
     expect(result.current.isModalOpen).toBe(false)
+  })
+
+  it('returns null and exposes API duplicate failures', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input), 'http://localhost')
+
+        if (url.pathname === '/api/workout-sessions' && init?.method === 'POST') {
+          return Response.json(
+            { success: false, error: 'Could not repeat workout' },
+            { status: 500 },
+          )
+        }
+
+        return Response.json({
+          success: true,
+          data: {
+            data: [makeSession()],
+            total: 1,
+            page: 1,
+            limit: 5,
+            hasMore: false,
+          },
+        })
+      }),
+    )
+
+    const { result } = renderHook(() => useWorkoutHistory({ userId: 'user-1', mode: 'recent' }))
+
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    let duplicated: WorkoutSession | null = makeSession()
+    await act(async () => {
+      duplicated = await result.current.actions.duplicateSession('session-1')
+    })
+
+    expect(duplicated).toBeNull()
+    expect(result.current.deleteError).toBe('Could not repeat workout')
   })
 })

@@ -79,6 +79,7 @@ function WorkoutPage() {
   }
 
   const handleSessionSave = (session: WorkoutSession) => {
+    if (isStartingTemplate) return
     setCurrentSession(session)
     console.log('Session saved:', session)
   }
@@ -97,7 +98,7 @@ function WorkoutPage() {
       <div className="max-w-4xl mx-auto px-3 py-4 sm:px-4 sm:py-6 lg:px-8 lg:py-8">
         <div className="mb-4 sm:mb-6 lg:mb-8">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white leading-tight">
-            {isEditing ? 'Edit Workout' : isStartingTemplate ? 'Start Template' : 'Log Workout'}
+            {isEditing ? 'Edit Workout' : isStartingTemplate ? 'Start Workout' : 'Log Workout'}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">
             Track your exercises, sets, reps, and weights

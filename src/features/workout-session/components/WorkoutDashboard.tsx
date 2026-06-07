@@ -27,14 +27,10 @@ export function WorkoutDashboardOverview({
   isSummaryLoading?: boolean
 }) {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const history = useWorkoutHistory({
     userId: user?.id,
     mode: 'recent',
     limit: 5,
-    onDuplicated: (session) => {
-      navigate({ to: '/workout', search: { sessionId: session.id } })
-    },
   })
   const timeSinceLastWorkout = useMemo(
     () => getTimeSinceLastWorkout(history.lastWorkoutDate),
@@ -62,14 +58,10 @@ export default function WorkoutDashboard({
   showOverview = true,
 }: WorkoutDashboardProps) {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const history = useWorkoutHistory({
     userId: user?.id,
     mode: 'recent',
     limit: 5,
-    onDuplicated: (session) => {
-      navigate({ to: '/workout', search: { sessionId: session.id } })
-    },
   })
   const timeSinceLastWorkout = useMemo(
     () => getTimeSinceLastWorkout(history.lastWorkoutDate),
@@ -192,19 +184,13 @@ function WorkoutDashboardOverviewContent({
   summaryStats?: DashboardSummaryStats
   isSummaryLoading?: boolean
 }) {
-  const lastSession = history.sessions[0]
   const navigate = useNavigate()
   const nextWorkout = useNextWorkout()
   const totalWorkouts = summaryStats?.totalWorkouts ?? history.sessions.length
   const currentStreak = summaryStats?.currentStreak ?? 0
   const workoutsThisMonth = summaryStats?.workoutsThisMonth ?? 0
 
-  const repeatLastWorkout = () => {
-    if (!lastSession || history.duplicatingId) return
-    history.actions.duplicateSession(lastSession.id)
-  }
-
-  const startRecommendedWorkout = () => {
+  const startRecommendedWorkout = async () => {
     const recommendation = nextWorkout.recommendation
     if (!recommendation) {
       navigate({ to: '/workout' })
@@ -217,7 +203,7 @@ function WorkoutDashboardOverviewContent({
     }
 
     if (recommendation.type === 'repeat-last' && recommendation.sessionId) {
-      history.actions.duplicateSession(recommendation.sessionId)
+      navigate({ to: '/workout' })
       return
     }
 
@@ -247,42 +233,13 @@ function WorkoutDashboardOverviewContent({
       />
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[1.15fr_1fr_1fr]">
-        {lastSession ? (
-          <button
-            type="button"
-            onClick={repeatLastWorkout}
-            disabled={Boolean(history.duplicatingId)}
-            className="motion-press col-span-2 flex min-h-14 cursor-pointer items-center gap-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-left text-white shadow-sm transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-20 sm:gap-4 sm:px-5 sm:py-4 md:col-span-1"
-          >
-            <RepeatWorkoutIcon className="h-6 w-6 shrink-0 text-white sm:h-8 sm:w-8" />
-            <span className="min-w-0">
-              <span className="block truncate font-semibold">
-                {history.duplicatingId ? 'Preparing workout...' : 'Repeat Last Workout'}
-              </span>
-              <span className="mt-0.5 hidden truncate text-blue-100 text-sm sm:block">
-                Start from {lastSession.name || 'your previous session'}.
-              </span>
-            </span>
-          </button>
-        ) : (
-          <Link
-            to="/workout"
-            className="motion-press col-span-2 flex min-h-14 items-center gap-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-left text-white shadow-sm transition-all duration-200 hover:shadow-md sm:min-h-20 sm:gap-4 sm:px-5 sm:py-4 md:col-span-1"
-          >
-            <LightningIcon className="h-6 w-6 shrink-0 text-white sm:h-7 sm:w-7" />
-            <span className="font-semibold">Start Workout</span>
-          </Link>
-        )}
-
-        {lastSession && (
-          <Link
-            to="/workout"
-            className="motion-press flex min-h-12 items-center justify-center gap-2 rounded-lg border border-blue-500/60 bg-blue-50/80 px-3 py-2 font-semibold text-blue-600 text-sm shadow-sm transition-colors hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-950/35 sm:min-h-20 sm:gap-3 sm:px-5 sm:py-4 sm:text-base"
-          >
-            <LightningIcon className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />
-            Start Workout
-          </Link>
-        )}
+        <Link
+          to="/workout"
+          className="motion-press flex min-h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2 text-left font-semibold text-white shadow-sm transition-all duration-200 hover:shadow-md sm:min-h-20 sm:gap-3 sm:px-5 sm:py-4 sm:text-base"
+        >
+          <LightningIcon className="h-5 w-5 shrink-0 text-white sm:h-6 sm:w-6" />
+          <span>Start Workout</span>
+        </Link>
 
         <Link
           to="/exercises"
@@ -410,21 +367,6 @@ function DashboardStat({
         )}
       </div>
     </div>
-  )
-}
-
-function RepeatWorkoutIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        d="M21 12a9 9 0 1 1-2.64-6.36"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-      />
-      <path d="M21 4v5h-5" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-      <path d="M17 17h4m-2-2v4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-    </svg>
   )
 }
 

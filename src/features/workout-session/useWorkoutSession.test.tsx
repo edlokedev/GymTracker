@@ -4,6 +4,7 @@ import type {
   ExerciseWithParsedFields,
   WorkoutSession,
   WorkoutSet,
+  WorkoutTemplateWithExercises,
   WorkoutWithDetails,
 } from '@/lib/types/database'
 import { makeExerciseFixture } from './__fixtures__/exercise'
@@ -65,6 +66,55 @@ const makeWorkoutDetails = (): WorkoutWithDetails => ({
   ],
 })
 
+const makeWorkoutTemplate = (): WorkoutTemplateWithExercises => ({
+  id: 'template-1',
+  user_id: 'user-1',
+  name: 'Push Plan',
+  is_archived: false,
+  created_at: new Date('2026-05-01T10:00:00.000Z'),
+  updated_at: new Date('2026-05-01T10:00:00.000Z'),
+  exercises: [
+    {
+      templateExercise: {
+        id: 'template-exercise-1',
+        template_id: 'template-1',
+        exercise_id: 'bench-press',
+        position: 1,
+        target_sets: 3,
+        created_at: new Date('2026-05-01T10:00:00.000Z'),
+      },
+      exercise: makeExerciseFixture({
+        id: 'bench-press',
+        name: 'Bench Press',
+        primary_muscles: ['chest'],
+        equipment: 'barbell',
+        category_name: 'Strength',
+        gif_path: null,
+        preview_image_path: null,
+      }),
+    },
+    {
+      templateExercise: {
+        id: 'template-exercise-2',
+        template_id: 'template-1',
+        exercise_id: 'squat',
+        position: 2,
+        target_sets: 3,
+        created_at: new Date('2026-05-01T10:00:00.000Z'),
+      },
+      exercise: makeExerciseFixture({
+        id: 'squat',
+        name: 'Squat',
+        primary_muscles: ['quadriceps'],
+        equipment: 'barbell',
+        category_name: 'Strength',
+        gif_path: null,
+        preview_image_path: null,
+      }),
+    },
+  ],
+})
+
 describe('useWorkoutSession', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -110,6 +160,41 @@ describe('useWorkoutSession', () => {
     expect(result.current.commandStatus).toBe('success')
     expect(result.current.commandError).toBeNull()
     expect(onSessionSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'session-1' }))
+  })
+
+  it('starts from a saved workout with planned exercises intact', async () => {
+    const onSessionSave = vi.fn()
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url.includes('action=startFromTemplate') && init?.method === 'POST') {
+        return Response.json({
+          success: true,
+          data: {
+            session: makeSession({ id: 'template-session', name: 'Push Plan' }),
+            template: makeWorkoutTemplate(),
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() =>
+      useWorkoutSession({ initialTemplateId: 'template-1', onSessionSave }),
+    )
+
+    await waitFor(() => expect(result.current.session?.id).toBe('template-session'))
+
+    expect(result.current.exercises.map((item) => item.exercise.id)).toEqual([
+      'bench-press',
+      'squat',
+    ])
+    expect(result.current.exercises.every((item) => item.sets.length === 0)).toBe(true)
+    expect(result.current.activeExerciseId).toBe('bench-press')
+    expect(result.current.totalSets).toBe(0)
+    expect(onSessionSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'template-session' }))
   })
 
   it('returns command errors instead of alerting when start fails', async () => {

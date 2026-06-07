@@ -12,8 +12,6 @@ export function getNextWorkoutRecommendation({
   recentSessions: WorkoutSession[]
 }): NextWorkoutRecommendation {
   const activeTemplates = templates.filter((template) => !template.is_archived)
-  const [lastSession] = recentSessions
-
   if (activeTemplates.length > 0) {
     const usedTemplates = activeTemplates.filter((template) => template.last_used_at)
     const selected =
@@ -34,21 +32,13 @@ export function getNextWorkoutRecommendation({
     }
   }
 
-  if (lastSession) {
-    const name = lastSession.name?.trim() || 'last workout'
-    return {
-      type: 'repeat-last',
-      title: `Repeat ${name}`,
-      reason: 'Based on your latest workout.',
-      ctaLabel: 'Start Workout',
-      sessionId: lastSession.id,
-    }
-  }
-
   return {
     type: 'starter',
-    title: 'Start your first workout',
-    reason: 'No workouts logged yet.',
+    title: recentSessions.length > 0 ? 'Start a workout' : 'Start your first workout',
+    reason:
+      recentSessions.length > 0
+        ? 'Start from Workouts or log from scratch.'
+        : 'No workouts logged yet.',
     ctaLabel: 'Start Workout',
   }
 }

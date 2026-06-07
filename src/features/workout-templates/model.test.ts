@@ -37,18 +37,17 @@ describe('getNextWorkoutRecommendation', () => {
     })
   })
 
-  it('repeats last workout when history exists without templates', () => {
+  it('does not recommend repeating history when no saved workouts exist', () => {
     expect(
       getNextWorkoutRecommendation({
         templates: [],
         recentSessions: [session({ id: 'last-session', name: 'Pull Day' })],
       }),
     ).toEqual({
-      type: 'repeat-last',
-      title: 'Repeat Pull Day',
-      reason: 'Based on your latest workout.',
+      type: 'starter',
+      title: 'Start a workout',
+      reason: 'Start from Workouts or log from scratch.',
       ctaLabel: 'Start Workout',
-      sessionId: 'last-session',
     })
   })
 

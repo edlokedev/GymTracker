@@ -91,9 +91,15 @@ export function useWorkoutHistory({
       try {
         const duplicatedSession = await duplicateWorkoutHistorySession(sessionId)
         onDuplicated?.(duplicatedSession)
+        return duplicatedSession
       } catch (duplicateError) {
         console.error('Failed to duplicate workout:', duplicateError)
-        setDeleteError('Failed to duplicate workout')
+        setDeleteError(
+          duplicateError instanceof Error && duplicateError.message
+            ? duplicateError.message
+            : 'Failed to duplicate workout',
+        )
+        return null
       } finally {
         setDuplicatingId(null)
       }
