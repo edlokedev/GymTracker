@@ -150,52 +150,95 @@ function ExerciseQuickSections({
     favoriteExercises.length > 0 ||
     recentlyUsedExercises.length > 0 ||
     suggestedExercises.length > 0
+  const quickPickCount =
+    favoriteExercises.length + recentlyUsedExercises.length + suggestedExercises.length
+  const [isCompactViewport, setIsCompactViewport] = useState(getIsCompactViewport)
+  const [isCollapsed, setIsCollapsed] = useState(getIsCompactViewport)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+
+    const query = window.matchMedia('(max-width: 639px)')
+    const updateViewport = () => setIsCompactViewport(query.matches)
+
+    updateViewport()
+    query.addEventListener('change', updateViewport)
+    return () => query.removeEventListener('change', updateViewport)
+  }, [])
 
   if (!hasQuickSections) return null
 
+  const shouldHideSections = isCompactViewport && isCollapsed
+
   return (
     <div className="space-y-2 border-gray-200 border-b px-3 py-2.5 dark:border-gray-700 sm:px-5 sm:py-3">
-      {favoriteExercises.length > 0 && (
-        <QuickExerciseSection
-          title="Favorites"
-          items={favoriteExercises.map((exercise) => ({ exercise }))}
-          favoriteExerciseIds={favoriteExerciseIds}
-          onSelectExercise={onSelectExercise}
-          onToggleFavorite={onToggleFavorite}
-        />
+      {isCompactViewport && (
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((value) => !value)}
+          aria-expanded={!isCollapsed}
+          className="flex min-h-11 w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 text-left text-gray-900 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-200 dark:hover:bg-gray-900/45 sm:hidden"
+        >
+          <span>
+            <span className="block font-semibold text-sm">Quick picks</span>
+            <span className="block text-gray-500 text-xs dark:text-gray-400">
+              {quickPickCount} saved, recent, or suggested
+            </span>
+          </span>
+          <ChevronIcon
+            className={`h-5 w-5 transition-transform ${isCollapsed ? '' : 'rotate-180'}`}
+          />
+        </button>
       )}
-      {recentlyUsedExercises.length > 0 && (
-        <QuickExerciseSection
-          title="Recently Used"
-          items={recentlyUsedExercises.map((item) => ({
-            exercise: item.exercise,
-            meta:
-              item.useCount && item.useCount > 1
-                ? `Used ${item.useCount} times`
-                : item.lastUsedAt
-                  ? 'Used recently'
-                  : undefined,
-          }))}
-          favoriteExerciseIds={favoriteExerciseIds}
-          onSelectExercise={onSelectExercise}
-          onToggleFavorite={onToggleFavorite}
-        />
-      )}
-      {suggestedExercises.length > 0 && (
-        <QuickExerciseSection
-          title="Suggested"
-          items={suggestedExercises.map((item, index) => ({
-            exercise: item.exercise,
-            rank: index + 1,
-            meta: item.reasons?.slice(0, 2).join(' + '),
-          }))}
-          favoriteExerciseIds={favoriteExerciseIds}
-          onSelectExercise={onSelectExercise}
-          onToggleFavorite={onToggleFavorite}
-        />
+      {!shouldHideSections && (
+        <>
+          {favoriteExercises.length > 0 && (
+            <QuickExerciseSection
+              title="Favorites"
+              items={favoriteExercises.map((exercise) => ({ exercise }))}
+              favoriteExerciseIds={favoriteExerciseIds}
+              onSelectExercise={onSelectExercise}
+              onToggleFavorite={onToggleFavorite}
+            />
+          )}
+          {recentlyUsedExercises.length > 0 && (
+            <QuickExerciseSection
+              title="Recently Used"
+              items={recentlyUsedExercises.map((item) => ({
+                exercise: item.exercise,
+                meta:
+                  item.useCount && item.useCount > 1
+                    ? `Used ${item.useCount} times`
+                    : item.lastUsedAt
+                      ? 'Used recently'
+                      : undefined,
+              }))}
+              favoriteExerciseIds={favoriteExerciseIds}
+              onSelectExercise={onSelectExercise}
+              onToggleFavorite={onToggleFavorite}
+            />
+          )}
+          {suggestedExercises.length > 0 && (
+            <QuickExerciseSection
+              title="Suggested"
+              items={suggestedExercises.map((item, index) => ({
+                exercise: item.exercise,
+                rank: index + 1,
+                meta: item.reasons?.slice(0, 2).join(' + '),
+              }))}
+              favoriteExerciseIds={favoriteExerciseIds}
+              onSelectExercise={onSelectExercise}
+              onToggleFavorite={onToggleFavorite}
+            />
+          )}
+        </>
       )}
     </div>
   )
+}
+
+function getIsCompactViewport() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches
 }
 
 function QuickExerciseSection({
@@ -329,6 +372,14 @@ function ExerciseSelectorModalHeader({ onClose }: { onClose: () => void }) {
         </button>
       </div>
     </div>
+  )
+}
+
+function ChevronIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
+    </svg>
   )
 }
 

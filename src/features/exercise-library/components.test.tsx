@@ -74,6 +74,7 @@ describe('Exercise Library components', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     navigateMock.mockReset()
   })
 
@@ -193,6 +194,42 @@ describe('Exercise Library components', () => {
       'aria-expanded',
       'true',
     )
+  })
+
+  it('collapses selector quick picks by default on mobile', async () => {
+    mockExerciseLibraryFetch()
+    const matchMediaMock = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 639px)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    vi.stubGlobal('matchMedia', matchMediaMock)
+
+    render(
+      <ExerciseSelector
+        onSelectExercise={vi.fn()}
+        recentlyUsedExercises={[
+          { exercise: makeExercise('recent-1', 'recent one'), useCount: 4 },
+          { exercise: makeExercise('recent-2', 'recent two'), useCount: 3 },
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    const quickPicksToggle = screen.getByRole('button', { name: /quick picks/i })
+    expect(quickPicksToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('region', { name: 'Recently Used' })).toBeNull()
+
+    fireEvent.click(quickPicksToggle)
+
+    expect(quickPicksToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('region', { name: 'Recently Used' })).toBeInTheDocument()
   })
 
   it('renders exercise history in recorded set order', async () => {
