@@ -5,9 +5,15 @@ interface SelectedExercisePanelProps {
   exercise: ExerciseWithParsedFields
   onChange: () => void
   onClear?: () => void
+  onPrefetch?: () => void
 }
 
-export function SelectedExercisePanel({ exercise, onChange, onClear }: SelectedExercisePanelProps) {
+export function SelectedExercisePanel({
+  exercise,
+  onChange,
+  onClear,
+  onPrefetch,
+}: SelectedExercisePanelProps) {
   return (
     <div className="rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 shadow-sm dark:border-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20">
       <div className="flex items-center justify-between">
@@ -28,6 +34,9 @@ export function SelectedExercisePanel({ exercise, onChange, onClear }: SelectedE
           <button
             type="button"
             onClick={onChange}
+            onPointerEnter={onPrefetch}
+            onPointerDown={onPrefetch}
+            onFocus={onPrefetch}
             className="min-h-11 rounded-lg border border-blue-300 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
           >
             Change
@@ -47,12 +56,21 @@ export function SelectedExercisePanel({ exercise, onChange, onClear }: SelectedE
   )
 }
 
-export function EmptyExerciseSelector({ onOpen }: { onOpen: () => void }) {
+export function EmptyExerciseSelector({
+  onOpen,
+  onPrefetch,
+}: {
+  onOpen: () => void
+  onPrefetch?: () => void
+}) {
   return (
     <div className="rounded-xl border-2 border-dashed border-gray-300 p-4 transition-colors hover:border-blue-400 dark:border-gray-600 dark:hover:border-blue-500">
       <button
         type="button"
         onClick={onOpen}
+        onPointerEnter={onPrefetch}
+        onPointerDown={onPrefetch}
+        onFocus={onPrefetch}
         className="flex min-h-11 w-full items-center justify-center gap-2 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

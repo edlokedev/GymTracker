@@ -41,7 +41,14 @@ export default function ExerciseMediaFrame({
 
   return (
     <div className={frameClassName}>
-      <img src={mediaSrc} alt={alt} className={imageClassName} onError={handleMediaError} />
+      <img
+        src={mediaSrc}
+        alt={alt}
+        className={imageClassName}
+        loading="lazy"
+        decoding="async"
+        onError={handleMediaError}
+      />
       <div className={iconClassName}>
         <svg className="h-12 w-12 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

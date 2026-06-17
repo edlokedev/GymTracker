@@ -1,4 +1,4 @@
-import { buildSearchParams, readApiData } from '@/lib/api'
+import { buildSearchParams, cachedGet, readApiData } from '@/lib/api'
 import type {
   ExerciseCategory,
   ExerciseFacetCatalog,
@@ -10,6 +10,12 @@ import type {
   ToggleFavoriteResult,
 } from './model'
 import { uniqueValues } from './model'
+
+// Client-cache TTL for the static catalog facets. They only change on a catalog
+// reseed, so a few minutes of reuse across navigations is safe; the HTTP layer
+// (P3) still backs longer-lived caching. Pairs with in-flight de-dup so parallel
+// picker mounts share one request.
+const FACET_CACHE_TTL_MS = 5 * 60 * 1000
 
 export function filtersToApiSearchParams(
   filters: ExerciseLibraryFilters,
@@ -38,9 +44,14 @@ export function suggestedExercisesToApiSearchParams(options: {
 }
 
 async function fetchJsonData<T>(url: string, fallback: T): Promise<T> {
-  const response = await fetch(url)
-  return readApiData(response, `Failed to fetch ${url}`, {
-    fallbackData: fallback,
+  // Only used for the static facet endpoints (categories, equipment, muscles),
+  // so it's safe to cache + de-dupe by URL. Dynamic/user reads below call
+  // `fetch` directly and are intentionally not cached here.
+  return cachedGet(url, FACET_CACHE_TTL_MS, async () => {
+    const response = await fetch(url)
+    return readApiData<T>(response, `Failed to fetch ${url}`, {
+      fallbackData: fallback,
+    })
   })
 }
 

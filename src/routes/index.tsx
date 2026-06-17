@@ -18,11 +18,17 @@ function HomePage() {
   const calendar = useCalendarData(user?.id || '')
 
   if (isLoading) {
+    // P5: render the dashboard shell + skeleton instead of a full-screen
+    // spinner, so first paint isn't blank and the layout doesn't shift when
+    // auth resolves and the real content swaps in. (Server-side session
+    // bootstrap to remove the hydration wait entirely is P13.)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-6 h-28 animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
+          <div className="mb-6 h-12 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
+          <div className="h-96 animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
+          <span className="sr-only">Loading your workouts…</span>
         </div>
       </div>
     )

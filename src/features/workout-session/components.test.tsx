@@ -55,6 +55,11 @@ const makeWorkoutDetails = ({
   includeSecondExercise = false,
   includeCrowdedRail = false,
   endTime,
+}: {
+  includeBenchSet?: boolean
+  includeSecondExercise?: boolean
+  includeCrowdedRail?: boolean
+  endTime?: string
 } = {}): WorkoutWithDetails => ({
   ...makeSession({ end_time: endTime }),
   exercises: [
