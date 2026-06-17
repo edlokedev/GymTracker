@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { emptyExerciseLibrarySearch } from '../model'
 import { useExerciseLibrary } from '../useExerciseLibrary'
@@ -41,11 +41,22 @@ export default function ExerciseSelector({
   onToggleFavorite,
 }: ExerciseSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [shouldLoad, setShouldLoad] = useState(false)
   const [inputQuery, setInputQuery] = useState('')
   const queryDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const library = useExerciseLibrary({
     initialSearch: emptyExerciseLibrarySearch,
+    enabled: shouldLoad,
   })
+
+  // P1: begin loading the catalog only once the user signals intent to open the
+  // picker (hover/focus/press), so the modal opens with data ready without
+  // paying the load on every workout screen where the picker is never opened.
+  const prefetchLibrary = useCallback(() => setShouldLoad(true), [])
+  const openPicker = useCallback(() => {
+    setShouldLoad(true)
+    setIsOpen(true)
+  }, [])
 
   const selectedCategory = library.filters.categoryIds[0] || ''
   const selectedEquipment = library.filters.equipment[0] || ''
@@ -109,11 +120,12 @@ export default function ExerciseSelector({
       {selectedExercise ? (
         <SelectedExercisePanel
           exercise={selectedExercise}
-          onChange={() => setIsOpen(true)}
+          onChange={openPicker}
+          onPrefetch={prefetchLibrary}
           onClear={onClearExercise ? clearSelection : undefined}
         />
       ) : (
-        <EmptyExerciseSelector onOpen={() => setIsOpen(true)} />
+        <EmptyExerciseSelector onOpen={openPicker} onPrefetch={prefetchLibrary} />
       )}
 
       <ExerciseSelectorModal

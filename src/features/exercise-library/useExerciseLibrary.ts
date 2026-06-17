@@ -33,6 +33,11 @@ interface UseExerciseLibraryOptions {
   routeSearch?: ExerciseLibrarySearch
   onRouteSearchChange?: (search: ExerciseLibrarySearch) => void
   pageSize?: number
+  // When false, the hook holds off its mount fetches (facet catalog, favorites,
+  // recent, initial search) until this flips true. Lets the exercise picker
+  // defer the whole catalog load until the user signals intent (P1). Defaults
+  // to true so the dedicated /exercises browser keeps loading eagerly.
+  enabled?: boolean
 }
 
 interface ExerciseLibraryState {
@@ -77,6 +82,7 @@ function toSearchResultState(
 
 export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
   const pageSize = options.pageSize ?? 20
+  const enabled = options.enabled ?? true
   const routeSearch = options.routeSearch
   const onRouteSearchChange = options.onRouteSearchChange
   const lastAppliedRouteKey = useRef<string | null>(null)
@@ -151,6 +157,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
   )
 
   useEffect(() => {
+    if (!enabled) return
     let isMounted = true
 
     async function loadCatalogSupport() {
@@ -192,9 +199,10 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [enabled])
 
   useEffect(() => {
+    if (!enabled) return
     if (!routeSearch) {
       runSearch(filtersRef.current)
       return
@@ -213,7 +221,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
       filters: nextFilters,
     }))
     runSearch(nextFilters)
-  }, [routeSearch, runSearch])
+  }, [routeSearch, runSearch, enabled])
 
   const applyFilters = useCallback(
     async (nextFilters: ExerciseLibraryFilters, syncRoute = true) => {
