@@ -14,28 +14,30 @@ Codex adversarial review (see `PLAN.md` / `PLAN-REVIEW-LOG.md`).
 
 | # | Finding | Status |
 |---|---------|--------|
-| P1 | Picker eager-loads whole library on workout-add path | ☐ Outstanding (structural) |
+| P1 | Picker eager-loads whole library on workout-add path | ✅ Done — `useExerciseLibrary` gains an `enabled` flag; the selector prefetches on hover/focus/press instead of on mount |
 | P2 | Catalog grid eager-loads animated GIFs, no lazy hints | ✅ Done — `loading="lazy"` + `decoding="async"` on `ExerciseMediaFrame` (kept GIF default per decision) |
 | P3 | No `Cache-Control` on public catalog/facet routes | ✅ Done — `CATALOG_CACHE_CONTROL` via `publicMethod` on the 3 facet routes |
 | P4 | Route code-splitting unverified | ◐ Partial — build shows per-route chunks; full client chunk map still pending (Oak) |
-| P5 | First paint blocks on async auth hydration | ☐ Outstanding (structural) |
+| P5 | First paint blocks on async auth hydration | ✅ Done (client) — full-screen spinner replaced with a layout-stable dashboard skeleton; SSR session bootstrap deferred to the planned migration |
 | P6 | Search slow-path scans whole catalog in JS | ☐ Outstanding (needs SQL `ilike`/FTS) |
 | P7 | Suggested-exercises full-catalog scan | ☐ Outstanding |
 | P8 | `listRecentRows` unbounded | ☐ Outstanding (scale-gated, low now) |
 | P9 | `listCategories` N+1 counts | ☐ Outstanding (low, bounded) |
 | P10 | `recharts` unused dependency | ✅ Done — removed from `package.json` + `bun.lock` |
 | P11 | `vercel.json` npm vs Bun | ✅ Done — `bun install` / `SERVER_PRESET=vercel bun run build` |
-| P12 | Per-request Supabase Auth round-trip | ☐ Outstanding (indirectly reduced once P1 lands) |
-| P13 | No SSR loaders + no client cache | ☐ Outstanding (structural; pairs with P3/P5) |
+| P12 | Per-request Supabase Auth round-trip | ☐ Outstanding (indirectly reduced by P1) |
+| P13 | No SSR loaders + no client cache | ◐ Partial — client GET cache + in-flight de-dup for the static facets done (`lib/api/cache.ts`); SSR loaders + user-data caching deferred to a planned TanStack Query migration |
 
 **Also done (not a numbered finding):** removed the dead `better-sqlite3` `Migration` type from
 `src/lib/types/database.ts` (last SQLite remnant) and fixed 6 pre-existing TypeScript errors
 (workout-detail duplicate-callback return type + workout-session test-fixture drift) — `tsc` is now clean.
 
-**Verification of shipped changes:** biome clean · `tsc --noEmit` 0 errors · focused tests green
-(facets/envelope + workout-session/workout-history, 66 tests) · production `vercel` build succeeds.
-**Still outstanding overall:** the structural wins (P1, P5, P13), the SQL/query changes (P6–P9),
-P12, and the **Oak measured pass** (Lighthouse / EXPLAIN / full chunk map) to confirm the rankings.
+**Verification of shipped changes:** biome clean · `tsc --noEmit` 0 errors · full test suite green
+(248 tests) · production `vercel` build succeeds.
+**Still outstanding overall:** the deferred SSR/architecture work — server-side session bootstrap
+(P5's remainder) and SSR loaders + user-data caching (P13's remainder), best done as one planned
+TanStack Query migration; the SQL/query changes (P6–P9); P12; and the **Oak measured pass**
+(Lighthouse / EXPLAIN / full chunk map) to confirm the rankings.
 
 ---
 
