@@ -35,10 +35,24 @@ export interface PublicResolution {
 
 export type PublicClientResolver = (request: Request) => PublicResolution
 
+export interface PublicMethodOptions {
+  // When set, a successful response carries this `Cache-Control` value so
+  // browsers/CDN can cache it. Catalog/facet data is effectively static
+  // (seeded), so it is safe to cache. Errors are never cached.
+  cacheControl?: string
+}
+
+// Shared cache policy for the static public Exercise Catalog facets
+// (categories, equipment types, muscle groups). Short browser TTL, long CDN
+// TTL with stale-while-revalidate so a reseed propagates without a cold miss.
+export const CATALOG_CACHE_CONTROL =
+  'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800'
+
 export function makePublicMethod(
   handler: PublicHandler<unknown>,
   clientResolver: PublicClientResolver = getSupabaseServerClient,
   errorLogLabel = 'public route',
+  options: PublicMethodOptions = {},
 ) {
   return async ({
     request,
@@ -51,8 +65,12 @@ export function makePublicMethod(
     const url = new URL(request.url)
     try {
       const data = await handler({ supabase, request, url, params: params ?? {} })
-      return successResponse(data, responseHeaders)
+      const headers = options.cacheControl
+        ? mergeHeaders(responseHeaders, { 'Cache-Control': options.cacheControl })
+        : responseHeaders
+      return successResponse(data, headers)
     } catch (err) {
+      // Errors are never cached — only the success path gets Cache-Control.
       const { status, message } = statusForError(err)
       if (status >= 500) console.error(`${errorLogLabel} error:`, err)
       return errorResponse(status, message, mergeHeaders(responseHeaders))
@@ -60,6 +78,6 @@ export function makePublicMethod(
   }
 }
 
-export function publicMethod<T>(handler: PublicHandler<T>) {
-  return makePublicMethod(handler as PublicHandler<unknown>)
+export function publicMethod<T>(handler: PublicHandler<T>, options?: PublicMethodOptions) {
+  return makePublicMethod(handler as PublicHandler<unknown>, undefined, undefined, options)
 }

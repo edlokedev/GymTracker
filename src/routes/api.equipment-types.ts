@@ -1,5 +1,9 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
-import { type PublicHandlerContext, publicMethod } from '../lib/api/define-public-route'
+import {
+  CATALOG_CACHE_CONTROL,
+  type PublicHandlerContext,
+  publicMethod,
+} from '../lib/api/define-public-route'
 import { exerciseCatalogQueries } from '../lib/supabase/queries/exercise-catalog'
 
 // Bare handler — exported so contract tests can invoke it with a stub
@@ -8,5 +12,5 @@ export const getEquipmentTypes = async ({ supabase }: PublicHandlerContext) =>
   exerciseCatalogQueries.listEquipmentTypes(supabase)
 
 export const ServerRoute = createServerFileRoute('/api/equipment-types').methods({
-  GET: publicMethod(getEquipmentTypes),
+  GET: publicMethod(getEquipmentTypes, { cacheControl: CATALOG_CACHE_CONTROL }),
 })

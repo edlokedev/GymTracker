@@ -97,7 +97,9 @@ export function WorkoutHistoryList({
         selectedDate={selectedDate}
         isLoading={isModalLoading}
         onWorkoutDeleted={actions.removeDeletedSession}
-        onDuplicateWorkout={actions.duplicateSession}
+        onDuplicateWorkout={(workoutId) =>
+          actions.duplicateSession(workoutId).then(() => undefined)
+        }
         onDeleteWorkout={actions.deleteSession}
       />
 

@@ -311,13 +311,6 @@ export interface FreeExerciseDBExercise {
   tracking_type?: 'strength' | 'cardio' | 'timed'
 }
 
-// Migration types
-export interface Migration {
-  name: string
-  up: (db: import('better-sqlite3').Database) => Promise<void> | void
-  down: (db: import('better-sqlite3').Database) => Promise<void> | void
-}
-
 // Error types
 export class DatabaseError extends Error {
   constructor(

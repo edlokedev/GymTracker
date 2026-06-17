@@ -83,15 +83,7 @@ const makeWorkoutTemplate = (): WorkoutTemplateWithExercises => ({
         target_sets: 3,
         created_at: new Date('2026-05-01T10:00:00.000Z'),
       },
-      exercise: makeExerciseFixture({
-        id: 'bench-press',
-        name: 'Bench Press',
-        primary_muscles: ['chest'],
-        equipment: 'barbell',
-        category_name: 'Strength',
-        gif_path: null,
-        preview_image_path: null,
-      }),
+      exercise: makeExercise('bench-press'),
     },
     {
       templateExercise: {
@@ -102,15 +94,7 @@ const makeWorkoutTemplate = (): WorkoutTemplateWithExercises => ({
         target_sets: 3,
         created_at: new Date('2026-05-01T10:00:00.000Z'),
       },
-      exercise: makeExerciseFixture({
-        id: 'squat',
-        name: 'Squat',
-        primary_muscles: ['quadriceps'],
-        equipment: 'barbell',
-        category_name: 'Strength',
-        gif_path: null,
-        preview_image_path: null,
-      }),
+      exercise: makeExercise('squat'),
     },
   ],
 })
