@@ -232,7 +232,7 @@ function WorkoutDashboardOverviewContent({
         onStart={startRecommendedWorkout}
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[1.15fr_1fr_1fr]">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[1.15fr_1fr]">
         <Link
           to="/workout"
           className="motion-press flex min-h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2 text-left font-semibold text-white shadow-sm transition-all duration-200 hover:shadow-md sm:min-h-20 sm:gap-3 sm:px-5 sm:py-4 sm:text-base"
