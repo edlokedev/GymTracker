@@ -49,11 +49,13 @@ export type AuthResolver = (request: Request) => Promise<AuthResolution>
 
 // Pure factory: returns the wrapped function TanStack's file router invokes.
 // Auth-resolver and label are injectable so tests can run without touching
-// the Supabase SSR module.
+// the Supabase SSR module. Pass extraHeaders to add route-specific response
+// headers (e.g. { 'Cache-Control': 'private, no-store' }).
 export function makePrivateMethod(
   handler: PrivateHandler<unknown>,
   authResolver: AuthResolver = getAuthenticatedUser,
   errorLogLabel = 'private route',
+  extraHeaders?: Record<string, string>,
 ) {
   return async ({
     request,
@@ -75,6 +77,9 @@ export function makePrivateMethod(
         url,
         params: params ?? {},
       })
+      if (extraHeaders) {
+        for (const [k, v] of Object.entries(extraHeaders)) responseHeaders.set(k, v)
+      }
       return successResponse(data, responseHeaders)
     } catch (err) {
       const { status, message } = statusForError(err)
@@ -86,6 +91,11 @@ export function makePrivateMethod(
 
 // The route-file-facing convenience: defaults the resolver to the real
 // Supabase one. Tests use makePrivateMethod with an injected resolver.
-export function privateMethod<T>(handler: PrivateHandler<T>) {
-  return makePrivateMethod(handler as PrivateHandler<unknown>)
+// Pass `extraHeaders` to set additional response headers (e.g. Cache-Control).
+export function privateMethod<T>(
+  handler: PrivateHandler<T>,
+  options?: { extraHeaders?: Record<string, string> },
+) {
+  const { extraHeaders } = options ?? {}
+  return makePrivateMethod(handler as PrivateHandler<unknown>, undefined, undefined, extraHeaders)
 }

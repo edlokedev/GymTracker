@@ -141,6 +141,16 @@ export const useCalendarData = (userId: string) => {
     setCalendarView: useCallback((view: CalendarState['calendarView']) => {
       setState((prev) => ({ ...prev, calendarView: view }))
     }, []),
+
+    updateSelectedWorkoutLocation: useCallback((locationName: string | null) => {
+      setState((prev) => {
+        if (!prev.selectedWorkout) return prev
+        return {
+          ...prev,
+          selectedWorkout: { ...prev.selectedWorkout, locationName: locationName ?? undefined },
+        }
+      })
+    }, []),
   }
 
   // Transform workout data to calendar events for ilamy Calendar

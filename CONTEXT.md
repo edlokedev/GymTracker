@@ -20,7 +20,11 @@ Public CDN URL for an exercise catalog image. GymTracker derives these from Free
 
 ### Workout Session
 
-A dated workout owned by one authenticated user. It groups workout sets and may include notes, start time, and end time.
+A dated workout owned by one authenticated user. It groups workout sets and may include notes, start time, end time, and a Workout Location.
+
+### Workout Location
+
+A free-text name for the physical place where a Workout Session occurred (e.g. "Planet Fitness", "Home Garage"). Stored as `location_name text` directly on the `workout_sessions` row — no separate locations table. Optional on every session, editable at any time (during active session or on past sessions). The UI autocompletes from the authenticated user's own distinct past location names.
 
 ### Workout Set
 

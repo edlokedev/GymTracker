@@ -1,7 +1,9 @@
 import { Link } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { InlineError } from '@/components/ui/InlineError'
 import { WorkoutDetailModal } from '@/features/calendar/components/WorkoutDetailModal'
+import { fetchLocationNames } from '@/features/workout-session/client'
 import { WorkoutSessionCard } from '@/features/workout-session/components/WorkoutSessionCard'
 import type { useWorkoutHistory } from '../useWorkoutHistory'
 
@@ -36,12 +38,50 @@ export function WorkoutHistoryList({
     isModalLoading,
     selectedWorkout,
     selectedDate,
+    locationFilter,
     actions,
   } = history
+
+  const [availableLocations, setAvailableLocations] = useState<string[]>([])
+  useEffect(() => {
+    fetchLocationNames()
+      .then(setAvailableLocations)
+      .catch(() => {})
+  }, [])
 
   return (
     <>
       <InlineError message={error || deleteError} className="mb-4" />
+
+      {availableLocations.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => actions.filterByLocation(undefined)}
+            className={`min-h-9 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+              locationFilter === undefined
+                ? 'bg-blue-600 text-white'
+                : 'border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+          >
+            All
+          </button>
+          {availableLocations.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => actions.filterByLocation(locationFilter === name ? undefined : name)}
+              className={`min-h-9 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                locationFilter === name
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              📍 {name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {sessions.length === 0 && !isLoading ? (
         <div className="text-center py-12">
@@ -97,10 +137,15 @@ export function WorkoutHistoryList({
         selectedDate={selectedDate}
         isLoading={isModalLoading}
         onWorkoutDeleted={actions.removeDeletedSession}
-        onDuplicateWorkout={(workoutId) =>
-          actions.duplicateSession(workoutId).then(() => undefined)
-        }
+        onDuplicateWorkout={actions.duplicateSession}
         onDeleteWorkout={actions.deleteSession}
+        onLocationUpdated={(workoutId, locationName) => {
+          actions.updateSessionLocation(workoutId, locationName)
+          // Refresh location filter chips if a new location was added
+          fetchLocationNames()
+            .then(setAvailableLocations)
+            .catch(() => {})
+        }}
       />
 
       <ConfirmDialog

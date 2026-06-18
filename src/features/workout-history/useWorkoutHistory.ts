@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { WorkoutSession } from '@/lib/types/database'
 import {
   deleteWorkoutHistorySession,
@@ -32,6 +32,7 @@ export function useWorkoutHistory({
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [locationFilter, setLocationFilter] = useState<string | undefined>(undefined)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<WorkoutSession | null>(null)
@@ -41,8 +42,15 @@ export function useWorkoutHistory({
   const [selectedWorkout, setSelectedWorkout] = useState<SelectedWorkout | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
 
+  // Ref so loadMore can always read the latest filter without needing it in
+  // loadSessions's dep array (which would cause a double-fetch on filter change).
+  const locationFilterRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    locationFilterRef.current = locationFilter
+  }, [locationFilter])
+
   const loadSessions = useCallback(
-    async (pageNum = 1, append = false) => {
+    async (pageNum = 1, append = false, overrideLocationFilter?: string | undefined | null) => {
       if (!userId) {
         setSessions([])
         setHasMore(false)
@@ -54,9 +62,15 @@ export function useWorkoutHistory({
         setError(null)
         setIsLoading(true)
         const offset = mode === 'recent' ? undefined : (pageNum - 1) * limit
+        // `null` = clear filter; `undefined` = use ref (avoids stale closure)
+        const activeFilter =
+          overrideLocationFilter === undefined
+            ? locationFilterRef.current
+            : (overrideLocationFilter ?? undefined)
         const result = await loadWorkoutHistorySessions({
           limit,
           offset,
+          locationName: activeFilter,
         })
 
         setSessions((currentSessions) =>
@@ -196,6 +210,26 @@ export function useWorkoutHistory({
     [userId],
   )
 
+  const filterByLocation = useCallback(
+    (name: string | undefined) => {
+      setLocationFilter(name)
+      void loadSessions(1, false, name ?? null)
+    },
+    [loadSessions],
+  )
+
+  const updateSessionLocation = useCallback((workoutId: string, locationName: string | null) => {
+    setSessions((current) =>
+      current.map((s) =>
+        s.id === workoutId ? { ...s, location_name: locationName ?? undefined } : s,
+      ),
+    )
+    setSelectedWorkout((prev) => {
+      if (!prev || prev.id !== workoutId) return prev
+      return { ...prev, locationName: locationName ?? undefined }
+    })
+  }, [])
+
   const lastWorkoutDate = useMemo(() => getLastWorkoutDate(sessions), [sessions])
   const deleteCandidateLabel = useMemo(
     () => getDeleteCandidateLabel(deleteCandidate),
@@ -217,6 +251,7 @@ export function useWorkoutHistory({
     isModalLoading,
     selectedWorkout,
     selectedDate,
+    locationFilter,
     actions: {
       loadMore,
       refresh: () => loadSessions(1, false),
@@ -228,6 +263,8 @@ export function useWorkoutHistory({
       openWorkoutDetails,
       closeDetailModal,
       removeDeletedSession,
+      filterByLocation,
+      updateSessionLocation,
     },
   }
 }

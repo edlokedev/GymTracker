@@ -22,6 +22,7 @@ type SessionRow = {
   start_time: string | null
   end_time: string | null
   notes: string | null
+  location_name: string | null
 }
 
 type SetRow = {
@@ -54,7 +55,7 @@ export const workoutDetailsQueries = {
     const db = queryClient(supabase)
     const { data: sessionsData, error: sessionsError } = await db
       .from<SessionRow>('workout_sessions')
-      .select('id, user_id, date, start_time, end_time, notes')
+      .select('id, user_id, date, start_time, end_time, notes, location_name')
       .eq('date', date)
       .order('start_time', { ascending: true })
 
@@ -110,6 +111,7 @@ export const workoutDetailsQueries = {
         date: session.date,
         duration: computeDurationMinutes(session.start_time, session.end_time),
         notes: session.notes ?? undefined,
+        locationName: session.location_name ?? undefined,
         sets: sessionSets.map((s) => ({
           id: s.id,
           sessionId: s.workout_id,

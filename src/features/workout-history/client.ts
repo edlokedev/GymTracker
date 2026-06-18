@@ -6,11 +6,13 @@ import type { SelectedWorkout } from './model'
 export async function loadWorkoutHistorySessions({
   limit,
   offset,
+  locationName,
 }: {
   limit: number
   offset?: number
+  locationName?: string
 }): Promise<PaginatedResult<WorkoutSession>> {
-  const params = buildSearchParams({ limit, offset })
+  const params = buildSearchParams({ limit, offset, location_name: locationName })
   const response = await fetch(`/api/workout-sessions?${params.toString()}`)
   return readApiData(response, `Failed to load workout history: ${response.status}`)
 }
