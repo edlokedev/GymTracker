@@ -46,6 +46,11 @@ export function WorkoutSessionCard({
             <span className="ml-2 text-green-600 dark:text-green-400">✓ Completed</span>
           )}
         </p>
+        {session.location_name && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            📍 {session.location_name}
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
         <Link

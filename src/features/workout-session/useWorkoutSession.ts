@@ -74,10 +74,12 @@ export function useWorkoutSession({
   const existingSessionStartTime = existingSession?.start_time
   const existingSessionEndTime = existingSession?.end_time
   const existingSessionNotes = existingSession?.notes
+  const existingSessionLocation = existingSession?.location_name
   const [session, setSession] = useState<WorkoutSession | null>(existingSession || null)
   const [exercises, setExercises] = useState<ExerciseInWorkout[]>([])
   const [sessionName, setSessionName] = useState(existingSession?.name || '')
   const [sessionNotes, setSessionNotes] = useState(existingSession?.notes || '')
+  const [sessionLocation, setSessionLocation] = useState(existingSession?.location_name || '')
   const [sessionDate, setSessionDate] = useState(existingSession?.date || todayString())
   const [selectedExercise, setSelectedExercise] = useState<ExerciseWithParsedFields | null>(null)
   const [activeExerciseId, setActiveExerciseId] = useState<string | null>(null)
@@ -92,6 +94,9 @@ export function useWorkoutSession({
     Record<string, WorkoutSet | undefined>
   >({})
   const startedTemplateIdRef = useRef<string | null>(null)
+  // Debounced metadata save: flushes on blur, complete, and unmount.
+  const metadataSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const metadataSaveFnRef = useRef<(() => void) | null>(null)
 
   const beginCommand = useCallback(() => {
     setCommandStatus('running')
@@ -117,6 +122,7 @@ export function useWorkoutSession({
     setExercises([])
     setSessionName('')
     setSessionNotes('')
+    setSessionLocation('')
     setSessionDate(todayString())
     setSelectedExercise(null)
     setActiveExerciseId(null)
@@ -172,6 +178,7 @@ export function useWorkoutSession({
         setSession(workout)
         setSessionName(workout.name || '')
         setSessionNotes(workout.notes || '')
+        setSessionLocation(workout.location_name || '')
         setSessionDate(workout.date)
         setSessionStartTime(workout.start_time)
         const loadedExercises = mapWorkoutDetailsToExercises(workout)
@@ -210,12 +217,14 @@ export function useWorkoutSession({
     })
     setSessionName(existingSessionName || '')
     setSessionNotes(existingSessionNotes || '')
+    setSessionLocation(existingSessionLocation || '')
     setSessionDate(existingSessionDate || todayString())
     setSessionStartTime(existingSessionStartTime || nowISOString())
     void loadSessionData(existingSessionId)
   }, [
     existingSessionDate,
     existingSessionEndTime,
+    existingSessionLocation,
     existingSessionName,
     existingSessionNotes,
     existingSessionStartTime,
@@ -235,6 +244,7 @@ export function useWorkoutSession({
         date: sessionDate,
         notes: sessionNotes.trim() || undefined,
         start_time: sessionStartTime,
+        location_name: sessionLocation.trim() || undefined,
       }
 
       const newSession = await createWorkoutSession(sessionData)
@@ -253,6 +263,7 @@ export function useWorkoutSession({
     finishCommand,
     onSessionSave,
     sessionDate,
+    sessionLocation,
     sessionName,
     sessionNotes,
     sessionStartTime,
@@ -269,6 +280,7 @@ export function useWorkoutSession({
         setSession(result.session)
         setSessionName(result.session.name || '')
         setSessionNotes(result.session.notes || '')
+        setSessionLocation(result.session.location_name || '')
         setSessionDate(result.session.date)
         setSessionStartTime(result.session.start_time)
         setExercises(plannedExercises)
@@ -307,10 +319,12 @@ export function useWorkoutSession({
     beginCommand()
 
     try {
+      const locationValue = sessionLocation.trim()
       const updatedSession = await updateWorkoutSession(session.id, {
         name: sessionName.trim(),
         notes: sessionNotes.trim(),
         date: sessionDate,
+        location_name: locationValue === '' ? null : locationValue,
       })
 
       setSession(updatedSession)
@@ -331,9 +345,41 @@ export function useWorkoutSession({
     onSessionSave,
     session,
     sessionDate,
+    sessionLocation,
     sessionName,
     sessionNotes,
   ])
+
+  // Keep the save fn ref up-to-date so the debounce timer always calls the
+  // latest closure (avoids stale sessionName/notes/location).
+  useEffect(() => {
+    metadataSaveFnRef.current = () => {
+      void saveSession()
+    }
+  }, [saveSession])
+
+  const scheduleMetadataSave = useCallback((delayMs = 1500) => {
+    if (metadataSaveTimerRef.current) clearTimeout(metadataSaveTimerRef.current)
+    metadataSaveTimerRef.current = setTimeout(() => {
+      metadataSaveFnRef.current?.()
+      metadataSaveTimerRef.current = null
+    }, delayMs)
+  }, [])
+
+  const flushMetadataSave = useCallback(() => {
+    if (metadataSaveTimerRef.current) {
+      clearTimeout(metadataSaveTimerRef.current)
+      metadataSaveTimerRef.current = null
+      metadataSaveFnRef.current?.()
+    }
+  }, [])
+
+  // Cancel pending timer on unmount to prevent saving to a deleted session.
+  useEffect(() => {
+    return () => {
+      if (metadataSaveTimerRef.current) clearTimeout(metadataSaveTimerRef.current)
+    }
+  }, [])
 
   const completeSession = useCallback(async () => {
     if (!session) return
@@ -341,6 +387,13 @@ export function useWorkoutSession({
     try {
       setLoading(true)
       beginCommand()
+      // Flush any pending metadata save before marking the session complete.
+      // Must await — completeWorkoutSession must not race the PATCH for metadata.
+      if (metadataSaveTimerRef.current) {
+        clearTimeout(metadataSaveTimerRef.current)
+        metadataSaveTimerRef.current = null
+        await saveSession()
+      }
       const completedSession = await completeWorkoutSession(session.id)
       setSession(completedSession)
       onSessionComplete?.(completedSession)
@@ -351,7 +404,7 @@ export function useWorkoutSession({
     } finally {
       setLoading(false)
     }
-  }, [beginCommand, failCommand, finishCommand, onSessionComplete, session])
+  }, [beginCommand, failCommand, finishCommand, onSessionComplete, saveSession, session])
 
   const deleteSession = useCallback(async () => {
     if (!session) return false
@@ -518,6 +571,7 @@ export function useWorkoutSession({
     exercises,
     sessionName,
     sessionNotes,
+    sessionLocation,
     sessionDate,
     selectedExercise,
     activeExerciseId: resolvedActiveExerciseId,
@@ -534,8 +588,11 @@ export function useWorkoutSession({
     sessionDuration,
     setSessionName,
     setSessionNotes,
+    setSessionLocation,
     setSessionDate,
     setSessionStartTime,
+    scheduleMetadataSave,
+    flushMetadataSave,
     actions: {
       startSession,
       startSessionFromTemplate,

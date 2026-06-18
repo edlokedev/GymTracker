@@ -61,6 +61,7 @@ export interface WorkoutSessionWithSets {
   date: string
   duration?: number
   notes?: string
+  locationName?: string
   sets: WorkoutSet[]
   totalVolume: number
   exerciseCount: number

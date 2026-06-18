@@ -1,10 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { type MouseEvent, useEffect } from 'react'
+import { type MouseEvent, useEffect, useState } from 'react'
 import { DuplicateIcon, EditIcon } from '@/components/ui/ActionIcons'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { InlineError } from '@/components/ui/InlineError'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { TrashButton } from '@/components/ui/TrashButton'
+import { updateWorkoutSessionLocation } from '@/features/workout-detail/client'
 import {
   formatWorkoutDetailDate,
   formatWorkoutDuration,
@@ -17,6 +18,7 @@ import {
   type WorkoutDetailWorkout,
 } from '@/features/workout-detail/model'
 import { useWorkoutDetailActions } from '@/features/workout-detail/useWorkoutDetailActions'
+import { fetchLocationNames } from '@/features/workout-session/client'
 
 interface WorkoutDetailModalProps {
   isOpen: boolean
@@ -27,6 +29,7 @@ interface WorkoutDetailModalProps {
   onWorkoutDeleted?: (workoutId: string) => void | Promise<void>
   onDuplicateWorkout?: (workoutId: string) => void | Promise<void>
   onDeleteWorkout?: (workoutId: string) => void | Promise<void>
+  onLocationUpdated?: (workoutId: string, locationName: string | null) => void
 }
 
 export function WorkoutDetailModal({
@@ -38,7 +41,35 @@ export function WorkoutDetailModal({
   onWorkoutDeleted,
   onDuplicateWorkout,
   onDeleteWorkout,
+  onLocationUpdated,
 }: WorkoutDetailModalProps) {
+  const [locationInput, setLocationInput] = useState(workout?.locationName ?? '')
+  const [locationNames, setLocationNames] = useState<string[]>([])
+
+  useEffect(() => {
+    setLocationInput(workout?.locationName ?? '')
+  }, [workout?.locationName])
+
+  useEffect(() => {
+    if (!isOpen) return
+    fetchLocationNames()
+      .then(setLocationNames)
+      .catch(() => {})
+  }, [isOpen])
+
+  const handleLocationBlur = async () => {
+    if (!workout) return
+    const trimmed = locationInput.trim()
+    const value = trimmed === '' ? null : trimmed
+    try {
+      await updateWorkoutSessionLocation(workout.id, value)
+      onLocationUpdated?.(workout.id, value)
+    } catch {
+      // non-fatal — revert local state to last known good
+      setLocationInput(workout.locationName ?? '')
+    }
+  }
+
   const detail = useWorkoutDetailActions({
     isOpen,
     onClose,
@@ -213,6 +244,33 @@ export function WorkoutDetailModal({
                       {Math.round(getWorkoutTotalVolume(workout))} kg
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-blue-200/60 dark:border-indigo-800/60">
+                  <label
+                    htmlFor="modal-workout-location"
+                    className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2 block"
+                  >
+                    Location
+                  </label>
+                  <input
+                    id="modal-workout-location"
+                    type="text"
+                    list="modal-workout-location-names"
+                    value={locationInput}
+                    onChange={(e) => setLocationInput(e.target.value)}
+                    onBlur={() => {
+                      void handleLocationBlur()
+                    }}
+                    placeholder="e.g., Planet Fitness, Home Gym"
+                    maxLength={100}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  />
+                  <datalist id="modal-workout-location-names">
+                    {locationNames.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </div>
 
                 {workout.notes && (

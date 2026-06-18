@@ -27,7 +27,8 @@ export const getWorkoutSessions = async ({ supabase, url }: PrivateHandlerContex
 
   const limit = parseInt(url.searchParams.get('limit') || '20', 10)
   const offset = parseInt(url.searchParams.get('offset') || '0', 10)
-  return workoutSessionQueries.list(supabase, limit, offset)
+  const locationName = url.searchParams.get('location_name') ?? undefined
+  return workoutSessionQueries.list(supabase, limit, offset, locationName)
 }
 
 export const createWorkoutSession = async ({ user, supabase, request }: PrivateHandlerContext) => {
@@ -53,11 +54,16 @@ export const createWorkoutSession = async ({ user, supabase, request }: PrivateH
   }
   if (action) badRequest('Unsupported workout session action')
 
-  // Accept the legacy WorkoutSessionInput shape but ignore any user_id the
-  // client tried to send. Identity is always taken from the Supabase JWT.
-  const body = (await request.json()) as Partial<WorkoutSessionInput>
-  const { user_id: _ignored, ...input } = body
+  // Accept the session input shape but ignore any user_id the client sent.
+  // Identity is always taken from the Supabase JWT.
+  const rawBody = (await request.json()) as Partial<WorkoutSessionInput>
+  const { user_id: _ignored, ...input } = rawBody
   void _ignored
+  if (input.location_name !== undefined && input.location_name !== null) {
+    const trimmed = input.location_name.trim()
+    if (trimmed.length > 100) badRequest('location_name must be 100 characters or fewer')
+    input.location_name = trimmed === '' ? undefined : trimmed
+  }
   return workoutSessionQueries.create(supabase, user.id, input)
 }
 
@@ -72,9 +78,15 @@ export const patchWorkoutSession = async ({ supabase, request, url }: PrivateHan
     return session
   }
 
-  const body = (await request.json()) as Partial<WorkoutSessionInput>
-  const { user_id: _ignored, ...updates } = body
+  const rawBody = (await request.json()) as Partial<WorkoutSessionInput>
+  const { user_id: _ignored, ...updates } = rawBody
   void _ignored
+
+  if (updates.location_name !== undefined && updates.location_name !== null) {
+    const trimmed = updates.location_name.trim()
+    if (trimmed.length > 100) badRequest('location_name must be 100 characters or fewer')
+    updates.location_name = trimmed === '' ? null : trimmed
+  }
 
   const session = await workoutSessionQueries.update(supabase, sessionId as string, updates)
   if (!session) notFound('Session not found')

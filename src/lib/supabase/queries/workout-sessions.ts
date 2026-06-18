@@ -32,6 +32,7 @@ type SessionRow = {
   start_time: string
   end_time: string | null
   notes: string | null
+  location_name: string | null
   created_at: string
   updated_at: string
 }
@@ -65,13 +66,20 @@ function mapSession(row: SessionRow): WorkoutSession {
     start_time: row.start_time,
     end_time: row.end_time ?? undefined,
     notes: row.notes ?? undefined,
+    location_name: row.location_name ?? undefined,
     created_at: new Date(row.created_at),
     updated_at: new Date(row.updated_at),
   }
 }
 
+function normalizeLocationName(value: string | null | undefined): string | null {
+  if (value == null) return null
+  const trimmed = value.trim()
+  return trimmed === '' ? null : trimmed
+}
+
 const SESSION_COLUMNS =
-  'id, user_id, name, date, start_time, end_time, notes, created_at, updated_at'
+  'id, user_id, name, date, start_time, end_time, notes, location_name, created_at, updated_at'
 const SET_COLUMNS =
   'id, workout_id, exercise_id, set_number, weight, reps, rest_time, notes, duration_seconds, distance_km, incline, speed_kmh, created_at, updated_at'
 
@@ -83,13 +91,20 @@ export const workoutSessionQueries = {
     supabase: SB,
     limit: number = 20,
     offset: number = 0,
+    locationName?: string,
   ): Promise<PaginatedResult<WorkoutSession>> {
-    const { data, error, count } = await queryClient(supabase)
+    let query = queryClient(supabase)
       .from('workout_sessions')
       .select(SESSION_COLUMNS, { count: 'exact' })
       .order('date', { ascending: false })
       .order('start_time', { ascending: false })
       .range(offset, offset + limit - 1)
+
+    if (locationName !== undefined) {
+      query = query.eq('location_name', locationName)
+    }
+
+    const { data, error, count } = await query
 
     assertPostgresOk(error)
 
@@ -135,6 +150,7 @@ export const workoutSessionQueries = {
       notes: data.notes ?? null,
       start_time: data.start_time ?? nowIso,
       end_time: data.end_time ?? null,
+      location_name: normalizeLocationName(data.location_name),
     }
 
     const { data: row, error } = await queryClient(supabase)
@@ -160,6 +176,11 @@ export const workoutSessionQueries = {
     if (data.notes !== undefined) patch.notes = data.notes
     if (data.start_time !== undefined) patch.start_time = data.start_time
     if (data.end_time !== undefined) patch.end_time = data.end_time
+    if (data.location_name !== undefined) {
+      // null clears the field; non-null values are trimmed (blank → null)
+      patch.location_name =
+        data.location_name === null ? null : normalizeLocationName(data.location_name)
+    }
 
     if (Object.keys(patch).length === 0) {
       // Nothing to patch — mirror SQLite behavior and return the current row.
@@ -224,6 +245,7 @@ export const workoutSessionQueries = {
     const duplicatedSession = await workoutSessionQueries.create(supabase, userId, {
       name: sourceRow.name ?? undefined,
       notes: sourceRow.notes ?? undefined,
+      location_name: sourceRow.location_name ?? undefined,
     })
 
     try {
@@ -369,6 +391,21 @@ export const workoutSessionQueries = {
       ...sessionRow,
       exercises,
     }
+  },
+
+  async listDistinctLocationNames(supabase: SB): Promise<string[]> {
+    const { data, error } = await queryClient(supabase)
+      .from('workout_sessions')
+      .select('location_name')
+      .not('location_name', 'is', null)
+      .neq('location_name', '')
+
+    assertPostgresOk(error)
+    const rows = (data ?? []) as { location_name: string | null }[]
+    const names = rows
+      .map((r) => r.location_name)
+      .filter((n): n is string => n !== null && n.trim() !== '')
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b))
   },
 
   async delete(supabase: SB, id: string): Promise<boolean> {

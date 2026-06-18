@@ -1,5 +1,5 @@
 // Typed errors raised by query modules and translated to HTTP status by the
-// route layer. See docs/adr/0002-route-error-taxonomy-from-postgres-signals.md
+// route layer. See docs/adrs/0002-route-error-taxonomy-from-postgres-signals.md
 // for the durable mapping rationale.
 //
 // Mapping rules owned here:

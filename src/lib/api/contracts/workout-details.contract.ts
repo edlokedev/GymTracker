@@ -28,6 +28,7 @@ const workoutSessionWithSets = z.object({
   date: z.string(),
   duration: z.number().optional(),
   notes: z.string().optional(),
+  locationName: z.string().optional(),
   sets: z.array(workoutDetailSet),
   totalVolume: z.number(),
   exerciseCount: z.number(),

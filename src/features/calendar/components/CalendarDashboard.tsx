@@ -217,6 +217,9 @@ export function CalendarDashboardContent({
           actions.closeWorkoutModal()
           actions.refreshData()
         }}
+        onLocationUpdated={(_id, locationName) => {
+          actions.updateSelectedWorkoutLocation(locationName)
+        }}
       />
     </div>
   )

@@ -39,7 +39,7 @@ Key hubs: workout state mutations · API error taxonomy · calendar date utils �
 - API responses: shared envelope unless route is redirect
 - Private routes: derive authed user server-side. Never trust `userId` from query/body.
 
-Docs: `CONTEXT.md` · `docs/supabase-vercel-migration-plan.md` · `docs/adr/` · `graphify-out/GRAPH_REPORT.md`
+Docs: `CONTEXT.md` · `docs/supabase-vercel-migration-plan.md` · `docs/adrs/` · `graphify-out/GRAPH_REPORT.md`
 
 ## Source Layout
 

@@ -3,6 +3,14 @@ import type { MouseEventHandler, ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WorkoutDetailModal } from './WorkoutDetailModal'
 
+vi.mock('@/features/workout-session/client', () => ({
+  fetchLocationNames: vi.fn().mockResolvedValue([]),
+}))
+
+vi.mock('@/features/workout-detail/client', () => ({
+  updateWorkoutSessionLocation: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
     children,

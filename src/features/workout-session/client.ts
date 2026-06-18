@@ -122,6 +122,13 @@ export async function deleteWorkoutSet(id: string): Promise<void> {
   await readApiSuccess(response, `Failed to delete set: ${response.status}`)
 }
 
+export async function fetchLocationNames(): Promise<string[]> {
+  const response = await fetch('/api/workout-locations')
+  return readApiData(response, `Failed to load location names: ${response.status}`, {
+    fallbackData: [],
+  })
+}
+
 export async function loadWorkoutSetHistory(
   exerciseId: string,
   limit = 1,

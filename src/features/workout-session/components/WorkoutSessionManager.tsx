@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { InlineError } from '@/components/ui/InlineError'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -9,6 +9,7 @@ import { createWorkoutTemplateFromSession } from '@/features/workout-templates/c
 import type { WorkoutSession, WorkoutSet } from '@/lib/types/database'
 import { type ExerciseTrackingType, getTrackingType } from '@/lib/utils/exercise-tracking'
 import { formatExerciseName } from '@/lib/utils/text'
+import { fetchLocationNames } from '../client'
 import { getNextActiveExerciseId } from '../model'
 import { formatDuration, formatSetRestTime } from '../setEntry'
 import { useWorkoutSession } from '../useWorkoutSession'
@@ -43,6 +44,7 @@ export default function WorkoutSessionManager({
     exercises,
     sessionName,
     sessionNotes,
+    sessionLocation,
     sessionDate,
     selectedExercise,
     activeExerciseId,
@@ -57,9 +59,23 @@ export default function WorkoutSessionManager({
     sessionDuration,
     setSessionName,
     setSessionNotes,
+    setSessionLocation,
     setSessionDate,
     actions,
   } = workout
+
+  const [locationNames, setLocationNames] = useState<string[]>([])
+  const loadLocationNames = useCallback(async () => {
+    try {
+      const names = await fetchLocationNames()
+      setLocationNames(names)
+    } catch {
+      // non-critical — autocomplete just won't pre-populate
+    }
+  }, [])
+  useEffect(() => {
+    void loadLocationNames()
+  }, [loadLocationNames])
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
@@ -288,7 +304,7 @@ export default function WorkoutSessionManager({
             >
               <span>Workout details</span>
               <span className="text-gray-500 text-xs dark:text-gray-400">
-                {showWorkoutDetails ? 'Hide' : sessionName || sessionDate}
+                {showWorkoutDetails ? 'Hide' : sessionLocation || sessionName || sessionDate}
               </span>
             </button>
           )}
@@ -321,6 +337,31 @@ export default function WorkoutSessionManager({
                   rows={2}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:disabled:bg-gray-600"
                 />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="workout-location"
+                  className="mb-1 block font-medium text-gray-700 text-sm dark:text-gray-300"
+                >
+                  Location
+                </label>
+                <input
+                  id="workout-location"
+                  type="text"
+                  list="workout-location-names"
+                  value={sessionLocation}
+                  onChange={(e) => setSessionLocation(e.target.value)}
+                  onBlur={actions.saveSession}
+                  placeholder="e.g., Planet Fitness, Home Gym"
+                  maxLength={100}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:disabled:bg-gray-600"
+                />
+                <datalist id="workout-location-names">
+                  {locationNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </div>
 
               <div>

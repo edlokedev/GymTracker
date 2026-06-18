@@ -82,6 +82,7 @@ export interface WorkoutSession {
   start_time: string // ISO datetime string
   end_time?: string // ISO datetime string
   notes?: string
+  location_name?: string
   created_at: Date
   updated_at: Date
 }
@@ -216,6 +217,7 @@ export interface WorkoutSessionInput {
   notes?: string
   start_time?: string
   end_time?: string
+  location_name?: string | null
 }
 
 export interface WorkoutSetInput {
@@ -309,6 +311,13 @@ export interface FreeExerciseDBExercise {
   category: string
   images: string[]
   tracking_type?: 'strength' | 'cardio' | 'timed'
+}
+
+// Migration types
+export interface Migration {
+  name: string
+  up: (db: import('better-sqlite3').Database) => Promise<void> | void
+  down: (db: import('better-sqlite3').Database) => Promise<void> | void
 }
 
 // Error types

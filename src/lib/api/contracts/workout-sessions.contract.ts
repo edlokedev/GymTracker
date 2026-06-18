@@ -11,6 +11,7 @@ const workoutSession = z.object({
   start_time: z.string(),
   end_time: z.string().optional(),
   notes: z.string().optional(),
+  location_name: z.string().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -66,13 +67,27 @@ const paginatedSessions = z.object({
   hasMore: z.boolean(),
 })
 
-const sessionInput = z
+// POST — create: location_name must be non-empty when provided
+const createSessionInput = z
   .object({
     name: z.string().optional(),
     date: z.string().optional(),
     notes: z.string().optional(),
     start_time: z.string().optional(),
     end_time: z.string().optional(),
+    location_name: z.string().trim().min(1).max(100).optional(),
+  })
+  .strict()
+
+// PATCH — update: location_name may be null to explicitly clear the field
+const updateSessionInput = z
+  .object({
+    name: z.string().optional(),
+    date: z.string().optional(),
+    notes: z.string().optional(),
+    start_time: z.string().optional(),
+    end_time: z.string().optional(),
+    location_name: z.string().trim().min(1).max(100).nullable().optional(),
   })
   .strict()
 
@@ -105,6 +120,7 @@ export const workoutSessionsContract = defineContract({
         includeDetails: z.literal('true').optional(),
         limit: z.string().optional(),
         offset: z.string().optional(),
+        location_name: z.string().optional(),
       }),
       // Three shapes depending on inputs:
       //   GET ?id=…                    → WorkoutSession
@@ -114,12 +130,12 @@ export const workoutSessionsContract = defineContract({
     },
     POST: {
       query: z.union([duplicateSessionQuery, startFromTemplateQuery, createSessionQuery]),
-      body: z.union([sessionInput, startFromTemplateBody]).optional(),
+      body: z.union([createSessionInput, startFromTemplateBody]).optional(),
       response: z.union([workoutSession, startFromTemplateResponse]),
     },
     PATCH: {
       query: z.object({ id: z.string(), action: z.literal('complete').optional() }),
-      body: sessionInput.partial().optional(),
+      body: updateSessionInput.partial().optional(),
       response: workoutSession,
     },
     DELETE: {
@@ -129,4 +145,10 @@ export const workoutSessionsContract = defineContract({
   },
 })
 
-export { paginatedSessions, workoutSession, workoutWithDetails }
+export {
+  createSessionInput,
+  paginatedSessions,
+  updateSessionInput,
+  workoutSession,
+  workoutWithDetails,
+}
