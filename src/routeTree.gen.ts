@@ -24,6 +24,7 @@ import { ServerRoute as AuthCallbackServerRouteImport } from './routes/auth.call
 import { ServerRoute as ApiWorkoutTemplatesServerRouteImport } from './routes/api.workout-templates'
 import { ServerRoute as ApiWorkoutSetsServerRouteImport } from './routes/api.workout-sets'
 import { ServerRoute as ApiWorkoutSessionsServerRouteImport } from './routes/api.workout-sessions'
+import { ServerRoute as ApiWorkoutLocationsServerRouteImport } from './routes/api.workout-locations'
 import { ServerRoute as ApiWorkoutDetailsServerRouteImport } from './routes/api.workout-details'
 import { ServerRoute as ApiProgressServerRouteImport } from './routes/api.progress'
 import { ServerRoute as ApiNextWorkoutServerRouteImport } from './routes/api.next-workout'
@@ -103,6 +104,12 @@ const ApiWorkoutSessionsServerRoute =
   ApiWorkoutSessionsServerRouteImport.update({
     id: '/api/workout-sessions',
     path: '/api/workout-sessions',
+    getParentRoute: () => rootServerRouteImport,
+  } as any)
+const ApiWorkoutLocationsServerRoute =
+  ApiWorkoutLocationsServerRouteImport.update({
+    id: '/api/workout-locations',
+    path: '/api/workout-locations',
     getParentRoute: () => rootServerRouteImport,
   } as any)
 const ApiWorkoutDetailsServerRoute = ApiWorkoutDetailsServerRouteImport.update({
@@ -251,6 +258,7 @@ export interface FileServerRoutesByFullPath {
   '/api/next-workout': typeof ApiNextWorkoutServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
+  '/api/workout-locations': typeof ApiWorkoutLocationsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
@@ -268,6 +276,7 @@ export interface FileServerRoutesByTo {
   '/api/next-workout': typeof ApiNextWorkoutServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
+  '/api/workout-locations': typeof ApiWorkoutLocationsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
@@ -286,6 +295,7 @@ export interface FileServerRoutesById {
   '/api/next-workout': typeof ApiNextWorkoutServerRoute
   '/api/progress': typeof ApiProgressServerRoute
   '/api/workout-details': typeof ApiWorkoutDetailsServerRoute
+  '/api/workout-locations': typeof ApiWorkoutLocationsServerRoute
   '/api/workout-sessions': typeof ApiWorkoutSessionsServerRoute
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
@@ -305,6 +315,7 @@ export interface FileServerRouteTypes {
     | '/api/next-workout'
     | '/api/progress'
     | '/api/workout-details'
+    | '/api/workout-locations'
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/api/workout-templates'
@@ -322,6 +333,7 @@ export interface FileServerRouteTypes {
     | '/api/next-workout'
     | '/api/progress'
     | '/api/workout-details'
+    | '/api/workout-locations'
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/api/workout-templates'
@@ -339,6 +351,7 @@ export interface FileServerRouteTypes {
     | '/api/next-workout'
     | '/api/progress'
     | '/api/workout-details'
+    | '/api/workout-locations'
     | '/api/workout-sessions'
     | '/api/workout-sets'
     | '/api/workout-templates'
@@ -357,6 +370,7 @@ export interface RootServerRouteChildren {
   ApiNextWorkoutServerRoute: typeof ApiNextWorkoutServerRoute
   ApiProgressServerRoute: typeof ApiProgressServerRoute
   ApiWorkoutDetailsServerRoute: typeof ApiWorkoutDetailsServerRoute
+  ApiWorkoutLocationsServerRoute: typeof ApiWorkoutLocationsServerRoute
   ApiWorkoutSessionsServerRoute: typeof ApiWorkoutSessionsServerRoute
   ApiWorkoutSetsServerRoute: typeof ApiWorkoutSetsServerRoute
   ApiWorkoutTemplatesServerRoute: typeof ApiWorkoutTemplatesServerRoute
@@ -461,6 +475,13 @@ declare module '@tanstack/react-start/server' {
       path: '/api/workout-sessions'
       fullPath: '/api/workout-sessions'
       preLoaderRoute: typeof ApiWorkoutSessionsServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
+    '/api/workout-locations': {
+      id: '/api/workout-locations'
+      path: '/api/workout-locations'
+      fullPath: '/api/workout-locations'
+      preLoaderRoute: typeof ApiWorkoutLocationsServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
     '/api/workout-details': {
@@ -579,6 +600,7 @@ const rootServerRouteChildren: RootServerRouteChildren = {
   ApiNextWorkoutServerRoute: ApiNextWorkoutServerRoute,
   ApiProgressServerRoute: ApiProgressServerRoute,
   ApiWorkoutDetailsServerRoute: ApiWorkoutDetailsServerRoute,
+  ApiWorkoutLocationsServerRoute: ApiWorkoutLocationsServerRoute,
   ApiWorkoutSessionsServerRoute: ApiWorkoutSessionsServerRoute,
   ApiWorkoutSetsServerRoute: ApiWorkoutSetsServerRoute,
   ApiWorkoutTemplatesServerRoute: ApiWorkoutTemplatesServerRoute,
