@@ -4,6 +4,18 @@ import { badRequest, notFound } from '../lib/api/errors'
 import { workoutSessionQueries } from '../lib/supabase/queries/workout-sessions'
 import { workoutTemplateQueries } from '../lib/supabase/queries/workout-templates'
 import type { WorkoutSessionInput } from '../lib/types/database'
+import { isValidCalendarDate } from '../lib/utils/calendar'
+
+// Reject a `date` field that is present but not a real `YYYY-MM-DD` calendar day.
+// Runtime guard — route handlers run unparsed; the zod contract is test-only.
+function assertValidDate(date: unknown): void {
+  if (
+    date !== undefined &&
+    date !== null &&
+    (typeof date !== 'string' || !isValidCalendarDate(date))
+  )
+    badRequest('date must be a valid YYYY-MM-DD date')
+}
 
 // Private workout-session CRUD. Identity is derived from the Supabase session
 // on the request — `userId` is NEVER read from query string or body. RLS
@@ -39,16 +51,31 @@ export const createWorkoutSession = async ({ user, supabase, request }: PrivateH
     const duplicateId = url.searchParams.get('duplicateId')?.trim()
     if (!duplicateId) badRequest('duplicateId is required')
 
-    const session = await workoutSessionQueries.duplicate(supabase, user.id, duplicateId)
+    // Body is optional ({ date }); tolerate an empty/absent body.
+    const body = (await request.json().catch(() => ({}))) as { date?: string }
+    assertValidDate(body.date)
+
+    const session = await workoutSessionQueries.duplicate(
+      supabase,
+      user.id,
+      duplicateId as string,
+      body.date,
+    )
     if (!session) notFound('Session not found')
     return session
   }
   if (action === 'startFromTemplate') {
-    const body = (await request.json()) as { templateId?: string }
+    const body = (await request.json()) as { templateId?: string; date?: string }
     const templateId = body.templateId?.trim()
     if (!templateId) badRequest('templateId is required')
+    assertValidDate(body.date)
 
-    const result = await workoutTemplateQueries.startFromTemplate(supabase, user.id, templateId)
+    const result = await workoutTemplateQueries.startFromTemplate(
+      supabase,
+      user.id,
+      templateId,
+      body.date,
+    )
     if (!result) notFound('Template not found')
     return result
   }
@@ -59,6 +86,7 @@ export const createWorkoutSession = async ({ user, supabase, request }: PrivateH
   const rawBody = (await request.json()) as Partial<WorkoutSessionInput>
   const { user_id: _ignored, ...input } = rawBody
   void _ignored
+  assertValidDate(input.date)
   if (input.location_name !== undefined && input.location_name !== null) {
     const trimmed = input.location_name.trim()
     if (trimmed.length > 100) badRequest('location_name must be 100 characters or fewer')
@@ -81,6 +109,7 @@ export const patchWorkoutSession = async ({ supabase, request, url }: PrivateHan
   const rawBody = (await request.json()) as Partial<WorkoutSessionInput>
   const { user_id: _ignored, ...updates } = rawBody
   void _ignored
+  assertValidDate(updates.date)
 
   if (updates.location_name !== undefined && updates.location_name !== null) {
     const trimmed = updates.location_name.trim()

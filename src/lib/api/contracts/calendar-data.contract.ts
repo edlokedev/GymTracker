@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from '../define-contract'
+import { calendarDate } from './calendar-date.schema'
 
 // GET /api/calendar-data — calendar rollup + summary stats + resolved range.
 const intensity = z.enum(['light', 'moderate', 'intense'])
@@ -30,7 +31,11 @@ export const calendarDataContract = defineContract({
   path: '/api/calendar-data',
   methods: {
     GET: {
-      query: z.object({ start: z.string().optional(), end: z.string().optional() }),
+      query: z.object({
+        start: calendarDate.optional(),
+        end: calendarDate.optional(),
+        today: calendarDate.optional(),
+      }),
       response: z.object({
         workouts: z.array(workoutDay),
         summary,

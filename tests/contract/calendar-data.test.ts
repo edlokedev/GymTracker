@@ -35,12 +35,44 @@ describe('GET /api/calendar-data', () => {
       handler: getCalendarData,
       user: fakeUser,
       supabase,
-      query: { start: '2026-05-19T00:00:00Z', end: '2026-05-21T00:00:00Z' },
+      query: { start: '2026-05-19', end: '2026-05-21', today: '2026-05-20' },
     })
     expect(res.status).toBe(200)
     const parsed = calendarDataContract.methods.GET.response.parse(res.body.data)
     expect(parsed.summary.totalWorkouts).toBe(1)
-    expect(parsed.dateRange.start).toBe('2026-05-19T00:00:00Z')
+    expect(parsed.dateRange.start).toBe('2026-05-19')
+  })
+
+  it('rejects a partial date window (only one of start/end)', async () => {
+    const supabase = stubSupabase(
+      { workout_sessions: [], workout_sets: [] },
+      { userId: fakeUser.id },
+    )
+    const res = await runRoute({
+      contract: calendarDataContract,
+      method: 'GET',
+      handler: getCalendarData,
+      user: fakeUser,
+      supabase,
+      query: { start: '2026-05-19' },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects a non-calendar date param', async () => {
+    const supabase = stubSupabase(
+      { workout_sessions: [], workout_sets: [] },
+      { userId: fakeUser.id },
+    )
+    const res = await runRoute({
+      contract: calendarDataContract,
+      method: 'GET',
+      handler: getCalendarData,
+      user: fakeUser,
+      supabase,
+      query: { start: '2026-05-19T00:00:00Z', end: '2026-05-21' },
+    })
+    expect(res.status).toBe(400)
   })
 
   it('returns 401 anonymously', async () => {

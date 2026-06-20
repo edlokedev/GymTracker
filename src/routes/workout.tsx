@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import WorkoutSessionManager from '@/features/workout-session/components/WorkoutSessionManager'
+import { getLocalCalendarDate } from '@/lib/utils/calendar'
 import { useAuth } from '../lib/auth'
 import type { WorkoutSession } from '../lib/types/database'
 
@@ -42,7 +43,7 @@ function WorkoutPage() {
     setCurrentSession({
       id: sessionId,
       user_id: user.id,
-      date: now.toISOString().slice(0, 10),
+      date: getLocalCalendarDate(now),
       start_time: now.toISOString(),
       created_at: now,
       updated_at: now,

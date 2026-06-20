@@ -1,6 +1,7 @@
 import { buildSearchParams, readApiData, readApiSuccess } from '@/lib/api'
 import type { WorkoutSessionWithSets } from '@/lib/types/calendar'
 import type { PaginatedResult, WorkoutSession } from '@/lib/types/database'
+import { getLocalCalendarDate } from '@/lib/utils/calendar'
 import type { SelectedWorkout } from './model'
 
 export async function loadWorkoutHistorySessions({
@@ -42,6 +43,8 @@ export async function duplicateWorkoutHistorySession(sessionId: string): Promise
   })
   const response = await fetch(`/api/workout-sessions?${params.toString()}`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date: getLocalCalendarDate() }),
   })
   return readApiData(response, `Failed to duplicate workout: ${response.status}`)
 }

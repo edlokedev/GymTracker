@@ -1,12 +1,16 @@
 import type { WorkoutSessionWithSets } from '@/lib/types/calendar'
 import type { WorkoutSession } from '@/lib/types/database'
+import { parseCalendarDate } from '@/lib/utils/calendar'
 
 export type SelectedWorkout = WorkoutSessionWithSets & { name?: string }
 
 export type WorkoutHistoryMode = 'history' | 'recent'
 
+// `session.date` is a calendar day (`YYYY-MM-DD`). Parse it as a LOCAL day —
+// `new Date("YYYY-MM-DD")` parses UTC midnight and renders shifted by offset.
 export function formatWorkoutDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString('en-US', {
+  const d = typeof date === 'string' ? parseCalendarDate(date) : date
+  return d.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -29,7 +33,7 @@ export function removeSessionById(sessions: WorkoutSession[], sessionId: string)
 
 export function getLastWorkoutDate(sessions: WorkoutSession[]): Date | null {
   if (sessions.length === 0) return null
-  return new Date(sessions[0].date)
+  return parseCalendarDate(sessions[0].date)
 }
 
 export function getTimeSinceLastWorkout(

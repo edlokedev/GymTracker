@@ -322,6 +322,7 @@ export const workoutTemplateQueries = {
     supabase: SB,
     userId: string,
     templateId: string,
+    date?: string,
   ): Promise<StartFromTemplateResult | null> {
     const template = await workoutTemplateQueries.getById(supabase, templateId)
     if (!template || template.is_archived) return null
@@ -329,6 +330,8 @@ export const workoutTemplateQueries = {
     const session = await workoutSessionQueries.create(supabase, userId, {
       name: template.name,
       notes: template.notes,
+      // Client's local day; create() falls back to UTC today only when omitted.
+      date,
     })
 
     const { error } = await queryClient(supabase)

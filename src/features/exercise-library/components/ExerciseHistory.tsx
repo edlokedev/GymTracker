@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { parseCalendarDate } from '@/lib/utils/calendar'
 
 export interface ExerciseHistoryProps {
   exerciseId: string
@@ -103,7 +104,7 @@ export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps
     .map(([date, sets]) => [date, [...sets].sort((a, b) => a.set_number - b.set_number)] as const)
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return parseCalendarDate(dateStr).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

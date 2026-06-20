@@ -7,6 +7,7 @@ import type {
   WorkoutSetInput,
   WorkoutWithDetails,
 } from '@/lib/types/database'
+import { getLocalCalendarDate } from '@/lib/utils/calendar'
 
 export type WorkoutSessionWriteInput = Omit<WorkoutSessionInput, 'user_id'>
 
@@ -48,7 +49,9 @@ export async function startWorkoutSessionFromTemplate(
   const response = await fetch(`/api/workout-sessions?${params.toString()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ templateId }),
+    // Send the client's local calendar day so the new session is dated "today"
+    // for the user, not the UTC/Vercel day.
+    body: JSON.stringify({ templateId, date: getLocalCalendarDate() }),
   })
 
   return readApiData(response, `Failed to start template workout: ${response.status}`)

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from '../define-contract'
+import { calendarDate } from './calendar-date.schema'
 import { startFromTemplateResponse } from './workout-templates.contract'
 
 // WorkoutSession on the wire. Dates serialize to ISO strings via JSON.stringify.
@@ -71,7 +72,7 @@ const paginatedSessions = z.object({
 const createSessionInput = z
   .object({
     name: z.string().optional(),
-    date: z.string().optional(),
+    date: calendarDate.optional(),
     notes: z.string().optional(),
     start_time: z.string().optional(),
     end_time: z.string().optional(),
@@ -83,7 +84,7 @@ const createSessionInput = z
 const updateSessionInput = z
   .object({
     name: z.string().optional(),
-    date: z.string().optional(),
+    date: calendarDate.optional(),
     notes: z.string().optional(),
     start_time: z.string().optional(),
     end_time: z.string().optional(),
@@ -105,9 +106,18 @@ const startFromTemplateQuery = z.object({
   action: z.literal('startFromTemplate'),
 })
 
+// Both server-side creation paths accept the client's local calendar date so the
+// new session is dated the user's "today", not the Vercel/UTC day.
 const startFromTemplateBody = z
   .object({
     templateId: z.string().trim().min(1),
+    date: calendarDate.optional(),
+  })
+  .strict()
+
+const duplicateSessionBody = z
+  .object({
+    date: calendarDate.optional(),
   })
   .strict()
 
@@ -130,7 +140,7 @@ export const workoutSessionsContract = defineContract({
     },
     POST: {
       query: z.union([duplicateSessionQuery, startFromTemplateQuery, createSessionQuery]),
-      body: z.union([createSessionInput, startFromTemplateBody]).optional(),
+      body: z.union([createSessionInput, startFromTemplateBody, duplicateSessionBody]).optional(),
       response: z.union([workoutSession, startFromTemplateResponse]),
     },
     PATCH: {

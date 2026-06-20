@@ -181,6 +181,58 @@ describe('useWorkoutSession', () => {
     expect(onSessionSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'template-session' }))
   })
 
+  it('prefills last-performance defaults for saved-workout (template) exercises', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url.includes('action=startFromTemplate') && init?.method === 'POST') {
+        return Response.json({
+          success: true,
+          data: {
+            session: makeSession({ id: 'template-session', name: 'Push Plan' }),
+            template: makeWorkoutTemplate(),
+          },
+        })
+      }
+
+      if (url.includes('action=history')) {
+        const exerciseId = new URL(url, 'http://test').searchParams.get('exerciseId')
+        return Response.json({
+          success: true,
+          data: [
+            {
+              id: `hist-${exerciseId}`,
+              set_number: 1,
+              reps: 5,
+              weight: 60,
+              session_date: '2026-05-30',
+              session_name: 'Push Day',
+            },
+          ],
+        })
+      }
+
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() => useWorkoutSession({ initialTemplateId: 'template-1' }))
+
+    await waitFor(() => expect(result.current.session?.id).toBe('template-session'))
+
+    // Both template exercises get last-performance prefill, like manual add.
+    await waitFor(() => {
+      expect(result.current.lastPerformanceByExerciseId['bench-press']).toMatchObject({
+        reps: 5,
+        weight: 60,
+      })
+      expect(result.current.lastPerformanceByExerciseId.squat).toMatchObject({
+        reps: 5,
+        weight: 60,
+      })
+    })
+  })
+
   it('returns command errors instead of alerting when start fails', async () => {
     const alertMock = vi.fn()
     const fetchMock = vi.fn(async () =>

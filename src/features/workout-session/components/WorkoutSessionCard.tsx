@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { DuplicateIcon, EditIcon } from '@/components/ui/ActionIcons'
 import { TrashButton } from '@/components/ui/TrashButton'
 import type { WorkoutSession } from '@/lib/types/database'
+import { parseCalendarDate } from '@/lib/utils/calendar'
 
 export interface WorkoutSessionCardProps {
   session: WorkoutSession
@@ -21,7 +22,8 @@ export function WorkoutSessionCard({
   onClick,
 }: WorkoutSessionCardProps) {
   const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    const d = typeof date === 'string' ? parseCalendarDate(date) : date
+    return d.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',

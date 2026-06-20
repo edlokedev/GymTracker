@@ -4,9 +4,12 @@ import {
   calculateCurrentStreak,
   calculateLongestStreak,
   formatDisplayDate,
+  getLocalCalendarDate,
   getWorkoutsThisMonth,
   isCurrentMonth,
   isToday,
+  isValidCalendarDate,
+  parseCalendarDate,
 } from './calendar'
 
 describe('calendar utils', () => {
@@ -62,6 +65,21 @@ describe('calendar utils', () => {
       ]
       expect(calculateCurrentStreak(dates)).toBe(0)
     })
+
+    it('dedupes multiple sessions on the same day (does not break the streak)', () => {
+      const dates = [
+        dayjs().toISOString(),
+        dayjs().toISOString(), // second session today
+        dayjs().subtract(1, 'day').toISOString(),
+      ]
+      expect(calculateCurrentStreak(dates)).toBe(2)
+    })
+
+    it('uses the supplied client-local today, not the system clock', () => {
+      expect(calculateCurrentStreak(['2026-03-10', '2026-03-09'], '2026-03-10')).toBe(2)
+      // Anchored to a different "today" → no current streak.
+      expect(calculateCurrentStreak(['2026-03-10', '2026-03-09'], '2026-03-20')).toBe(0)
+    })
   })
 
   describe('calculateLongestStreak', () => {
@@ -85,6 +103,10 @@ describe('calendar utils', () => {
       const dates = [dayjs().subtract(5, 'day').toISOString()]
       expect(calculateLongestStreak(dates)).toBe(1)
     })
+
+    it('dedupes same-day sessions before counting the run', () => {
+      expect(calculateLongestStreak(['2026-03-10', '2026-03-10', '2026-03-11'])).toBe(2)
+    })
   })
 
   describe('getWorkoutsThisMonth', () => {
@@ -95,6 +117,28 @@ describe('calendar utils', () => {
         dayjs().subtract(1, 'month').toISOString(), // previous month
       ]
       expect(getWorkoutsThisMonth(dates)).toBe(2)
+    })
+
+    it('includes a workout dated the 1st of the month (inclusive bounds)', () => {
+      expect(getWorkoutsThisMonth(['2026-04-01', '2026-04-30'], '2026-04-11')).toBe(2)
+    })
+  })
+
+  describe('local calendar date helpers', () => {
+    it('getLocalCalendarDate formats a Date as a local YYYY-MM-DD day', () => {
+      expect(getLocalCalendarDate(new Date(2026, 1, 3))).toBe('2026-02-03')
+    })
+
+    it('parseCalendarDate round-trips with getLocalCalendarDate', () => {
+      expect(getLocalCalendarDate(parseCalendarDate('2026-02-03'))).toBe('2026-02-03')
+    })
+
+    it('isValidCalendarDate accepts real days and rejects impossible/malformed ones', () => {
+      expect(isValidCalendarDate('2026-02-28')).toBe(true)
+      expect(isValidCalendarDate('2026-02-31')).toBe(false) // Feb 31 doesn't exist
+      expect(isValidCalendarDate('2026-13-01')).toBe(false)
+      expect(isValidCalendarDate('2026-1-1')).toBe(false) // not zero-padded
+      expect(isValidCalendarDate('not-a-date')).toBe(false)
     })
   })
 

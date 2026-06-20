@@ -4,8 +4,9 @@ import {
   calculateAverageWorkoutsPerWeek,
   calculateCurrentStreak,
   calculateLongestStreak,
+  dayjs,
   formatCalendarDate,
-  getRolling30DayRange,
+  getLocalCalendarDate,
   getWorkoutsThisMonth,
 } from '../../utils/calendar'
 import { type AppSupabaseClient, queryClient } from '../query-client'
@@ -14,11 +15,14 @@ import { type AppSupabaseClient, queryClient } from '../query-client'
 // rows to the authenticated user; user_id filtering is added as defense in
 // depth and to keep query plans tight on the (user_id, date) index.
 
-export type CalendarDateRange = {
-  start: Date
-  end: Date
-  startISOString: string
-  endISOString: string
+// The calendar window + the user's actual "today", all as local `YYYY-MM-DD`
+// calendar-day strings. `today` is decoupled from the window so summary math
+// (streak / avg / this-month / year) stays anchored to the real current day
+// even when the user navigates to a past/future window.
+export type CalendarRange = {
+  startDate: string
+  endDate: string
+  today: string
 }
 
 export type CalendarSummary = {
@@ -51,29 +55,34 @@ type SetRow = {
   reps: number | null
 }
 
+// Caller (the route) is responsible for validating the params as calendar dates
+// and for rejecting a partial (only one of start/end) window. Here we just
+// resolve: both bounds present → use them; neither → default rolling 30 days
+// ending at `today`.
 export function resolveCalendarRange(
   startDateParam: string | null,
   endDateParam: string | null,
-): CalendarDateRange {
+  todayParam: string | null,
+): CalendarRange {
+  const today = todayParam ?? getLocalCalendarDate()
   if (startDateParam && endDateParam) {
-    return {
-      start: new Date(startDateParam),
-      end: new Date(endDateParam),
-      startISOString: startDateParam,
-      endISOString: endDateParam,
-    }
+    return { startDate: startDateParam, endDate: endDateParam, today }
   }
-  return getRolling30DayRange()
+  const end = dayjs(today)
+  return {
+    startDate: end.subtract(30, 'day').format('YYYY-MM-DD'),
+    endDate: end.format('YYYY-MM-DD'),
+    today,
+  }
 }
 
 export async function getCalendarAggregate(
   supabase: AppSupabaseClient,
   userId: string,
-  range: CalendarDateRange,
+  range: CalendarRange,
 ): Promise<CalendarAggregate> {
   const db = queryClient(supabase)
-  const startDate = range.startISOString.split('T')[0]
-  const endDate = range.endISOString.split('T')[0]
+  const { startDate, endDate, today } = range
 
   // 1) Sessions in the requested window.
   const { data: sessionsData, error: sessionsError } = await db
@@ -155,11 +164,13 @@ export async function getCalendarAggregate(
   }
 
   // Fill in days with no workout so the response covers the whole window.
+  // Iterate calendar days as local dayjs values keyed by `YYYY-MM-DD` so the
+  // keys match the session date keys exactly (no UTC drift).
   const workoutData: WorkoutCalendarData[] = []
-  const cursor = new Date(range.start)
-  const endCursor = new Date(range.end)
-  while (cursor <= endCursor) {
-    const dateKey = formatCalendarDate(cursor)
+  let cursor = dayjs(startDate)
+  const endCursor = dayjs(endDate)
+  while (cursor.isSame(endCursor, 'day') || cursor.isBefore(endCursor, 'day')) {
+    const dateKey = cursor.format('YYYY-MM-DD')
     const existing = workoutDataMap.get(dateKey)
     if (existing) {
       workoutData.push(existing)
@@ -175,14 +186,12 @@ export async function getCalendarAggregate(
         intensity: 'light',
       })
     }
-    cursor.setDate(cursor.getDate() + 1)
+    cursor = cursor.add(1, 'day')
   }
 
   // 3) Pull a year's worth of dates for streak/avg/this-month stats.
-  // Only the `date` column is needed.
-  const oneYearAgo = new Date()
-  oneYearAgo.setDate(oneYearAgo.getDate() - 365)
-  const yearStart = formatCalendarDate(oneYearAgo)
+  // Only the `date` column is needed. Anchored to the client-local `today`.
+  const yearStart = dayjs(today).subtract(365, 'day').format('YYYY-MM-DD')
 
   const { data: yearSessionsData, error: yearError } = await db
     .from<{ date: string }>('workout_sessions')
@@ -197,19 +206,19 @@ export async function getCalendarAggregate(
   const summary: CalendarSummary = {
     totalWorkouts: sessions.length,
     totalVolume: Array.from(workoutDataMap.values()).reduce((sum, day) => sum + day.totalVolume, 0),
-    averageWorkoutsPerWeek: calculateAverageWorkoutsPerWeek(workoutDates),
+    averageWorkoutsPerWeek: calculateAverageWorkoutsPerWeek(workoutDates, 4, today),
     longestStreak: calculateLongestStreak(workoutDates),
-    currentStreak: calculateCurrentStreak(workoutDates),
+    currentStreak: calculateCurrentStreak(workoutDates, today),
     lastWorkoutDate: workoutDates.length > 0 ? workoutDates[0] : null,
-    workoutsThisMonth: getWorkoutsThisMonth(workoutDates),
+    workoutsThisMonth: getWorkoutsThisMonth(workoutDates, today),
   }
 
   return {
     data: workoutData,
     summary,
     dateRange: {
-      start: range.startISOString,
-      end: range.endISOString,
+      start: startDate,
+      end: endDate,
     },
   }
 }

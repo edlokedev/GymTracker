@@ -1,6 +1,7 @@
 // Barrel for every route contract. Adding a new contract? Re-export it here
 // so consumers can pull it from a single specifier.
 export { calendarDataContract } from './calendar-data.contract'
+export { calendarDate } from './calendar-date.schema'
 export { equipmentTypesContract } from './equipment-types.contract'
 export { catalogExerciseSchema } from './exercise.schema'
 export { exerciseCategoriesContract } from './exercise-categories.contract'
