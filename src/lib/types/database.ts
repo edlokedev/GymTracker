@@ -70,6 +70,7 @@ export interface Exercise {
   images?: string // JSON array as string (legacy Free Exercise DB column; unused)
   gif_path?: string | null // absolute jsDelivr URL for the animated GIF
   preview_image_path?: string | null // absolute jsDelivr URL for the still preview
+  is_custom?: boolean // true for user-created Custom Exercises (ADR-0004)
   created_at: Date
   updated_at: Date
 }

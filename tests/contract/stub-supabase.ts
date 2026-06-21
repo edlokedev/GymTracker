@@ -157,7 +157,12 @@ export function stubSupabase(tables: StubTables, options: StubOptions = {}) {
         return builder
       },
       is(col: string, val: unknown) {
-        state.filters.push((r) => readCol(r, col) === val)
+        state.filters.push((r) => {
+          const cur = readCol(r, col)
+          // `is null` matches a SQL NULL, i.e. an absent column in a fixture row.
+          if (val === null) return cur === null || cur === undefined
+          return cur === val
+        })
         return builder
       },
       not(col: string, _op: string, val: unknown) {

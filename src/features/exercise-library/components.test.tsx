@@ -13,6 +13,12 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
 }))
 
+// ExerciseBrowser now reads the authed user (for the Add-exercise affordance);
+// stub it as signed-out so these catalog-rendering tests stay focused.
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ user: null, isAuthenticated: false, isLoading: false }),
+}))
+
 const makeExercise = (id: string, name: string): ExerciseWithParsedFields => ({
   id,
   name,
