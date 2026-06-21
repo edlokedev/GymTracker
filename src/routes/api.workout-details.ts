@@ -2,6 +2,7 @@ import { createServerFileRoute } from '@tanstack/react-start/server'
 import { type PrivateHandlerContext, privateMethod } from '../lib/api/define-private-route'
 import { badRequest } from '../lib/api/errors'
 import { workoutDetailsQueries } from '../lib/supabase/queries/workout-details'
+import { isValidCalendarDate } from '../lib/utils/calendar'
 
 // Aggregate route: returns every workout session the authenticated user has on
 // a given date, each with its sets and computed totals. Identity comes from
@@ -10,6 +11,7 @@ import { workoutDetailsQueries } from '../lib/supabase/queries/workout-details'
 export const getWorkoutDetails = async ({ supabase, url }: PrivateHandlerContext) => {
   const date = url.searchParams.get('date')
   if (!date) badRequest('date is required')
+  if (!isValidCalendarDate(date as string)) badRequest('date must be a valid YYYY-MM-DD date')
   return workoutDetailsQueries.getByDate(supabase, date as string)
 }
 

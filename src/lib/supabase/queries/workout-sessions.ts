@@ -221,6 +221,7 @@ export const workoutSessionQueries = {
     supabase: SB,
     userId: string,
     sourceSessionId: string,
+    date?: string,
   ): Promise<WorkoutSession | null> {
     const { data: source, error: sourceError } = await queryClient(supabase)
       .from('workout_sessions')
@@ -246,6 +247,9 @@ export const workoutSessionQueries = {
       name: sourceRow.name ?? undefined,
       notes: sourceRow.notes ?? undefined,
       location_name: sourceRow.location_name ?? undefined,
+      // Caller passes the client's local day; create() falls back to UTC today
+      // only when omitted.
+      date,
     })
 
     try {

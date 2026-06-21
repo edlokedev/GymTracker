@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from '../define-contract'
+import { calendarDate } from './calendar-date.schema'
 
 // GET /api/workout-details?date=YYYY-MM-DD
 // Returns every workout session the authenticated user has on the given
@@ -38,7 +39,7 @@ export const workoutDetailsContract = defineContract({
   path: '/api/workout-details',
   methods: {
     GET: {
-      query: z.object({ date: z.string() }),
+      query: z.object({ date: calendarDate }),
       response: z.array(workoutSessionWithSets),
     },
   },

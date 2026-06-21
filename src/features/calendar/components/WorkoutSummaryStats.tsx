@@ -1,4 +1,5 @@
 // React import omitted (automatic runtime)
+import { parseCalendarDate } from '@/lib/utils/calendar'
 
 interface WorkoutSummaryStatsProps {
   stats: {
@@ -32,7 +33,7 @@ export function WorkoutSummaryStats({ stats, isLoading }: WorkoutSummaryStatsPro
   const formatLastWorkout = (date: string | null) => {
     if (!date) return 'Never'
 
-    const workoutDate = new Date(date)
+    const workoutDate = parseCalendarDate(date)
     const now = new Date()
     const diffTime = Math.abs(now.getTime() - workoutDate.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))

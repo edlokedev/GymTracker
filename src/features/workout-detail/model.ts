@@ -1,4 +1,5 @@
 import type { WorkoutSessionWithSets, WorkoutSet } from '@/lib/types/calendar'
+import { parseCalendarDate } from '@/lib/utils/calendar'
 import { formatExerciseName } from '@/lib/utils/text'
 
 export type WorkoutDetailWorkout = Omit<
@@ -34,7 +35,8 @@ export function formatWorkoutDetailDate(date: Date): string {
 }
 
 export function formatWorkoutSummaryDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString('en-US')
+  const d = typeof date === 'string' ? parseCalendarDate(date) : date
+  return d.toLocaleDateString('en-US')
 }
 
 export function formatWorkoutDuration(minutes?: number): string {
@@ -128,5 +130,5 @@ export function getWorkoutDetailLabel(workout: WorkoutDetailWorkout | null | und
   const workoutName = workout.name?.trim()
   if (workoutName) return workoutName
 
-  return `workout from ${formatWorkoutDetailDate(new Date(workout.date))}`
+  return `workout from ${formatWorkoutDetailDate(parseCalendarDate(workout.date))}`
 }

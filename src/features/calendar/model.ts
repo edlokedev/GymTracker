@@ -1,5 +1,5 @@
 import type { CalendarState, WorkoutCalendarData, WorkoutEvent } from '@/lib/types/calendar'
-import { formatCalendarDate, getRolling30DayRange } from '@/lib/utils/calendar'
+import { formatCalendarDate, getRolling30DayRange, parseCalendarDate } from '@/lib/utils/calendar'
 
 export const emptyCalendarSummary: CalendarState['summaryStats'] = {
   totalWorkouts: 0,
@@ -41,7 +41,7 @@ export function toWorkoutEvents(workoutData: WorkoutCalendarData[]): WorkoutEven
   return workoutData
     .filter((day) => day.hasWorkout)
     .map((day) => {
-      const date = new Date(day.date)
+      const date = parseCalendarDate(day.date)
       const color = workoutIntensityColors[day.intensity]
 
       return {

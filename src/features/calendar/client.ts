@@ -1,15 +1,19 @@
 import { buildSearchParams, readApiResult } from '@/lib/api'
 import type { CalendarDataResponse, WorkoutDetailResponse } from '@/lib/types/calendar'
-import { formatCalendarDate } from '@/lib/utils/calendar'
+import { formatCalendarDate, getLocalCalendarDate } from '@/lib/utils/calendar'
 
 interface CalendarDataRequest {
   dateRange: { start: Date; end: Date }
 }
 
 export function calendarDataSearchParams({ dateRange }: CalendarDataRequest): URLSearchParams {
+  // Send the window as local calendar-day strings (not UTC ISO instants) and a
+  // separate `today` so summary stats anchor to the real current day even when
+  // the user navigates the window.
   return buildSearchParams({
-    start: dateRange.start.toISOString(),
-    end: dateRange.end.toISOString(),
+    start: getLocalCalendarDate(dateRange.start),
+    end: getLocalCalendarDate(dateRange.end),
+    today: getLocalCalendarDate(),
   })
 }
 

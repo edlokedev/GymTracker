@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { WorkoutSession } from '@/lib/types/database'
+import { parseCalendarDate } from '@/lib/utils/calendar'
 import {
   deleteWorkoutHistorySession,
   duplicateWorkoutHistorySession,
@@ -194,7 +195,7 @@ export function useWorkoutHistory({
     async (session: WorkoutSession) => {
       if (!userId) return
 
-      setSelectedDate(new Date(session.date))
+      setSelectedDate(parseCalendarDate(session.date))
       setIsModalOpen(true)
       setIsModalLoading(true)
 

@@ -5,6 +5,7 @@ import type {
   WorkoutSet,
   WorkoutSetInput,
 } from '@/lib/types/database'
+import { getLocalCalendarDate } from '@/lib/utils/calendar'
 import {
   completeWorkoutSession,
   createWorkoutSession,
@@ -49,7 +50,7 @@ interface UseWorkoutSessionOptions {
 }
 
 function todayString(): string {
-  return new Date().toISOString().split('T')[0]
+  return getLocalCalendarDate()
 }
 
 function nowISOString(): string {
@@ -94,6 +95,14 @@ export function useWorkoutSession({
     Record<string, WorkoutSet | undefined>
   >({})
   const startedTemplateIdRef = useRef<string | null>(null)
+  // Track whether the user explicitly changed date / start time, so startSession
+  // can recompute "now" at submit time (a page left open across midnight must not
+  // log yesterday's date or a stale start timestamp).
+  const userEditedDateRef = useRef(false)
+  const userEditedStartTimeRef = useRef(false)
+  // Monotonic token guarding the batch last-performance prefill against stale
+  // merges after a session/template switch.
+  const prefillRequestRef = useRef(0)
   // Debounced metadata save: flushes on blur, complete, and unmount.
   const metadataSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const metadataSaveFnRef = useRef<(() => void) | null>(null)
@@ -131,6 +140,8 @@ export function useWorkoutSession({
     setCommandStatus('idle')
     setCommandError(null)
     setLastPerformanceByExerciseId({})
+    userEditedDateRef.current = false
+    userEditedStartTimeRef.current = false
   }, [])
 
   const mapHistoryItemToWorkoutSet = useCallback(
@@ -168,6 +179,39 @@ export function useWorkoutSession({
     [mapHistoryItemToWorkoutSet],
   )
 
+  // Batch variant: load last-performance defaults for several exercises at once
+  // (used when starting from a saved workout/template or resuming a session,
+  // where exercises are added without going through addExercise). Mirrors the
+  // manual-add prefill so saved workouts prefill previous values too.
+  const loadLastPerformanceDefaultsForExercises = useCallback(
+    async (exerciseIds: string[]) => {
+      const uniqueIds = [...new Set(exerciseIds)].filter(Boolean)
+      if (uniqueIds.length === 0) return
+
+      const requestId = ++prefillRequestRef.current
+      const results = await Promise.allSettled(
+        uniqueIds.map(async (id) => {
+          const [lastSet] = await loadWorkoutSetHistory(id, 1)
+          return lastSet ? ([id, mapHistoryItemToWorkoutSet(id, lastSet)] as const) : null
+        }),
+      )
+
+      // Discard if a newer load started (session/template switched) meanwhile.
+      if (requestId !== prefillRequestRef.current) return
+
+      const merged: Record<string, WorkoutSet> = {}
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          merged[result.value[0]] = result.value[1]
+        }
+      }
+      if (Object.keys(merged).length === 0) return
+
+      setLastPerformanceByExerciseId((current) => ({ ...current, ...merged }))
+    },
+    [mapHistoryItemToWorkoutSet],
+  )
+
   const loadSessionData = useCallback(
     async (sessionId: string) => {
       try {
@@ -186,6 +230,15 @@ export function useWorkoutSession({
         setActiveExerciseId((currentActiveExerciseId) =>
           getActiveExerciseId(loadedExercises, currentActiveExerciseId),
         )
+        // Prefill last-performance only for exercises with no in-session sets —
+        // exercises that already have sets prefill from their last logged set
+        // (previousSet wins over lastPerformance), so fetching history for them
+        // would be wasted requests.
+        void loadLastPerformanceDefaultsForExercises(
+          loadedExercises
+            .filter((exercise) => exercise.sets.length === 0)
+            .map((exercise) => exercise.exercise.id),
+        )
         finishCommand()
       } catch (error) {
         console.error('Failed to load session data:', error)
@@ -195,7 +248,7 @@ export function useWorkoutSession({
         setLoading(false)
       }
     },
-    [beginCommand, failCommand, finishCommand],
+    [beginCommand, failCommand, finishCommand, loadLastPerformanceDefaultsForExercises],
   )
 
   useEffect(() => {
@@ -239,16 +292,24 @@ export function useWorkoutSession({
       setLoading(true)
       beginCommand()
 
+      // Recompute "now" at submit time unless the user explicitly set them — a
+      // page mounted before midnight must not log yesterday's date / a stale start.
+      const dateToUse = userEditedDateRef.current ? sessionDate : getLocalCalendarDate()
+      const startTimeToUse = userEditedStartTimeRef.current ? sessionStartTime : nowISOString()
+
       const sessionData: WorkoutSessionWriteInput = {
         name: sessionName.trim() || undefined,
-        date: sessionDate,
+        date: dateToUse,
         notes: sessionNotes.trim() || undefined,
-        start_time: sessionStartTime,
+        start_time: startTimeToUse,
         location_name: sessionLocation.trim() || undefined,
       }
 
       const newSession = await createWorkoutSession(sessionData)
       setSession(newSession)
+      // Reflect the server-stored values in the UI (raw setters — not user edits).
+      setSessionDate(newSession.date)
+      setSessionStartTime(newSession.start_time)
       onSessionSave?.(newSession)
       finishCommand()
     } catch (error) {
@@ -285,6 +346,11 @@ export function useWorkoutSession({
         setSessionStartTime(result.session.start_time)
         setExercises(plannedExercises)
         setActiveExerciseId(getActiveExerciseId(plannedExercises, null))
+        // Prefill last-performance values for the template's exercises, matching
+        // the manual-add behaviour (this is the saved-workout prefill bug fix).
+        void loadLastPerformanceDefaultsForExercises(
+          plannedExercises.map((exercise) => exercise.exercise.id),
+        )
         onSessionSave?.(result.session)
         finishCommand()
       } catch (error) {
@@ -294,7 +360,13 @@ export function useWorkoutSession({
         setLoading(false)
       }
     },
-    [beginCommand, failCommand, finishCommand, onSessionSave],
+    [
+      beginCommand,
+      failCommand,
+      finishCommand,
+      loadLastPerformanceDefaultsForExercises,
+      onSessionSave,
+    ],
   )
 
   useEffect(() => {
@@ -548,6 +620,17 @@ export function useWorkoutSession({
     [beginCommand, failCommand, finishCommand],
   )
 
+  // Public setters that record an explicit user edit (so startSession knows not
+  // to overwrite them with a freshly-computed "now").
+  const setSessionDateEdited = useCallback((value: string) => {
+    userEditedDateRef.current = true
+    setSessionDate(value)
+  }, [])
+  const setSessionStartTimeEdited = useCallback((value: string) => {
+    userEditedStartTimeRef.current = true
+    setSessionStartTime(value)
+  }, [])
+
   const totalSets = useMemo(() => getTotalSets(exercises), [exercises])
   const totalVolume = useMemo(() => getTotalVolume(exercises), [exercises])
   const sessionDuration = useMemo(() => getSessionDuration(session), [session])
@@ -589,8 +672,8 @@ export function useWorkoutSession({
     setSessionName,
     setSessionNotes,
     setSessionLocation,
-    setSessionDate,
-    setSessionStartTime,
+    setSessionDate: setSessionDateEdited,
+    setSessionStartTime: setSessionStartTimeEdited,
     scheduleMetadataSave,
     flushMetadataSave,
     actions: {

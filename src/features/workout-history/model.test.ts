@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkoutSession } from '@/lib/types/database'
+import { getLocalCalendarDate } from '@/lib/utils/calendar'
 import {
   getDeleteCandidateLabel,
   getLastWorkoutDate,
@@ -36,7 +37,8 @@ describe('workout history model', () => {
   it('derives last workout date and relative label from ordered sessions', () => {
     const lastWorkout = getLastWorkoutDate([makeSession({ date: '2026-05-14' })])
 
-    expect(lastWorkout?.toISOString()).toContain('2026-05-14')
+    // Parsed as a LOCAL calendar day (not UTC midnight), so the local day round-trips.
+    expect(lastWorkout && getLocalCalendarDate(lastWorkout)).toBe('2026-05-14')
     expect(getTimeSinceLastWorkout(lastWorkout, new Date('2026-05-15T12:00:00.000Z'))).toBe(
       '1 day ago',
     )
