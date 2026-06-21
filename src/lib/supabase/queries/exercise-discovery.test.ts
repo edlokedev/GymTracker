@@ -35,6 +35,11 @@ class FakeBuilder {
     return this
   }
 
+  is(...args: unknown[]) {
+    this.state.ops.push({ name: 'is', args })
+    return this
+  }
+
   order(...args: unknown[]) {
     this.state.ops.push({ name: 'order', args })
     return this
@@ -135,6 +140,7 @@ function catalogExercise(overrides: Partial<CatalogExercise> = {}): CatalogExerc
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     category_name: 'Strength',
+    is_custom: false,
     ...overrides,
   }
 }
@@ -165,6 +171,8 @@ describe('exerciseDiscoveryQueries', () => {
       args: ['user_id', 'user-1'],
     })
     expect(states.exercises.ops).toContainEqual({ name: 'in', args: ['id', ['bench']] })
+    // Favorites is a picker surface → archived custom exercises are hidden.
+    expect(states.exercises.ops).toContainEqual({ name: 'is', args: ['archived_at', null] })
   })
 
   it('adds favorite with user and exercise composite key insert', async () => {
@@ -243,6 +251,8 @@ describe('exerciseDiscoveryQueries', () => {
       name: 'eq',
       args: ['workout_sessions.user_id', 'user-1'],
     })
+    // Recent reflects history → an archived exercise still resolves here.
+    expect(states.exercises.ops).not.toContainEqual({ name: 'is', args: ['archived_at', null] })
   })
 })
 

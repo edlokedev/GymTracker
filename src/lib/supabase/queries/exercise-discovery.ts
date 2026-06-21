@@ -61,11 +61,19 @@ async function listFavoriteRows(supabase: SB, userId: string): Promise<FavoriteR
   return (data ?? []) as FavoriteRow[]
 }
 
-async function listExercisesByIds(supabase: SB, exerciseIds: string[]): Promise<CatalogExercise[]> {
+async function listExercisesByIds(
+  supabase: SB,
+  exerciseIds: string[],
+  opts: { excludeArchived?: boolean } = {},
+): Promise<CatalogExercise[]> {
   const ids = uniqueOrdered(exerciseIds)
   if (ids.length === 0) return []
 
-  const { data, error } = await table(supabase, 'exercises').select(EXERCISE_SELECT).in('id', ids)
+  // Recent/history keep archived rows resolvable; favorites (a picker) hide
+  // them. Caller opts in via excludeArchived.
+  let q = table(supabase, 'exercises').select(EXERCISE_SELECT).in('id', ids)
+  if (opts.excludeArchived) q = q.is('archived_at', null)
+  const { data, error } = await q
   assertPostgresOk(error)
 
   const byId = new Map(
@@ -179,7 +187,7 @@ export const exerciseDiscoveryQueries = {
   ): Promise<{ items: CatalogExercise[]; exerciseIds: string[] }> {
     const rows = await listFavoriteRows(supabase, userId)
     const exerciseIds = rows.map((row) => row.exercise_id)
-    const items = await listExercisesByIds(supabase, exerciseIds)
+    const items = await listExercisesByIds(supabase, exerciseIds, { excludeArchived: true })
     return { items, exerciseIds: items.map((exercise) => exercise.id) }
   },
 
