@@ -57,25 +57,29 @@ const hasArchivedFilter = (ops: QueryOp[]) =>
 describe('exercise catalog reads exclude archived custom exercises', () => {
   it('search fast path filters archived_at is null', async () => {
     const { client, ops } = makeClient({ data: [], count: 0 })
-    await exerciseCatalogQueries.search(client, { category_id: 'strength', limit: 20, offset: 0 })
+    await exerciseCatalogQueries.search(client as never, {
+      category_id: 'strength',
+      limit: 20,
+      offset: 0,
+    })
     expect(hasArchivedFilter(ops)).toBe(true)
   })
 
   it('search slow path (text query) filters archived_at is null', async () => {
     const { client, ops } = makeClient({ data: [] })
-    await exerciseCatalogQueries.search(client, { query: 'row', limit: 20, offset: 0 })
+    await exerciseCatalogQueries.search(client as never, { query: 'row', limit: 20, offset: 0 })
     expect(hasArchivedFilter(ops)).toBe(true)
   })
 
   it('equipment facet excludes archived', async () => {
     const { client, ops } = makeClient({ data: [] })
-    await exerciseCatalogQueries.listEquipmentTypes(client)
+    await exerciseCatalogQueries.listEquipmentTypes(client as never)
     expect(hasArchivedFilter(ops)).toBe(true)
   })
 
   it('muscle facet excludes archived', async () => {
     const { client, ops } = makeClient({ data: [] })
-    await exerciseCatalogQueries.listMuscleGroups(client)
+    await exerciseCatalogQueries.listMuscleGroups(client as never)
     expect(hasArchivedFilter(ops)).toBe(true)
   })
 })
