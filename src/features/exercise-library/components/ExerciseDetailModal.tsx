@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useAuth } from '@/lib/auth'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
@@ -22,6 +23,10 @@ interface ExerciseDetailModalProps {
   onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
   similarExercises?: SimilarExerciseItem[]
   onSelectSimilarExercise?: (exercise: ExerciseWithParsedFields) => void
+  // When the viewer owns this custom exercise, expose edit + archive.
+  canManage?: boolean
+  onEditExercise?: (exercise: ExerciseWithParsedFields) => void
+  onArchiveExercise?: (exercise: ExerciseWithParsedFields) => void | Promise<void>
 }
 
 export default function ExerciseDetailModal({
@@ -33,8 +38,13 @@ export default function ExerciseDetailModal({
   onToggleFavorite,
   similarExercises = [],
   onSelectSimilarExercise,
+  canManage = false,
+  onEditExercise,
+  onArchiveExercise,
 }: ExerciseDetailModalProps) {
   const { user } = useAuth()
+  const [confirmArchive, setConfirmArchive] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -280,9 +290,25 @@ export default function ExerciseDetailModal({
           </div>
 
           <div
-            className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 
+            className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700
                         bg-gray-50 dark:bg-gray-900/50 sticky bottom-0"
           >
+            {canManage && onEditExercise && (
+              <button
+                onClick={() => onEditExercise(exercise)}
+                className="px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px] cursor-pointer mr-auto"
+              >
+                Edit
+              </button>
+            )}
+            {canManage && onArchiveExercise && (
+              <button
+                onClick={() => setConfirmArchive(true)}
+                className="px-4 py-3 text-sm font-medium text-red-700 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors min-h-[44px] cursor-pointer"
+              >
+                Archive
+              </button>
+            )}
             <button
               onClick={onClose}
               className="px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 
@@ -312,6 +338,26 @@ export default function ExerciseDetailModal({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmArchive}
+        title="Archive this exercise?"
+        description="It will be hidden from search and pickers. Your logged history stays intact."
+        confirmLabel="Archive"
+        variant="danger"
+        isConfirming={isArchiving}
+        onCancel={() => setConfirmArchive(false)}
+        onConfirm={async () => {
+          if (!onArchiveExercise) return
+          setIsArchiving(true)
+          try {
+            await onArchiveExercise(exercise)
+            setConfirmArchive(false)
+          } finally {
+            setIsArchiving(false)
+          }
+        }}
+      />
     </div>
   )
 }

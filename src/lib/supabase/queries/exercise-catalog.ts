@@ -48,6 +48,10 @@ export interface CatalogExercise {
   created_at: string
   updated_at: string
   category_name: string
+  // True when the row was created by a user (Custom Exercise). Derived from
+  // `created_by`; the raw owner uuid is intentionally NOT exposed because this
+  // shape is serialized by the anon-served public catalog routes.
+  is_custom: boolean
 }
 
 export interface CatalogCategoryWithCount {
@@ -92,6 +96,7 @@ type RawExerciseRow = {
   instructions: unknown
   gif_path: string | null
   preview_image_path: string | null
+  created_by: string | null
   created_at: string
   updated_at: string
   exercise_categories: { name: string } | { name: string }[] | null
@@ -123,11 +128,12 @@ export function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
     created_at: row.created_at,
     updated_at: row.updated_at,
     category_name: cat?.name ?? '',
+    is_custom: row.created_by != null,
   }
 }
 
 export const EXERCISE_SELECT =
-  'id, name, category_id, tracking_type, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_at, updated_at, exercise_categories!inner(name)'
+  'id, name, category_id, tracking_type, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_by, created_at, updated_at, exercise_categories!inner(name)'
 
 export const exerciseCatalogQueries = {
   async listCategories(supabase: SB): Promise<CatalogCategoryWithCount[]> {
@@ -147,6 +153,7 @@ export const exerciseCatalogQueries = {
           .from('exercises')
           .select('id', { count: 'exact', head: true })
           .eq('category_id', cat.id)
+          .is('archived_at', null)
         if (countErr) throw countErr
         return {
           id: cat.id,
@@ -170,6 +177,7 @@ export const exerciseCatalogQueries = {
       const { data, error } = await supabase
         .from('exercises')
         .select('equipment')
+        .is('archived_at', null)
         .not('equipment', 'is', null)
         .neq('equipment', '')
         .range(from, from + PAGE - 1)
@@ -190,6 +198,7 @@ export const exerciseCatalogQueries = {
       const { data, error } = await supabase
         .from('exercises')
         .select('primary_muscles, secondary_muscles')
+        .is('archived_at', null)
         .range(from, from + PAGE - 1)
       assertPostgresOk(error)
       const rows = (data ?? []) as {
@@ -223,7 +232,11 @@ export const exerciseCatalogQueries = {
 
     // Build the base filter set that Postgres can evaluate directly.
     const buildBase = () => {
-      let q = supabase.from('exercises').select(EXERCISE_SELECT, { count: 'exact' })
+      // Archived custom exercises are hidden from search/pickers (CONTEXT.md).
+      let q = supabase
+        .from('exercises')
+        .select(EXERCISE_SELECT, { count: 'exact' })
+        .is('archived_at', null)
 
       if (params.category_id) q = q.eq('category_id', params.category_id)
       if (params.equipment) q = q.eq('equipment', params.equipment)
@@ -268,7 +281,7 @@ export const exerciseCatalogQueries = {
     // more than 1000 rows (e.g. equipment=body weight returns 325 rows today
     // but could grow).
     const buildSlowQuery = () => {
-      let q = supabase.from('exercises').select(EXERCISE_SELECT)
+      let q = supabase.from('exercises').select(EXERCISE_SELECT).is('archived_at', null)
       if (params.category_id) q = q.eq('category_id', params.category_id)
       if (params.equipment) q = q.eq('equipment', params.equipment)
       if (params.level) q = q.eq('level', params.level)

@@ -1,9 +1,12 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAuth } from '@/lib/auth'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { toTitleCase } from '@/lib/utils/text'
+import { archiveCustomExercise, fetchMyCustomExerciseIds } from '../client'
 import { type ExerciseLibrarySearch, routeSearchToNavigateSearch } from '../model'
 import { useExerciseLibrary } from '../useExerciseLibrary'
+import CustomExerciseForm from './CustomExerciseForm'
 import {
   DesktopFilterSidebar,
   ExerciseBrowserFilters,
@@ -26,8 +29,28 @@ export default function ExerciseBrowser({
   onSelectExercise,
 }: ExerciseBrowserProps) {
   const navigate = useNavigate({ from: '/exercises' })
+  const { user } = useAuth()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [selectedExercise, setSelectedExercise] = useState<ExerciseWithParsedFields | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingExercise, setEditingExercise] = useState<ExerciseWithParsedFields | null>(null)
+  const [ownedCustomIds, setOwnedCustomIds] = useState<Set<string>>(new Set())
+
+  const refreshOwnedCustomIds = useCallback(async () => {
+    if (!user) {
+      setOwnedCustomIds(new Set())
+      return
+    }
+    try {
+      setOwnedCustomIds(new Set(await fetchMyCustomExerciseIds()))
+    } catch (error) {
+      console.error('Failed to load custom exercises:', error)
+    }
+  }, [user])
+
+  useEffect(() => {
+    void refreshOwnedCustomIds()
+  }, [refreshOwnedCustomIds])
 
   const handleRouteSearchChange = useCallback(
     (routeSearch: ExerciseLibrarySearch) => {
@@ -95,6 +118,29 @@ export default function ExerciseBrowser({
     [onSelectExercise, selectExercise],
   )
 
+  const openCreateForm = useCallback(() => {
+    setEditingExercise(null)
+    setFormOpen(true)
+  }, [])
+
+  const openEditForm = useCallback((exercise: ExerciseWithParsedFields) => {
+    setEditingExercise(exercise)
+    setFormOpen(true)
+  }, [])
+
+  const handleSaved = useCallback(async () => {
+    await Promise.all([library.actions.refresh(), refreshOwnedCustomIds()])
+  }, [library.actions, refreshOwnedCustomIds])
+
+  const handleArchive = useCallback(
+    async (exercise: ExerciseWithParsedFields) => {
+      await archiveCustomExercise(exercise.id)
+      setSelectedExercise(null)
+      await Promise.all([library.actions.refresh(), refreshOwnedCustomIds()])
+    },
+    [library.actions, refreshOwnedCustomIds],
+  )
+
   const filterControls = (
     <ExerciseBrowserFilters
       query={library.filters.query}
@@ -132,6 +178,17 @@ export default function ExerciseBrowser({
           </DesktopFilterSidebar>
 
           <main className="min-w-0 flex-1">
+            {user && (
+              <div className="mb-3 flex justify-end sm:mb-4">
+                <button
+                  type="button"
+                  onClick={openCreateForm}
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-blue-700 hover:to-blue-600 cursor-pointer"
+                >
+                  <span aria-hidden>+</span> Add exercise
+                </button>
+              </div>
+            )}
             <ExerciseGrid
               exercises={library.exercises}
               total={library.total}
@@ -150,6 +207,23 @@ export default function ExerciseBrowser({
             isOpen={Boolean(selectedExercise)}
             onClose={closeModal}
             onSelectExercise={onSelectExercise}
+            canManage={ownedCustomIds.has(selectedExercise.id)}
+            onEditExercise={(exercise) => {
+              closeModal()
+              openEditForm(exercise)
+            }}
+            onArchiveExercise={handleArchive}
+          />
+        )}
+
+        {user && (
+          <CustomExerciseForm
+            isOpen={formOpen}
+            onClose={() => setFormOpen(false)}
+            categories={library.categories}
+            userId={user.id}
+            initial={editingExercise}
+            onSaved={handleSaved}
           />
         )}
       </div>

@@ -12,11 +12,23 @@ One-to-one app record for an authenticated user. Stores small user-facing prefer
 
 ### Exercise Catalog
 
-Shared library of exercise definitions, categories, equipment, muscle groups, instructions, and images. Catalog data is not owned by one user.
+Shared library of exercise definitions, categories, equipment, muscle groups, instructions, and images. The catalog is shared by everyone; entries are either Seed Exercises or Custom Exercises.
+
+### Seed Exercise
+
+A catalog exercise that came from the Free Exercise DB import. It has no creator and is only writable by the service role.
+
+### Custom Exercise
+
+A catalog exercise created by an Authenticated User from inside the app. It is shared into the same Exercise Catalog and behaves like any Seed Exercise once created — searchable, filterable, favouritable, and selectable for a Workout Set. It records the creator's id so that only the creator can edit or archive it; everyone else can see and use it.
+
+### Archived Exercise
+
+A Custom Exercise its creator has retired. An Archived Exercise is hidden from search, filters, favourites, and the exercise picker, but it stays resolvable by id so historical Workout Sets that reference it still render. Archiving never deletes Workout Set history.
 
 ### Exercise Image URL
 
-Public CDN URL for an exercise catalog image. GymTracker derives these from Free Exercise DB image paths using jsDelivr rather than storing image files in Supabase Storage during the first migration.
+Public CDN URL for an exercise image. Seed Exercises derive these from Free Exercise DB image paths using jsDelivr. Custom Exercises store images the creator uploads to a public Supabase Storage bucket; the column still holds a public URL so the same media helper can render either source.
 
 ### Workout Session
 

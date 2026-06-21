@@ -30,6 +30,7 @@ interface ExerciseSelectorModalProps {
   onSelectExercise: (exercise: ExerciseWithParsedFields) => void
   onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
   onLoadMore: () => void
+  onAddCustomExercise?: () => void
 }
 
 export default function ExerciseSelectorModal({
@@ -55,6 +56,7 @@ export default function ExerciseSelectorModal({
   onSelectExercise,
   onToggleFavorite,
   onLoadMore,
+  onAddCustomExercise,
 }: ExerciseSelectorModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [lockedHeight, setLockedHeight] = useState<number>()
@@ -95,7 +97,7 @@ export default function ExerciseSelectorModal({
         aria-labelledby="exercise-selector-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <ExerciseSelectorModalHeader onClose={onClose} />
+        <ExerciseSelectorModalHeader onClose={onClose} onAddCustomExercise={onAddCustomExercise} />
         <ExerciseQuickSections
           favoriteExercises={favoriteExercises}
           favoriteExerciseIds={favoriteExerciseIds}
@@ -344,32 +346,49 @@ function ExerciseQuickSectionItem({
   )
 }
 
-function ExerciseSelectorModalHeader({ onClose }: { onClose: () => void }) {
+function ExerciseSelectorModalHeader({
+  onClose,
+  onAddCustomExercise,
+}: {
+  onClose: () => void
+  onAddCustomExercise?: () => void
+}) {
   return (
     <div className="border-gray-200 border-b p-3 dark:border-gray-700 sm:p-6">
       <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-gray-300 dark:bg-gray-600 sm:hidden" />
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2
           id="exercise-selector-title"
           className="text-lg font-semibold text-gray-900 dark:text-white sm:text-xl"
         >
           Select Exercise
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-          aria-label="Close exercise selector"
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {onAddCustomExercise && (
+            <button
+              type="button"
+              onClick={onAddCustomExercise}
+              className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-blue-500 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-900/30 cursor-pointer"
+            >
+              <span aria-hidden>+</span> Add
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+            aria-label="Close exercise selector"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   )

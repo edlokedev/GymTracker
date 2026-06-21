@@ -45,6 +45,8 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart({
       customViteReactPlugin: true,
+      // Colocated *.test.ts(x) under src/routes are unit tests, not routes.
+      tsr: { routeFileIgnorePattern: '\\.test\\.' },
       ...(serverTarget ? { target: serverTarget } : {}),
     }),
     viteReact(),

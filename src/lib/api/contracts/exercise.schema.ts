@@ -17,4 +17,7 @@ export const catalogExerciseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   category_name: z.string(),
+  // True for user-created Custom Exercises. The owner uuid (`created_by`) is
+  // deliberately not part of this public, anon-served shape.
+  is_custom: z.boolean(),
 })

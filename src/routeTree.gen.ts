@@ -36,6 +36,7 @@ import { ServerRoute as ApiCalendarDataServerRouteImport } from './routes/api.ca
 import { ServerRoute as ApiExercisesSuggestedServerRouteImport } from './routes/api.exercises.suggested'
 import { ServerRoute as ApiExercisesSearchServerRouteImport } from './routes/api.exercises.search'
 import { ServerRoute as ApiExercisesRecentServerRouteImport } from './routes/api.exercises.recent'
+import { ServerRoute as ApiExercisesCustomServerRouteImport } from './routes/api.exercises.custom'
 
 const rootServerRouteImport = createServerRootRoute()
 
@@ -172,6 +173,12 @@ const ApiExercisesRecentServerRoute =
     path: '/api/exercises/recent',
     getParentRoute: () => rootServerRouteImport,
   } as any)
+const ApiExercisesCustomServerRoute =
+  ApiExercisesCustomServerRouteImport.update({
+    id: '/api/exercises/custom',
+    path: '/api/exercises/custom',
+    getParentRoute: () => rootServerRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -263,6 +270,7 @@ export interface FileServerRoutesByFullPath {
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
+  '/api/exercises/custom': typeof ApiExercisesCustomServerRoute
   '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
   '/api/exercises/suggested': typeof ApiExercisesSuggestedServerRoute
@@ -281,6 +289,7 @@ export interface FileServerRoutesByTo {
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
+  '/api/exercises/custom': typeof ApiExercisesCustomServerRoute
   '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
   '/api/exercises/suggested': typeof ApiExercisesSuggestedServerRoute
@@ -300,6 +309,7 @@ export interface FileServerRoutesById {
   '/api/workout-sets': typeof ApiWorkoutSetsServerRoute
   '/api/workout-templates': typeof ApiWorkoutTemplatesServerRoute
   '/auth/callback': typeof AuthCallbackServerRoute
+  '/api/exercises/custom': typeof ApiExercisesCustomServerRoute
   '/api/exercises/recent': typeof ApiExercisesRecentServerRoute
   '/api/exercises/search': typeof ApiExercisesSearchServerRoute
   '/api/exercises/suggested': typeof ApiExercisesSuggestedServerRoute
@@ -320,6 +330,7 @@ export interface FileServerRouteTypes {
     | '/api/workout-sets'
     | '/api/workout-templates'
     | '/auth/callback'
+    | '/api/exercises/custom'
     | '/api/exercises/recent'
     | '/api/exercises/search'
     | '/api/exercises/suggested'
@@ -338,6 +349,7 @@ export interface FileServerRouteTypes {
     | '/api/workout-sets'
     | '/api/workout-templates'
     | '/auth/callback'
+    | '/api/exercises/custom'
     | '/api/exercises/recent'
     | '/api/exercises/search'
     | '/api/exercises/suggested'
@@ -356,6 +368,7 @@ export interface FileServerRouteTypes {
     | '/api/workout-sets'
     | '/api/workout-templates'
     | '/auth/callback'
+    | '/api/exercises/custom'
     | '/api/exercises/recent'
     | '/api/exercises/search'
     | '/api/exercises/suggested'
@@ -375,6 +388,7 @@ export interface RootServerRouteChildren {
   ApiWorkoutSetsServerRoute: typeof ApiWorkoutSetsServerRoute
   ApiWorkoutTemplatesServerRoute: typeof ApiWorkoutTemplatesServerRoute
   AuthCallbackServerRoute: typeof AuthCallbackServerRoute
+  ApiExercisesCustomServerRoute: typeof ApiExercisesCustomServerRoute
   ApiExercisesRecentServerRoute: typeof ApiExercisesRecentServerRoute
   ApiExercisesSearchServerRoute: typeof ApiExercisesSearchServerRoute
   ApiExercisesSuggestedServerRoute: typeof ApiExercisesSuggestedServerRoute
@@ -561,6 +575,13 @@ declare module '@tanstack/react-start/server' {
       preLoaderRoute: typeof ApiExercisesRecentServerRouteImport
       parentRoute: typeof rootServerRouteImport
     }
+    '/api/exercises/custom': {
+      id: '/api/exercises/custom'
+      path: '/api/exercises/custom'
+      fullPath: '/api/exercises/custom'
+      preLoaderRoute: typeof ApiExercisesCustomServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
   }
 }
 
@@ -605,6 +626,7 @@ const rootServerRouteChildren: RootServerRouteChildren = {
   ApiWorkoutSetsServerRoute: ApiWorkoutSetsServerRoute,
   ApiWorkoutTemplatesServerRoute: ApiWorkoutTemplatesServerRoute,
   AuthCallbackServerRoute: AuthCallbackServerRoute,
+  ApiExercisesCustomServerRoute: ApiExercisesCustomServerRoute,
   ApiExercisesRecentServerRoute: ApiExercisesRecentServerRoute,
   ApiExercisesSearchServerRoute: ApiExercisesSearchServerRoute,
   ApiExercisesSuggestedServerRoute: ApiExercisesSuggestedServerRoute,

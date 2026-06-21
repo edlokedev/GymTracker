@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAuth } from '@/lib/auth'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { emptyExerciseLibrarySearch } from '../model'
 import { useExerciseLibrary } from '../useExerciseLibrary'
+import CustomExerciseForm from './CustomExerciseForm'
 import ExerciseSelectorModal from './ExerciseSelectorModal'
 import { EmptyExerciseSelector, SelectedExercisePanel } from './ExerciseSelectorPanel'
 
@@ -40,8 +42,10 @@ export default function ExerciseSelector({
   suggestedExercises = [],
   onToggleFavorite,
 }: ExerciseSelectorProps) {
+  const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [shouldLoad, setShouldLoad] = useState(false)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [inputQuery, setInputQuery] = useState('')
   const queryDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const library = useExerciseLibrary({
@@ -159,7 +163,21 @@ export default function ExerciseSelector({
         onSelectExercise={handleSelectExercise}
         onToggleFavorite={effectiveToggleFavorite}
         onLoadMore={() => void library.actions.loadMore()}
+        onAddCustomExercise={user ? () => setIsFormOpen(true) : undefined}
       />
+
+      {user && (
+        <CustomExerciseForm
+          isOpen={isFormOpen}
+          onClose={() => setIsFormOpen(false)}
+          categories={library.categories}
+          userId={user.id}
+          onSaved={(exercise) => {
+            void library.actions.refresh()
+            handleSelectExercise(exercise)
+          }}
+        />
+      )}
     </div>
   )
 }

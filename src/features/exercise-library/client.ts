@@ -1,4 +1,8 @@
 import { buildSearchParams, cachedGet, readApiData } from '@/lib/api'
+import { EXERCISE_IMAGE_BUCKET } from '@/lib/api/custom-exercise-input'
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser'
+import type { ExerciseWithParsedFields } from '@/lib/types/database'
+import type { CustomExercisePayload } from './custom-exercise'
 import type {
   ExerciseCategory,
   ExerciseFacetCatalog,
@@ -163,4 +167,82 @@ export async function fetchSuggestedExercises(options: {
       },
     },
   )
+}
+
+// ----------------------------------------------------------------------------
+// Custom exercises (ADR-0004). Authenticated create/edit/archive + listing the
+// caller's own custom exercise ids (so the UI can show edit affordances without
+// the public catalog leaking creator ids), plus image upload to the public
+// `exercise-images` bucket under the user's own folder.
+// ----------------------------------------------------------------------------
+
+export async function fetchMyCustomExerciseIds(): Promise<string[]> {
+  const response = await fetch('/api/exercises/custom')
+  const data = await readApiData<{ items: ExerciseWithParsedFields[]; exerciseIds: string[] }>(
+    response,
+    `Failed to fetch custom exercises: ${response.status}`,
+    { fallbackData: { items: [], exerciseIds: [] } },
+  )
+  return data.exerciseIds
+}
+
+export async function createCustomExercise(
+  payload: CustomExercisePayload,
+): Promise<ExerciseWithParsedFields> {
+  const response = await fetch('/api/exercises/custom', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return await readApiData<ExerciseWithParsedFields>(
+    response,
+    `Failed to create exercise: ${response.status}`,
+  )
+}
+
+export async function updateCustomExercise(
+  id: string,
+  payload: CustomExercisePayload,
+): Promise<ExerciseWithParsedFields> {
+  const params = buildSearchParams({ id })
+  const response = await fetch(`/api/exercises/custom?${params.toString()}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return await readApiData<ExerciseWithParsedFields>(
+    response,
+    `Failed to update exercise: ${response.status}`,
+  )
+}
+
+export async function archiveCustomExercise(
+  id: string,
+): Promise<{ exerciseId: string; archived: true }> {
+  const params = buildSearchParams({ id })
+  const response = await fetch(`/api/exercises/custom?${params.toString()}`, { method: 'DELETE' })
+  return await readApiData<{ exerciseId: string; archived: true }>(
+    response,
+    `Failed to archive exercise: ${response.status}`,
+    { fallbackData: { exerciseId: id, archived: true } },
+  )
+}
+
+const SANITIZE_FILENAME = /[^a-zA-Z0-9._-]/g
+
+// Upload an exercise image/GIF to the user's own folder and return its public
+// URL. The folder's second segment is a fresh uuid (storage RLS only scopes on
+// the leading uid segment), so we don't need the server-generated exercise id.
+export async function uploadCustomExerciseImage(file: File, userId: string): Promise<string> {
+  const supabase = await getSupabaseBrowserClient()
+  const safeName = file.name.replace(SANITIZE_FILENAME, '_')
+  const path = `${userId}/${crypto.randomUUID()}/${safeName}`
+
+  const { error } = await supabase.storage
+    .from(EXERCISE_IMAGE_BUCKET)
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+  if (error) throw new Error(`Failed to upload image: ${error.message}`)
+
+  const { data } = supabase.storage.from(EXERCISE_IMAGE_BUCKET).getPublicUrl(path)
+  return data.publicUrl
 }

@@ -2,13 +2,19 @@ type SmokeTarget = {
   name: string
   path: string
   expectJson?: boolean
+  // Expected HTTP status. Defaults to 200. Private routes are expected to
+  // reject unauthenticated requests with 401 (the Supabase auth gate).
+  expectStatus?: number
   assert?: (body: unknown) => void
 }
 
 const baseUrl = (process.env.SMOKE_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
-const userId =
-  process.env.SMOKE_USER_ID || 'NMUKDBTSGLRu9otdn6qK5fOVoNNQVdT6'
-const workoutId = process.env.SMOKE_WORKOUT_ID || '7242k8sav42farsnrt0o1v'
+
+// userId is intentionally bogus. Private routes derive identity from the
+// Supabase session cookie and never trust query userId, so these requests
+// must come back 401 regardless of what we send.
+const userId = process.env.SMOKE_USER_ID || 'smoke-unauthenticated'
+const workoutId = process.env.SMOKE_WORKOUT_ID || 'smoke-workout'
 const exerciseId = process.env.SMOKE_EXERCISE_ID || '0739'
 
 const badBodyMarkers = [
@@ -34,17 +40,23 @@ function assertArray(value: unknown, name: string) {
   }
 }
 
+// Private route: must reject an unauthenticated request with the 401 envelope.
+function assertUnauthorized(body: unknown) {
+  assertRecord(body)
+  if (body.success !== false) {
+    throw new Error('Expected success false on auth-gated route')
+  }
+  if (body.error !== 'Unauthorized') {
+    throw new Error(`Expected Unauthorized error, got ${JSON.stringify(body.error)}`)
+  }
+}
+
 const targets: SmokeTarget[] = [
   { name: 'home route', path: '/' },
   { name: 'workout route', path: '/workout' },
   { name: 'exercises route', path: '/exercises' },
   { name: 'history route', path: '/history' },
   { name: 'progress route', path: '/progress' },
-  {
-    name: 'auth session',
-    path: '/api/auth/get-session',
-    expectJson: true,
-  },
   {
     name: 'exercise categories',
     path: '/api/exercise-categories',
@@ -73,20 +85,24 @@ const targets: SmokeTarget[] = [
     },
   },
   {
+    // Public catalog. Envelope wraps the handler result as `data`, and the
+    // handler returns `{ items, total, page, totalPages, hasMore }`.
     name: 'exercise search',
     path: '/api/exercises/search?limit=5',
     expectJson: true,
     assert: (body) => {
       assertRecord(body)
-      assertArray(body.data, 'data')
-      if (typeof body.total !== 'number' || !Number.isFinite(body.total)) {
-        throw new Error('Expected total number')
+      assertRecord(body.data)
+      const page = body.data
+      assertArray(page.items, 'data.items')
+      if (typeof page.total !== 'number' || !Number.isFinite(page.total)) {
+        throw new Error('Expected data.total number')
       }
-      if (body.hasMore !== true) {
+      if (page.hasMore !== true) {
         throw new Error('Expected first exercise page to have more results')
       }
-      const data = body.data as unknown[]
-      const placeholder = data.find((item) => {
+      const items = page.items as unknown[]
+      const placeholder = items.find((item) => {
         assertRecord(item)
         return typeof item.name === 'string' && /^Exercise \d+/.test(item.name)
       })
@@ -95,79 +111,50 @@ const targets: SmokeTarget[] = [
       }
     },
   },
+  // Private routes — unauthenticated requests must hit the Supabase auth gate
+  // and return 401. This verifies the boundary, not the authed payload shape
+  // (authed-path coverage lives in the contract tests).
   {
-    name: 'calendar data',
+    name: 'calendar data (auth gate)',
     path: `/api/calendar-data?userId=${userId}&start=2026-04-20T00%3A00%3A00.000Z&end=2026-05-20T00%3A00%3A00.000Z`,
     expectJson: true,
-    assert: (body) => {
-      assertRecord(body)
-      if (body.success !== true) {
-        throw new Error('Expected success true')
-      }
-      assertArray(body.data, 'data')
-    },
+    expectStatus: 401,
+    assert: assertUnauthorized,
   },
   {
-    name: 'progress data',
+    name: 'progress data (auth gate)',
     path: `/api/progress?userId=${userId}`,
     expectJson: true,
-    assert: (body) => {
-      assertRecord(body)
-      if (body.success !== true) {
-        throw new Error('Expected success true')
-      }
-      assertRecord(body.data)
-      assertArray(body.data.progress, 'data.progress')
-    },
+    expectStatus: 401,
+    assert: assertUnauthorized,
   },
   {
-    name: 'workout sessions',
+    name: 'workout sessions (auth gate)',
     path: `/api/workout-sessions?userId=${userId}&limit=5`,
     expectJson: true,
-    assert: (body) => {
-      assertRecord(body)
-      if (body.success !== true) {
-        throw new Error('Expected success true')
-      }
-      assertRecord(body.data)
-      assertArray(body.data.data, 'data.data')
-    },
+    expectStatus: 401,
+    assert: assertUnauthorized,
   },
   {
-    name: 'workout details',
+    name: 'workout details (auth gate)',
     path: `/api/workout-details?userId=${userId}&date=2026-05-17`,
     expectJson: true,
-    assert: (body) => {
-      assertRecord(body)
-      if (body.success !== true) {
-        throw new Error('Expected success true')
-      }
-      assertArray(body.data, 'data')
-    },
+    expectStatus: 401,
+    assert: assertUnauthorized,
   },
   {
-    name: 'workout sets',
+    name: 'workout sets (auth gate)',
     path: `/api/workout-sets?workoutId=${workoutId}`,
     expectJson: true,
-    assert: (body) => {
-      assertRecord(body)
-      if (body.success !== true) {
-        throw new Error('Expected success true')
-      }
-      assertArray(body.data, 'data')
-    },
+    expectStatus: 401,
+    assert: assertUnauthorized,
   },
   {
-    name: 'exercise history',
+    name: 'exercise history (auth gate)',
     path: `/api/workout-sets?action=history&userId=${userId}&exerciseId=${exerciseId}&limit=5`,
     expectJson: true,
-    assert: (body) => {
-      assertRecord(body)
-      if (body.success !== true) {
-        throw new Error('Expected success true')
-      }
-      assertArray(body.data, 'data')
-    },
+    expectStatus: 401,
+    assert: assertUnauthorized,
   },
 ]
 
@@ -176,14 +163,19 @@ async function runTarget(target: SmokeTarget) {
     headers: { accept: target.expectJson ? 'application/json' : 'text/html,application/xhtml+xml' },
   })
   const text = await response.text()
+  const expectStatus = target.expectStatus ?? 200
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`)
+  if (response.status !== expectStatus) {
+    throw new Error(`Expected HTTP ${expectStatus}, got ${response.status}: ${text.slice(0, 200)}`)
   }
 
-  const marker = badBodyMarkers.find((badMarker) => text.includes(badMarker))
-  if (marker) {
-    throw new Error(`Found runtime/error marker: ${marker}`)
+  // Only scan for runtime-error markers on success responses. A deliberate
+  // 401 envelope is expected and must not trip the marker scan.
+  if (expectStatus === 200) {
+    const marker = badBodyMarkers.find((badMarker) => text.includes(badMarker))
+    if (marker) {
+      throw new Error(`Found runtime/error marker: ${marker}`)
+    }
   }
 
   if (!target.expectJson) {
