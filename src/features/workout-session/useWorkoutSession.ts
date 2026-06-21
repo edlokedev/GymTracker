@@ -230,9 +230,14 @@ export function useWorkoutSession({
         setActiveExerciseId((currentActiveExerciseId) =>
           getActiveExerciseId(loadedExercises, currentActiveExerciseId),
         )
-        // Prefill last-performance for exercises with no in-session sets yet.
+        // Prefill last-performance only for exercises with no in-session sets —
+        // exercises that already have sets prefill from their last logged set
+        // (previousSet wins over lastPerformance), so fetching history for them
+        // would be wasted requests.
         void loadLastPerformanceDefaultsForExercises(
-          loadedExercises.map((exercise) => exercise.exercise.id),
+          loadedExercises
+            .filter((exercise) => exercise.sets.length === 0)
+            .map((exercise) => exercise.exercise.id),
         )
         finishCommand()
       } catch (error) {
