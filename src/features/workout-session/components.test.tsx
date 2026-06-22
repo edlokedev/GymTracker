@@ -303,6 +303,56 @@ describe('WorkoutSessionManager', () => {
     expect(screen.getByText('Set 2')).toBeInTheDocument()
   })
 
+  it('pre-marks logged exercises done when editing a completed workout', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          data: makeWorkoutDetails({
+            includeSecondExercise: true,
+            endTime: '2026-05-01T11:00:00.000Z',
+          }),
+        }),
+      ),
+    )
+
+    render(
+      <WorkoutSessionManager
+        existingSession={makeSession({ end_time: '2026-05-01T11:00:00.000Z' })}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+
+    // Both logged exercises render the green "Exercise done" bar without any tap.
+    await waitFor(() => expect(screen.getAllByText('Exercise done')).toHaveLength(2))
+    expect(screen.queryByText('Set 2')).not.toBeInTheDocument()
+
+    // Completion is still editable — resume restores the set-entry form.
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Bench Press' }))
+    expect(screen.getByText('Set 2')).toBeInTheDocument()
+  })
+
+  it('does not pre-mark exercises done for an in-progress workout', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
+    )
+
+    render(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+
+    // No end_time → live session, completion stays driven by the user.
+    expect(screen.queryByText('Exercise done')).not.toBeInTheDocument()
+    expect(screen.getByText('Set 2')).toBeInTheDocument()
+  })
+
   it('keeps exercise completion disabled until the exercise has a set', async () => {
     vi.stubGlobal(
       'fetch',

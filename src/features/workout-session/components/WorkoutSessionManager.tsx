@@ -98,6 +98,11 @@ export default function WorkoutSessionManager({
   const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(() => new Set())
   const [submitSignal, setSubmitSignal] = useState(0)
   const exerciseRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  // Tracks the session id we've already seeded completion state for, so editing a
+  // completed workout pre-marks its done exercises exactly once — and never
+  // re-seeds after the user resumes/edits (which mutates completedExerciseIds and
+  // exercises).
+  const seededCompletionSessionIdRef = useRef<string | null>(null)
   const showWorkoutHeader =
     isSessionStarted ||
     Boolean(session) ||
@@ -106,16 +111,36 @@ export default function WorkoutSessionManager({
     commandStatus === 'error'
 
   useEffect(() => {
-    if (session?.id) {
-      setCompletedExerciseIds(new Set())
-      setTemplateSaveStatus('idle')
-      setTemplateSaveError(null)
-      return
-    }
+    // On every session switch, clear transient UI and re-arm the completed-workout
+    // seed so it can run again for the newly loaded session.
     setCompletedExerciseIds(new Set())
     setTemplateSaveStatus('idle')
     setTemplateSaveError(null)
+    if (seededCompletionSessionIdRef.current !== session?.id) {
+      seededCompletionSessionIdRef.current = null
+    }
   }, [session?.id])
+
+  // Editing a completed workout (end_time set): pre-mark exercises that already
+  // have logged sets as done, so the green "Exercise done" bar reflects saved
+  // state instead of a blank slate. Live/in-progress sessions are untouched —
+  // completion there stays driven by the "Done Exercise" tap. Seeds once per
+  // session load (guarded by the ref) so resuming an exercise isn't undone, and
+  // waits for exercises to finish loading.
+  useEffect(() => {
+    if (!session?.id || !session.end_time) return
+    if (seededCompletionSessionIdRef.current === session.id) return
+    if (exercises.length === 0) return
+
+    seededCompletionSessionIdRef.current = session.id
+    setCompletedExerciseIds(
+      new Set(
+        exercises
+          .filter((exercise) => exercise.sets.length > 0)
+          .map((exercise) => exercise.exercise.id),
+      ),
+    )
+  }, [session?.id, session?.end_time, exercises])
 
   const focusExercise = (exerciseId: string | null) => {
     if (!exerciseId) return
