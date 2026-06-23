@@ -41,7 +41,7 @@ describe('Header', () => {
     const { container } = render(<Header />)
 
     expect(screen.getByRole('link', { name: /gymmie/i })).toHaveAttribute('href', '/')
-    expect(container.querySelector('img[src="/gymmie-icon.svg"]')).toBeInTheDocument()
+    expect(container.querySelector('img[src="/gymmie-icon.png"]')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Dashboard' })[0]).toHaveAttribute('href', '/')
     expect(screen.getAllByRole('link', { name: 'Workouts' })[0]).toHaveAttribute(
       'href',
