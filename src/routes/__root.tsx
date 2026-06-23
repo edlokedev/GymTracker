@@ -26,8 +26,8 @@ export const Route = createRootRoute({
       },
     ],
     links: [
-      { rel: 'icon', href: '/gymmie-icon.svg', type: 'image/svg+xml' },
-      { rel: 'shortcut icon', href: '/gymmie-icon.svg' },
+      { rel: 'icon', href: '/gymmie-icon.png', type: 'image/png' },
+      { rel: 'shortcut icon', href: '/gymmie-icon.png' },
       {
         rel: 'stylesheet',
         href: appCss,
