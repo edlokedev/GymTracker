@@ -11,7 +11,7 @@
 // Postgres `set_number` column — that mapping is preserved here so the route
 // contracts stay stable.
 
-import { assertPostgresOk } from '../../api/errors'
+import { assertPostgresOk, BadRequestError, ConflictError, NotFoundError } from '../../api/errors'
 import type { WorkoutSet, WorkoutSetInput } from '../../types/database'
 import { type AppSupabaseClient, queryClient } from '../query-client'
 
@@ -241,6 +241,42 @@ export const workoutSetQueries = {
 
     assertPostgresOk(error)
     return Array.isArray(data) && data.length > 0
+  },
+
+  // Repoint a whole exercise group's sets in one workout to a different
+  // exercise (the "Change exercise" feature). Delegates to the
+  // `repoint_workout_exercise` SQL function, which locks the parent session,
+  // validates the target, blocks on collision, and updates atomically under
+  // RLS. The function's custom SQLSTATEs map to typed HTTP errors here.
+  async repointExercise(
+    supabase: SB,
+    workoutId: string,
+    fromExerciseId: string,
+    toExerciseId: string,
+  ): Promise<{ repointed: number; setIds: string[] }> {
+    const { data, error } = await queryClient(supabase).rpc<{ set_id: string }[]>(
+      'repoint_workout_exercise',
+      { p_workout_id: workoutId, p_from: fromExerciseId, p_to: toExerciseId },
+    )
+
+    if (error) {
+      switch (error.code) {
+        case 'GYM03':
+          throw new ConflictError('That exercise is already logged in this workout')
+        case 'GYM04':
+          throw new NotFoundError('Workout or exercise not found')
+        case 'GYM01':
+          throw new BadRequestError('The new exercise is the same as the current one')
+        case 'GYM02':
+          throw new BadRequestError('That exercise is not available')
+        default:
+          assertPostgresOk(error)
+      }
+    }
+
+    const rows = (data ?? []) as { set_id: string }[]
+    const setIds = rows.map((row) => row.set_id)
+    return { repointed: setIds.length, setIds }
   },
 
   // Remove every set for a given exercise from a given workout. Used by the

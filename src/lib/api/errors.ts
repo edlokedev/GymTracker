@@ -46,6 +46,14 @@ export class BadRequestError extends Error {
   }
 }
 
+export class ConflictError extends Error {
+  readonly kind = 'conflict' as const
+  constructor(message = 'Conflict') {
+    super(message)
+    this.name = 'ConflictError'
+  }
+}
+
 // Convenience throwers — route handler bodies use these to short-circuit.
 export function notFound(message?: string): never {
   throw new NotFoundError(message)
@@ -57,6 +65,10 @@ export function forbidden(message?: string): never {
 
 export function badRequest(message?: string): never {
   throw new BadRequestError(message)
+}
+
+export function conflict(message?: string): never {
+  throw new ConflictError(message)
 }
 
 // Shape of a Postgres / PostgREST error as surfaced by @supabase/supabase-js.

@@ -6,7 +6,7 @@ import { TrashButton } from '@/components/ui/TrashButton'
 import { ExerciseHistory } from '@/features/exercise-library/components/ExerciseHistory'
 import ExerciseSelector from '@/features/exercise-library/components/ExerciseSelector'
 import { createWorkoutTemplateFromSession } from '@/features/workout-templates/client'
-import type { WorkoutSession, WorkoutSet } from '@/lib/types/database'
+import type { ExerciseWithParsedFields, WorkoutSession, WorkoutSet } from '@/lib/types/database'
 import { type ExerciseTrackingType, getTrackingType } from '@/lib/utils/exercise-tracking'
 import { formatExerciseName } from '@/lib/utils/text'
 import { fetchLocationNames } from '../client'
@@ -90,6 +90,10 @@ export default function WorkoutSessionManager({
     confirmLabel: 'Confirm',
     onConfirm: () => {},
   })
+  // "Change exercise": which group is being changed, and a signal to open the
+  // single shared picker instance programmatically.
+  const [changingExerciseId, setChangingExerciseId] = useState<string | null>(null)
+  const [pickerOpenSignal, setPickerOpenSignal] = useState(0)
   const [showWorkoutDetails, setShowWorkoutDetails] = useState(false)
   const [templateSaveStatus, setTemplateSaveStatus] = useState<
     'idle' | 'saving' | 'saved' | 'error'
@@ -213,6 +217,62 @@ export default function WorkoutSessionManager({
         }
       },
     })
+  }
+
+  // Start the "Change exercise" flow: remember the group, then open the shared
+  // picker. Selection is routed to the change confirm via handlePickerSelect.
+  const startChangeExercise = (exerciseId: string) => {
+    setChangingExerciseId(exerciseId)
+    setPickerOpenSignal((current) => current + 1)
+  }
+
+  const promptChangeExercise = (fromExerciseId: string, toExercise: ExerciseWithParsedFields) => {
+    const fromGroup = exercises.find((e) => e.exercise.id === fromExerciseId)
+    const fromName = fromGroup ? formatExerciseName(fromGroup.exercise.name) : 'this exercise'
+    const toName = formatExerciseName(toExercise.name)
+    const setCount = fromGroup?.sets.length ?? 0
+
+    const fromType = getTrackingType({
+      trackingType: fromGroup?.exercise.tracking_type,
+      categoryName: fromGroup?.exercise.category_name,
+      force: fromGroup?.exercise.force,
+    })
+    const toType = getTrackingType({
+      trackingType: toExercise.tracking_type,
+      categoryName: toExercise.category_name,
+      force: toExercise.force,
+    })
+    const mismatch = fromType !== toType
+
+    const description =
+      `Change "${fromName}" → "${toName}" for this workout? ` +
+      `${setCount} ${setCount === 1 ? 'set' : 'sets'} will be repointed.` +
+      (mismatch
+        ? ` Heads up: these are tracked differently (${fromType} → ${toType}), so the logged data may not match the new exercise.`
+        : '')
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Change Exercise',
+      description,
+      confirmLabel: 'Change Exercise',
+      onConfirm: async () => {
+        const didChange = await actions.changeExercise(fromExerciseId, toExercise)
+        setChangingExerciseId(null)
+        if (didChange) {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }))
+        }
+      },
+    })
+  }
+
+  // Route a picker selection: in change-mode confirm the swap, otherwise add.
+  const handlePickerSelect = (exercise: ExerciseWithParsedFields) => {
+    if (changingExerciseId) {
+      promptChangeExercise(changingExerciseId, exercise)
+      return
+    }
+    actions.addExercise(exercise)
   }
 
   const completeExercise = (exerciseId: string) => {
@@ -536,11 +596,20 @@ export default function WorkoutSessionManager({
                       </p>
                     )}
                   </div>
-                  <TrashButton
-                    label={`Remove ${exerciseName}`}
-                    onClick={() => removeExercise(exerciseId)}
-                    className="shrink-0"
-                  />
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => startChangeExercise(exerciseId)}
+                      className="motion-press inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 font-medium text-gray-700 text-sm transition-colors hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                      aria-label={`Change ${exerciseName}`}
+                    >
+                      Change
+                    </button>
+                    <TrashButton
+                      label={`Remove ${exerciseName}`}
+                      onClick={() => removeExercise(exerciseId)}
+                    />
+                  </div>
                 </div>
 
                 {isExerciseComplete ? (
@@ -676,10 +745,26 @@ export default function WorkoutSessionManager({
           id="workout-add-exercise"
           className="motion-enter rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 sm:p-6"
         >
-          <h2 className="mb-4 font-semibold text-gray-900 text-lg dark:text-white">Add Exercise</h2>
+          <h2 className="mb-4 font-semibold text-gray-900 text-lg dark:text-white">
+            {changingExerciseId ? 'Change Exercise' : 'Add Exercise'}
+          </h2>
+          {changingExerciseId && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800 text-sm dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+              <span>Pick a replacement exercise.</span>
+              <button
+                type="button"
+                onClick={() => setChangingExerciseId(null)}
+                className="motion-press shrink-0 font-medium underline"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           <ExerciseSelector
-            onSelectExercise={actions.addExercise}
+            onSelectExercise={handlePickerSelect}
             selectedExercise={selectedExercise}
+            requestOpenSignal={pickerOpenSignal}
+            onPickerClose={() => setChangingExerciseId(null)}
           />
         </div>
       )}
@@ -715,7 +800,10 @@ export default function WorkoutSessionManager({
         confirmLabel={confirmModal.confirmLabel}
         cancelLabel="Cancel"
         onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onCancel={() => {
+          setChangingExerciseId(null)
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }))
+        }}
       />
 
       {isSessionStarted && !session?.end_time && (

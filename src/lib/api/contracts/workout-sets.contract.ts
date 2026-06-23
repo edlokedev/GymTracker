@@ -72,6 +72,16 @@ export const workoutSetsContract = defineContract({
       body: workoutSetInput.partial(),
       response: workoutSet,
     },
+    // Repoint a whole exercise group's sets in one workout to a different
+    // exercise ("Change exercise"). Returns the changed set ids + count.
+    PATCH: {
+      query: z.object({
+        workoutId: z.string(),
+        fromExerciseId: z.string(),
+        toExerciseId: z.string(),
+      }),
+      response: z.object({ repointed: z.number(), setIds: z.array(z.string()) }),
+    },
     DELETE: {
       query: z.object({
         id: z.string().optional(),

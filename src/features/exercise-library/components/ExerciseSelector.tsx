@@ -29,6 +29,13 @@ interface ExerciseSelectorProps {
   recentlyUsedExercises?: RecentExerciseQuickPick[]
   suggestedExercises?: SuggestedExerciseQuickPick[]
   onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
+  // Controlled-open trigger: increment this number to open the picker modal
+  // programmatically (e.g. a per-exercise "Change exercise" action reusing this
+  // single selector instance). Ignored while undefined or 0.
+  requestOpenSignal?: number
+  // Fired when the picker modal closes (selection or dismiss) so a caller
+  // driving change-mode can reset its state.
+  onPickerClose?: () => void
 }
 
 export default function ExerciseSelector({
@@ -41,6 +48,8 @@ export default function ExerciseSelector({
   recentlyUsedExercises = [],
   suggestedExercises = [],
   onToggleFavorite,
+  requestOpenSignal,
+  onPickerClose,
 }: ExerciseSelectorProps) {
   const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
@@ -61,6 +70,13 @@ export default function ExerciseSelector({
     setShouldLoad(true)
     setIsOpen(true)
   }, [])
+
+  // Controlled-open: a parent increments requestOpenSignal to open the picker
+  // programmatically. Guarded on > 0 so the initial render doesn't auto-open.
+  useEffect(() => {
+    if (!requestOpenSignal) return
+    openPicker()
+  }, [requestOpenSignal, openPicker])
 
   const selectedCategory = library.filters.categoryIds[0] || ''
   const selectedEquipment = library.filters.equipment[0] || ''
@@ -108,9 +124,14 @@ export default function ExerciseSelector({
     }, 300)
   }
 
+  const closePicker = () => {
+    setIsOpen(false)
+    onPickerClose?.()
+  }
+
   const handleSelectExercise = (exercise: ExerciseWithParsedFields) => {
     onSelectExercise(exercise)
-    setIsOpen(false)
+    closePicker()
   }
 
   const clearSelection = () => {
@@ -148,7 +169,7 @@ export default function ExerciseSelector({
         favoriteExerciseIds={effectiveFavoriteExerciseIds}
         recentlyUsedExercises={effectiveRecentlyUsedExercises}
         suggestedExercises={effectiveSuggestedExercises}
-        onClose={() => setIsOpen(false)}
+        onClose={closePicker}
         onQueryChange={handleQueryChange}
         onCategoryChange={(categoryId) => {
           void library.actions.updateFilters({

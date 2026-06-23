@@ -10,7 +10,7 @@
 // and triggers an error when `!response.ok` OR `success === false`. The
 // envelope below is a strict superset of what the client tolerates.
 
-import { BadRequestError, ForbiddenError, NotFoundError } from './errors'
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from './errors'
 
 export type ApiSuccess<T> = { success: true; data: T }
 export type ApiFailure = { success: false; error: string }
@@ -44,5 +44,6 @@ export function statusForError(err: unknown): { status: number; message: string 
   if (err instanceof NotFoundError) return { status: 404, message: err.message }
   if (err instanceof ForbiddenError) return { status: 403, message: err.message }
   if (err instanceof BadRequestError) return { status: 400, message: err.message }
+  if (err instanceof ConflictError) return { status: 409, message: err.message }
   return { status: 500, message: 'Internal server error' }
 }
