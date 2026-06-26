@@ -21,6 +21,8 @@ interface ExerciseDetailModalProps {
   onSelectExercise?: (exercise: ExerciseWithParsedFields) => void
   isFavorite?: boolean
   onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
+  isFavoriteDisabled?: boolean
+  isFavoritePending?: boolean
   similarExercises?: SimilarExerciseItem[]
   onSelectSimilarExercise?: (exercise: ExerciseWithParsedFields) => void
   // When the viewer owns this custom exercise, expose edit + archive.
@@ -36,6 +38,8 @@ export default function ExerciseDetailModal({
   onSelectExercise,
   isFavorite = false,
   onToggleFavorite,
+  isFavoriteDisabled = false,
+  isFavoritePending = false,
   similarExercises = [],
   onSelectSimilarExercise,
   canManage = false,
@@ -90,6 +94,8 @@ export default function ExerciseDetailModal({
                   exerciseTitle={exerciseTitle}
                   isFavorite={isFavorite}
                   onClick={() => onToggleFavorite(exercise)}
+                  disabled={isFavoriteDisabled}
+                  busy={isFavoritePending}
                 />
               )}
               <button
