@@ -41,6 +41,9 @@ export interface QueryBuilder<TData = unknown> extends PromiseLike<QueryResult<T
 
 export interface QueryClient {
   from<TData = unknown>(table: string): QueryBuilder<TData>
+  // Call a Postgres function. Awaiting the result yields { data, error }, where
+  // data is the function's returned rows (RETURNS TABLE) or scalar.
+  rpc<TData = unknown>(fn: string, args?: Record<string, unknown>): PromiseLike<QueryResult<TData>>
 }
 
 export type AppSupabaseClient = ReturnType<typeof createServerClient<Database>> | QueryClient

@@ -54,6 +54,25 @@ export const updateWorkoutSet = async ({ supabase, request, url }: PrivateHandle
   return updated
 }
 
+// Repoint a whole exercise group's sets in one workout to a different exercise
+// ("Change exercise"). The atomic work (lock, validate, block-on-collision,
+// update) lives in the `repoint_workout_exercise` RPC; the query layer maps its
+// SQLSTATEs to typed errors (conflict -> 409, stale -> 404, archived -> 400).
+export const repointWorkoutExercise = async ({ supabase, url }: PrivateHandlerContext) => {
+  const workoutId = url.searchParams.get('workoutId')
+  const fromExerciseId = url.searchParams.get('fromExerciseId')
+  const toExerciseId = url.searchParams.get('toExerciseId')
+
+  if (!workoutId || !fromExerciseId || !toExerciseId) {
+    badRequest('workoutId, fromExerciseId, and toExerciseId are required')
+  }
+  if (fromExerciseId === toExerciseId) {
+    badRequest('The new exercise is the same as the current one')
+  }
+
+  return workoutSetQueries.repointExercise(supabase, workoutId, fromExerciseId, toExerciseId)
+}
+
 export const deleteWorkoutSet = async ({ supabase, url }: PrivateHandlerContext) => {
   const setId = url.searchParams.get('id')
   const workoutId = url.searchParams.get('workoutId')
@@ -80,5 +99,6 @@ export const ServerRoute = createServerFileRoute('/api/workout-sets').methods({
   GET: privateMethod(getWorkoutSets),
   POST: privateMethod(createWorkoutSet),
   PUT: privateMethod(updateWorkoutSet),
+  PATCH: privateMethod(repointWorkoutExercise),
   DELETE: privateMethod(deleteWorkoutSet),
 })

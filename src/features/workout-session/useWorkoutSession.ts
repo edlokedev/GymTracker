@@ -7,6 +7,7 @@ import type {
 } from '@/lib/types/database'
 import { getLocalCalendarDate } from '@/lib/utils/calendar'
 import {
+  changeExerciseSets,
   completeWorkoutSession,
   createWorkoutSession,
   createWorkoutSet,
@@ -35,6 +36,7 @@ import {
   mapWorkoutTemplateToExercises,
   removeExerciseFromWorkout,
   removeSetFromExercise,
+  replaceExerciseInWorkout,
   replaceSetInExercise,
   type SaveStatus,
 } from './model'
@@ -557,6 +559,50 @@ export function useWorkoutSession({
     [beginCommand, failCommand, finishCommand, session?.id],
   )
 
+  // "Change exercise": repoint a logged group to a different exercise, keeping
+  // its sets. Persisted workouts go through the atomic RPC then reload; an
+  // unsaved workout swaps locally. Fast-fails on a client-visible duplicate
+  // (the server still blocks authoritatively with a 409).
+  const changeExercise = useCallback(
+    async (fromExerciseId: string, toExercise: ExerciseWithParsedFields): Promise<boolean> => {
+      if (fromExerciseId === toExercise.id) return false
+      if (hasExerciseInWorkout(exercises, toExercise.id)) {
+        setCommandStatus('error')
+        setCommandError('That exercise is already in your workout.')
+        return false
+      }
+
+      try {
+        beginCommand()
+        if (session?.id) {
+          await changeExerciseSets(session.id, fromExerciseId, toExercise.id)
+          await loadSessionData(session.id)
+        } else {
+          setExercises((current) => replaceExerciseInWorkout(current, fromExerciseId, toExercise))
+        }
+        setActiveExerciseId((currentId) =>
+          currentId === fromExerciseId ? toExercise.id : currentId,
+        )
+        void loadLastPerformanceDefaults(toExercise.id)
+        finishCommand()
+        return true
+      } catch (error) {
+        console.error('Failed to change exercise:', error)
+        failCommand(error, 'Failed to change exercise')
+        return false
+      }
+    },
+    [
+      beginCommand,
+      exercises,
+      failCommand,
+      finishCommand,
+      loadLastPerformanceDefaults,
+      loadSessionData,
+      session?.id,
+    ],
+  )
+
   const saveSet = useCallback(
     async (exerciseId: string, setData: WorkoutSetInput): Promise<WorkoutSet | null> => {
       if (!session) return null
@@ -685,6 +731,7 @@ export function useWorkoutSession({
       addExercise,
       selectActiveExercise: setActiveExerciseId,
       removeExercise,
+      changeExercise,
       saveSet,
       updateSet,
       deleteSet,

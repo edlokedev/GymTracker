@@ -12,6 +12,7 @@ import {
   getTotalVolume,
   hasExerciseInWorkout,
   mapWorkoutDetailsToExercises,
+  replaceExerciseInWorkout,
 } from './model'
 
 const makeSet = (id: string, setNumber: number, weight: number, reps: number): WorkoutSet => ({
@@ -148,6 +149,31 @@ describe('workout session model', () => {
 
     expect(getNextActiveExerciseId(exercises, 'squat', new Set(['bench-press']))).toBe('row')
     expect(getNextActiveExerciseId(exercises, 'squat', new Set(['bench-press', 'row']))).toBeNull()
+  })
+
+  it('replaces an exercise group, keeping sets and remapping their exercise_id', () => {
+    const exercises = [
+      {
+        exercise: makeExercise('lever-seated-fly', 'Lever Seated Fly'),
+        sets: [makeSet('set-1', 1, 50, 12), makeSet('set-2', 2, 55, 10)],
+      },
+      { exercise: makeExercise('squat', 'Squat'), sets: [makeSet('set-3', 1, 100, 5)] },
+    ]
+    const target = makeExercise('pectoral-machine', 'Pectoral Machine')
+
+    const result = replaceExerciseInWorkout(exercises, 'lever-seated-fly', target)
+
+    expect(result[0].exercise).toEqual(target)
+    expect(result[0].sets.map((s) => s.exercise_id)).toEqual([
+      'pectoral-machine',
+      'pectoral-machine',
+    ])
+    expect(result[0].sets.map((s) => ({ weight: s.weight, reps: s.reps }))).toEqual([
+      { weight: 50, reps: 12 },
+      { weight: 55, reps: 10 },
+    ])
+    // untouched group stays as-is
+    expect(result[1]).toBe(exercises[1])
   })
 
   it('derives next set defaults from the previous set without notes', () => {

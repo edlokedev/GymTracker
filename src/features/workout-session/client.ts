@@ -86,6 +86,25 @@ export async function deleteWorkoutSession(id: string): Promise<void> {
   await readApiSuccess(response, 'Failed to delete workout')
 }
 
+// "Change exercise": repoint every set logged for `fromExerciseId` in this
+// workout to `toExerciseId`. Atomic + collision-checked server-side; returns
+// the changed set ids. A 409 (target already in workout) surfaces as a thrown
+// error from readApiData.
+export async function changeExerciseSets(
+  workoutId: string,
+  fromExerciseId: string,
+  toExerciseId: string,
+): Promise<{ repointed: number; setIds: string[] }> {
+  const response = await fetch(
+    `/api/workout-sets?${buildSearchParams({ workoutId, fromExerciseId, toExerciseId }).toString()}`,
+    {
+      method: 'PATCH',
+    },
+  )
+
+  return readApiData(response, `Failed to change exercise: ${response.status}`)
+}
+
 export async function removeExerciseSets(workoutId: string, exerciseId: string): Promise<void> {
   const response = await fetch(
     `/api/workout-sets?${buildSearchParams({ workoutId, exerciseId }).toString()}`,

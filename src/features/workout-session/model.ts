@@ -176,6 +176,23 @@ export function removeExerciseFromWorkout(
   return exercises.filter((exercise) => exercise.exercise.id !== exerciseId)
 }
 
+// Swap an exercise group for a different exercise, keeping its logged sets
+// (used by the "Change exercise" feature's local/pre-save path). Each set's
+// exercise_id is remapped so the local model stays consistent with the server.
+export function replaceExerciseInWorkout(
+  exercises: ExerciseInWorkout[],
+  fromExerciseId: string,
+  toExercise: ExerciseWithParsedFields,
+): ExerciseInWorkout[] {
+  return exercises.map((exercise) => {
+    if (exercise.exercise.id !== fromExerciseId) return exercise
+    return {
+      exercise: toExercise,
+      sets: exercise.sets.map((set) => ({ ...set, exercise_id: toExercise.id })),
+    }
+  })
+}
+
 export function appendSetToExercise(
   exercises: ExerciseInWorkout[],
   exerciseId: string,
