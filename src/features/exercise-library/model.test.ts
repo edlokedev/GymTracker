@@ -4,6 +4,8 @@ import {
   buildExerciseQuickPickLists,
   favoriteIdsFromResult,
   filtersFromRouteSearch,
+  getActiveFilterCount,
+  routeSearchFromFilters,
   routeSearchKey,
   routeSearchToNavigateSearch,
   toggleFilterValue,
@@ -108,6 +110,72 @@ describe('exercise library model', () => {
         items: [{ id: 'bench-press' }, { id: 'bench-press' }, { id: 'squat' }] as never,
       }),
     ).toEqual(['bench-press', 'squat'])
+  })
+
+  it('carries the favourites flag through route/filter conversions', () => {
+    expect(
+      filtersFromRouteSearch({
+        category_id: [],
+        equipment: [],
+        muscle_group: [],
+        query: '',
+        favourites: true,
+      }).favourites,
+    ).toBe(true)
+
+    expect(
+      routeSearchFromFilters({
+        categoryIds: [],
+        equipment: [],
+        muscleGroups: [],
+        query: '',
+        favourites: true,
+      }).favourites,
+    ).toBe(true)
+
+    expect(routeSearchToNavigateSearch({ favourites: true }).favourites).toBe(true)
+    expect(routeSearchToNavigateSearch({ favourites: false }).favourites).toBeUndefined()
+  })
+
+  it('counts the favourites filter as active', () => {
+    expect(
+      getActiveFilterCount({
+        categoryIds: [],
+        equipment: [],
+        muscleGroups: [],
+        query: '',
+        favourites: true,
+      }),
+    ).toBe(1)
+    expect(
+      getActiveFilterCount({
+        categoryIds: [],
+        equipment: [],
+        muscleGroups: [],
+        query: '',
+        favourites: false,
+      }),
+    ).toBe(0)
+  })
+
+  it('builds a favourites chip when the favourites filter is active', () => {
+    const chips = buildActiveFilterChips(
+      { categoryIds: [], equipment: [], muscleGroups: [], query: '', favourites: true },
+      new Map(),
+    )
+    expect(chips).toContainEqual({ type: 'favourites', prefix: 'Show', label: 'Favourites' })
+  })
+
+  it('keeps the favourites flag distinct in the route search key', () => {
+    expect(
+      routeSearchKey({
+        category_id: [],
+        equipment: [],
+        muscle_group: [],
+        query: '',
+        favourites: true,
+      }),
+    ).not.toBe(routeSearchKey({ category_id: [], equipment: [], muscle_group: [], query: '' }))
   })
 
   it('builds quick-pick lists without altering ranked metadata', () => {

@@ -10,6 +10,7 @@ export const Route = createFileRoute('/exercises')({
     equipment: normalizeSearchArray(search.equipment),
     muscle_group: normalizeSearchArray(search.muscle_group),
     query: typeof search.query === 'string' ? search.query : '',
+    favourites: search.favourites === 'true' || search.favourites === true,
   }),
   component: ExercisesPage,
 })

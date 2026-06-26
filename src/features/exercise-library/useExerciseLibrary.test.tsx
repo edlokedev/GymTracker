@@ -179,6 +179,158 @@ describe('useExerciseLibrary', () => {
     expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat'])
   })
 
+  it('shows favourite exercises when the favourites filter is active', async () => {
+    const benchPress = makeExercise('bench-press', 'Bench Press')
+    const squat = makeExercise('squat', 'Squat')
+    const pushUp = makeExercise('push-up', 'Push-Up')
+    const searchCalls: string[] = []
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url === '/api/exercise-categories') return Response.json({ data: [] })
+      if (url === '/api/equipment-types') return Response.json({ data: [] })
+      if (url === '/api/muscle-groups') return Response.json({ data: [] })
+      if (url === '/api/exercise-favorites') {
+        return Response.json({
+          success: true,
+          data: { items: [squat, pushUp], exerciseIds: ['squat', 'push-up'] },
+        })
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return Response.json({ success: true, data: { items: [] } })
+      }
+      if (url.startsWith('/api/exercises/search')) {
+        searchCalls.push(url)
+        return Response.json({
+          success: true,
+          data: {
+            items: [benchPress],
+            total: 1,
+            page: 1,
+            totalPages: 1,
+            hasMore: false,
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() =>
+      useExerciseLibrary({
+        initialSearch: {
+          category_id: [],
+          equipment: [],
+          muscle_group: [],
+          query: '',
+        },
+      }),
+    )
+
+    await waitFor(() => expect(result.current.exercises).toHaveLength(1))
+    await waitFor(() => expect(result.current.favoriteExercises).toHaveLength(2))
+
+    const searchCallsBeforeToggle = searchCalls.length
+
+    await act(async () => {
+      await result.current.actions.toggleFavouritesFilter()
+    })
+
+    expect(result.current.filters.favourites).toBe(true)
+    expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat', 'push-up'])
+    expect(result.current.total).toBe(2)
+    expect(result.current.hasMore).toBe(false)
+    // Favourites is a pure client-side filter — it must not hit the search API.
+    expect(searchCalls.length).toBe(searchCallsBeforeToggle)
+
+    await act(async () => {
+      await result.current.actions.toggleFavouritesFilter()
+    })
+
+    expect(result.current.filters.favourites).toBe(false)
+    expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['bench-press'])
+    expect(searchCalls.length).toBe(searchCallsBeforeToggle + 1)
+  })
+
+  it('refreshes the displayed list when a favourite is removed while the favourites filter is active', async () => {
+    const squat = makeExercise('squat', 'Squat')
+    const pushUp = makeExercise('push-up', 'Push-Up')
+    const benchPress = makeExercise('bench-press', 'Bench Press')
+    let squatRemoved = false
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url === '/api/exercise-categories') return Response.json({ data: [] })
+      if (url === '/api/equipment-types') return Response.json({ data: [] })
+      if (url === '/api/muscle-groups') return Response.json({ data: [] })
+      if (url.startsWith('/api/exercise-favorites') && init?.method === 'DELETE') {
+        squatRemoved = true
+        return Response.json({
+          success: true,
+          data: { exerciseId: 'squat', isFavorite: false },
+        })
+      }
+      if (url === '/api/exercise-favorites') {
+        return Response.json({
+          success: true,
+          data: squatRemoved
+            ? { items: [pushUp], exerciseIds: ['push-up'] }
+            : { items: [squat, pushUp], exerciseIds: ['squat', 'push-up'] },
+        })
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return Response.json({ success: true, data: { items: [] } })
+      }
+      if (url.startsWith('/api/exercises/search')) {
+        return Response.json({
+          success: true,
+          data: {
+            items: [benchPress],
+            total: 1,
+            page: 1,
+            totalPages: 1,
+            hasMore: false,
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() =>
+      useExerciseLibrary({
+        initialSearch: {
+          category_id: [],
+          equipment: [],
+          muscle_group: [],
+          query: '',
+        },
+      }),
+    )
+
+    await waitFor(() => expect(result.current.favoriteExercises).toHaveLength(2))
+
+    await act(async () => {
+      await result.current.actions.toggleFavouritesFilter()
+    })
+    expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat', 'push-up'])
+    expect(result.current.total).toBe(2)
+
+    await act(async () => {
+      await result.current.actions.toggleFavorite('squat')
+    })
+
+    // Removing a favourite while the favourites view is active must update the
+    // rendered list, not just the favouriteExercises state.
+    expect(result.current.favoriteExercises.map((exercise) => exercise.id)).toEqual(['push-up'])
+    expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['push-up'])
+    expect(result.current.total).toBe(1)
+  })
+
   it('loads quick-pick lists and toggles favorites without changing search filters', async () => {
     const benchPress = makeExercise('bench-press', 'Bench Press')
     const squat = makeExercise('squat', 'Squat')

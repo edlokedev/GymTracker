@@ -152,10 +152,13 @@ export default function ExerciseBrowser({
       selectedCategoryIds={library.filters.categoryIds}
       selectedEquipment={library.filters.equipment}
       selectedMuscleGroups={library.filters.muscleGroups}
+      favouritesCount={library.favoriteExercises.length}
+      isFavouritesActive={library.filters.favourites === true}
       onQueryChange={library.actions.setQuery}
       onToggleCategory={library.actions.toggleCategory}
       onToggleEquipment={library.actions.toggleEquipment}
       onToggleMuscleGroup={library.actions.toggleMuscleGroup}
+      onToggleFavourites={library.actions.toggleFavouritesFilter}
       onRemoveFilter={(chip) => library.actions.removeFilter(chip.type, chip.value)}
       onResetFilters={library.actions.resetFilters}
     />
