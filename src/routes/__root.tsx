@@ -1,4 +1,6 @@
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import { lazy, Suspense } from 'react'
 
 import Header from '@/app/components/Header'
@@ -49,6 +51,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <ConditionalHeader />
           <ConditionalAppContent>{children}</ConditionalAppContent>
         </AuthProvider>
+        <Analytics />
+        <SpeedInsights />
         {DevtoolsPanel && (
           <Suspense fallback={null}>
             <DevtoolsPanel />
