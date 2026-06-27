@@ -10,6 +10,12 @@ interface ExerciseGridProps {
   hasMore?: boolean
   onSelectExercise: (exercise: ExerciseWithParsedFields) => void
   onLoadMore?: () => void
+  // Favourite-star wiring. When onToggleFavorite is absent no star renders and
+  // behaviour is unchanged for other callers (e.g. the in-workout picker).
+  favoriteExerciseIds?: Set<string>
+  onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
+  togglingFavoriteId?: string | null
+  isToggleBusy?: boolean
 }
 
 export default function ExerciseGrid({
@@ -20,6 +26,10 @@ export default function ExerciseGrid({
   hasMore = false,
   onSelectExercise,
   onLoadMore,
+  favoriteExerciseIds,
+  onToggleFavorite,
+  togglingFavoriteId = null,
+  isToggleBusy = false,
 }: ExerciseGridProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -151,7 +161,15 @@ export default function ExerciseGrid({
       {/* Exercise Grid - Tennis dashboard responsive */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {exercises.map((exercise) => (
-          <ExerciseCard key={exercise.id} exercise={exercise} onSelect={onSelectExercise} />
+          <ExerciseCard
+            key={exercise.id}
+            exercise={exercise}
+            onSelect={onSelectExercise}
+            isFavorite={favoriteExerciseIds?.has(exercise.id) ?? false}
+            onToggleFavorite={onToggleFavorite}
+            isFavoriteDisabled={isToggleBusy}
+            isFavoritePending={togglingFavoriteId === exercise.id}
+          />
         ))}
       </div>
 

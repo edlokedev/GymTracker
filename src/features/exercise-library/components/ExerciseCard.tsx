@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
 import ExerciseMediaFrame from './ExerciseMediaFrame'
@@ -9,6 +9,10 @@ interface ExerciseCardProps {
   onSelect: (exercise: ExerciseWithParsedFields) => void
   isFavorite?: boolean
   onToggleFavorite?: (exercise: ExerciseWithParsedFields) => void
+  // Disable the star (e.g. another toggle is in flight); the in-flight card
+  // also gets aria-busy via isFavoritePending.
+  isFavoriteDisabled?: boolean
+  isFavoritePending?: boolean
 }
 
 export default function ExerciseCard({
@@ -16,6 +20,8 @@ export default function ExerciseCard({
   onSelect,
   isFavorite = false,
   onToggleFavorite,
+  isFavoriteDisabled = false,
+  isFavoritePending = false,
 }: ExerciseCardProps) {
   const exerciseTitle = formatExerciseName(exercise.name)
 
@@ -43,6 +49,8 @@ export default function ExerciseCard({
               event.stopPropagation()
               onToggleFavorite(exercise)
             }}
+            disabled={isFavoriteDisabled}
+            busy={isFavoritePending}
             className="absolute top-2 right-2 z-20"
           />
         )}
@@ -115,26 +123,60 @@ export default function ExerciseCard({
   )
 }
 
+// Complete static class strings per state (default / active / disabled) — the
+// Gymmie "static class strings only" rule forbids template-literal class
+// construction, so each branch spells out the full utility set.
+const STAR_DEFAULT_CLASS =
+  'flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-gray-200 bg-white/95 text-gray-500 shadow-sm transition-colors hover:bg-gray-50 hover:text-amber-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-amber-400'
+
+const STAR_ACTIVE_CLASS =
+  'flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-gray-200 bg-white/95 text-amber-500 shadow-sm transition-colors hover:bg-gray-50 hover:text-amber-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-700 dark:bg-gray-900/95 dark:text-amber-400 dark:hover:bg-gray-800 dark:hover:text-amber-400'
+
+const STAR_DISABLED_CLASS =
+  'flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-gray-200 bg-white/95 text-gray-300 opacity-60 cursor-not-allowed shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-600'
+
 export function FavoriteStarButton({
   exerciseTitle,
   isFavorite,
   onClick,
+  disabled = false,
+  busy = false,
   className = '',
 }: {
   exerciseTitle: string
   isFavorite: boolean
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void
+  onClick: (event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => void
+  disabled?: boolean
+  busy?: boolean
   className?: string
 }) {
+  const stateClass = disabled
+    ? STAR_DISABLED_CLASS
+    : isFavorite
+      ? STAR_ACTIVE_CLASS
+      : STAR_DEFAULT_CLASS
+  const buttonClassName = [stateClass, className].filter(Boolean).join(' ')
+
   return (
     <button
       type="button"
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (disabled) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          // Enter/Space already activate a native button; preventDefault stops
+          // the synthesized click so the toggle fires exactly once.
+          event.preventDefault()
+          onClick(event)
+        }
+      }}
+      disabled={disabled}
       aria-pressed={isFavorite}
+      aria-busy={busy || undefined}
       aria-label={
         isFavorite ? `Remove ${exerciseTitle} from favorites` : `Add ${exerciseTitle} to favorites`
       }
-      className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-gray-200 bg-white/95 text-gray-500 shadow-sm transition-colors hover:bg-gray-50 hover:text-amber-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-amber-400 ${isFavorite ? 'text-amber-500 dark:text-amber-400' : ''} ${className}`}
+      className={buttonClassName}
     >
       <svg
         className="h-5 w-5"

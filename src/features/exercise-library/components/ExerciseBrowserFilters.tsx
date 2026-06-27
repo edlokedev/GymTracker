@@ -13,10 +13,13 @@ interface ExerciseBrowserFiltersProps {
   selectedCategoryIds: string[]
   selectedEquipment: string[]
   selectedMuscleGroups: string[]
+  favouritesCount: number
+  isFavouritesActive: boolean
   onQueryChange: (query: string) => void
   onToggleCategory: (value: string) => void
   onToggleEquipment: (value: string) => void
   onToggleMuscleGroup: (value: string) => void
+  onToggleFavourites: () => void
   onRemoveFilter: (chip: ActiveExerciseFilterChip) => void
   onResetFilters: () => void
 }
@@ -30,6 +33,11 @@ export function ExerciseBrowserFilters(props: ExerciseBrowserFiltersProps) {
         activeFilterChips={props.activeFilterChips}
         onRemoveFilter={props.onRemoveFilter}
         onResetFilters={props.onResetFilters}
+      />
+      <FavouritesToggle
+        favouritesCount={props.favouritesCount}
+        isActive={props.isFavouritesActive}
+        onToggle={props.onToggleFavourites}
       />
       <ExerciseFacetSections {...props} />
     </div>
@@ -244,6 +252,48 @@ function ActiveFilterSummary({
         ))}
       </div>
     </div>
+  )
+}
+
+function FavouritesToggle({
+  favouritesCount,
+  isActive,
+  onToggle,
+}: {
+  favouritesCount: number
+  isActive: boolean
+  onToggle: () => void
+}) {
+  // Full static class strings per branch (no template-literal composition) per
+  // the Gymmie "static class strings only" styling rule.
+  const buttonClassName = isActive
+    ? 'flex min-h-[44px] w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold shadow-sm transition-colors border-blue-500 bg-blue-600 text-white hover:bg-blue-700 dark:border-blue-400 dark:bg-blue-600 dark:hover:bg-blue-500'
+    : 'flex min-h-[44px] w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold shadow-sm transition-colors border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-200 dark:hover:bg-slate-900'
+
+  const badgeClassName = isActive
+    ? 'rounded-full px-2 py-0.5 text-xs font-bold bg-white/20 text-white'
+    : 'rounded-full px-2 py-0.5 text-xs font-bold bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300'
+
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={isActive} className={buttonClassName}>
+      <span className="flex items-center gap-2">
+        <svg
+          className="h-4 w-4 flex-shrink-0"
+          fill={isActive ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+          />
+        </svg>
+        Favourites only
+      </span>
+      <span className={badgeClassName}>{favouritesCount}</span>
+    </button>
   )
 }
 

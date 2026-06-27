@@ -88,6 +88,9 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
   const lastAppliedRouteKey = useRef<string | null>(null)
   const filtersRef = useRef<ExerciseLibraryFilters>(initialFiltersFromOptions(options))
   const exercisesRef = useRef<ExerciseWithParsedFields[]>([])
+  // Mirror of the latest favourite exercises so the favourites-only filter can
+  // read them inside `runSearch` without adding them to its dependency list.
+  const favoriteExercisesRef = useRef<ExerciseWithParsedFields[]>([])
 
   const [state, setState] = useState<ExerciseLibraryState>({
     isLoading: false,
@@ -119,6 +122,24 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     ) => {
       const append = options?.append ?? false
       const offset = options?.offset ?? 0
+
+      // Favourites is a pure client-side view: the favourite exercises are
+      // already fetched, so skip the search API entirely and expose them as-is.
+      if (filters.favourites === true) {
+        const favouriteItems = favoriteExercisesRef.current
+        exercisesRef.current = favouriteItems
+        setState((prev) => ({
+          ...prev,
+          exercises: favouriteItems,
+          total: favouriteItems.length,
+          currentPage: 1,
+          totalPages: 1,
+          hasMore: false,
+          isLoading: false,
+          isLoadingMore: false,
+        }))
+        return
+      }
 
       setState((prev) => ({
         ...prev,
@@ -156,6 +177,12 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     [pageSize],
   )
 
+  // Keep the favourites ref aligned with state for any path that mutates the
+  // favourites list (mount load, quick-pick refresh, toggle favorite).
+  useEffect(() => {
+    favoriteExercisesRef.current = state.favoriteExercises
+  }, [state.favoriteExercises])
+
   useEffect(() => {
     if (!enabled) return
     let isMounted = true
@@ -169,6 +196,14 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         ])
         if (!isMounted) return
 
+        favoriteExercisesRef.current = favorites.items
+        // If the favourites-only filter is already active (e.g. landed on the
+        // page with ?favourites=true), reflect the freshly-loaded favourites
+        // into the displayed list, since the mount search ran before they
+        // arrived.
+        const favouritesActive = filtersRef.current.favourites === true
+        if (favouritesActive) exercisesRef.current = favorites.items
+
         setState((prev) => ({
           ...prev,
           categories: catalog.categories,
@@ -178,6 +213,15 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
           favoriteExercises: favorites.items,
           recentExercises: recent.items,
           isLoadingQuickPicks: false,
+          ...(favouritesActive
+            ? {
+                exercises: favorites.items,
+                total: favorites.items.length,
+                currentPage: 1,
+                totalPages: 1,
+                hasMore: false,
+              }
+            : {}),
         }))
       } catch (error) {
         console.error('Failed to load exercise catalog support:', error)
@@ -230,6 +274,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         equipment: uniqueValues(nextFilters.equipment),
         muscleGroups: uniqueValues(nextFilters.muscleGroups),
         query: nextFilters.query,
+        favourites: nextFilters.favourites,
       }
       filtersRef.current = normalizedFilters
 
@@ -296,6 +341,10 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         return updateFilters({ query: '' })
       }
 
+      if (type === 'favourites') {
+        return updateFilters({ favourites: false })
+      }
+
       return Promise.resolve()
     },
     [updateFilters],
@@ -309,6 +358,22 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
       offset: exercisesRef.current.length,
     })
   }, [runSearch, state.hasMore, state.isLoadingMore])
+
+  // When the favourites-only filter is active, the rendered list IS the
+  // favourites list — so any path that fetches a fresh favourites set must also
+  // refresh exercises/total/hasMore (not just favoriteExercises state).
+  const reflectFavouritesIfActive = useCallback((items: ExerciseWithParsedFields[]) => {
+    if (filtersRef.current.favourites !== true) return
+    exercisesRef.current = items
+    setState((prev) => ({
+      ...prev,
+      exercises: items,
+      total: items.length,
+      currentPage: 1,
+      totalPages: 1,
+      hasMore: false,
+    }))
+  }, [])
 
   const refreshQuickPicks = useCallback(async () => {
     setState((prev) => ({
@@ -329,6 +394,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         recentExercises: recent.items,
         isLoadingQuickPicks: false,
       }))
+      reflectFavouritesIfActive(favorites.items)
     } catch (error) {
       console.error('Failed to refresh exercise quick picks:', error)
       setState((prev) => ({
@@ -336,7 +402,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         isLoadingQuickPicks: false,
       }))
     }
-  }, [])
+  }, [reflectFavouritesIfActive])
 
   const toggleFavorite = useCallback(
     async (exerciseId: string) => {
@@ -361,6 +427,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
           togglingFavoriteId:
             prev.togglingFavoriteId === result.exerciseId ? null : prev.togglingFavoriteId,
         }))
+        reflectFavouritesIfActive(favorites.items)
       } catch (error) {
         console.error('Failed to toggle favorite exercise:', error)
         setState((prev) => ({
@@ -372,7 +439,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         }))
       }
     },
-    [state.favoriteExerciseIds],
+    [state.favoriteExerciseIds, reflectFavouritesIfActive],
   )
 
   const loadSuggestedExercises = useCallback(
@@ -448,6 +515,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
         updateFilters({
           muscleGroups: toggleFilterValue(filtersRef.current.muscleGroups, muscle),
         }),
+      toggleFavouritesFilter: () => updateFilters({ favourites: !filtersRef.current.favourites }),
       removeFilter,
       resetFilters,
       loadMore,

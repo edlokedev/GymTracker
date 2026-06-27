@@ -13,6 +13,7 @@ export interface ExerciseLibrarySearch {
   equipment?: string[]
   muscle_group?: string[]
   query?: string
+  favourites?: boolean
 }
 
 export interface ExerciseLibraryFilters {
@@ -20,6 +21,7 @@ export interface ExerciseLibraryFilters {
   equipment: string[]
   muscleGroups: string[]
   query: string
+  favourites?: boolean
 }
 
 // Inner payload returned by /api/exercises/search inside the envelope's
@@ -76,7 +78,7 @@ export interface ExerciseQuickPickLists {
   suggested: SuggestedExerciseItem[]
 }
 
-export type ActiveExerciseFilterType = 'category' | 'equipment' | 'muscle' | 'query'
+export type ActiveExerciseFilterType = 'category' | 'equipment' | 'muscle' | 'query' | 'favourites'
 
 export interface ActiveExerciseFilterChip {
   type: ActiveExerciseFilterType
@@ -120,6 +122,7 @@ export function filtersFromRouteSearch(search: ExerciseLibrarySearch): ExerciseL
     equipment: uniqueValues(search.equipment ?? []),
     muscleGroups: uniqueValues(search.muscle_group ?? []),
     query: search.query || '',
+    favourites: search.favourites === true ? true : undefined,
   }
 }
 
@@ -129,6 +132,7 @@ export function routeSearchFromFilters(filters: ExerciseLibraryFilters): Exercis
     equipment: uniqueValues(filters.equipment),
     muscle_group: uniqueValues(filters.muscleGroups),
     query: filters.query.trim(),
+    favourites: filters.favourites === true ? true : undefined,
   }
 }
 
@@ -138,6 +142,7 @@ export function routeSearchKey(search: ExerciseLibrarySearch): string {
     equipment: uniqueValues(search.equipment ?? []).sort(),
     muscle_group: uniqueValues(search.muscle_group ?? []).sort(),
     query: search.query || '',
+    favourites: search.favourites === true,
   })
 }
 
@@ -149,6 +154,7 @@ export function routeSearchToNavigateSearch(search: ExerciseLibrarySearch): Exer
     muscle_group:
       search.muscle_group && search.muscle_group.length > 0 ? search.muscle_group : undefined,
     query: search.query || undefined,
+    favourites: search.favourites === true ? true : undefined,
   }
 }
 
@@ -161,7 +167,8 @@ export function getActiveFilterCount(filters: ExerciseLibraryFilters): number {
     filters.categoryIds.length +
     filters.equipment.length +
     filters.muscleGroups.length +
-    (filters.query.trim() ? 1 : 0)
+    (filters.query.trim() ? 1 : 0) +
+    (filters.favourites === true ? 1 : 0)
   )
 }
 
@@ -170,6 +177,14 @@ export function buildActiveFilterChips(
   categoryLabelById: Map<string, string>,
 ): ActiveExerciseFilterChip[] {
   const chips: ActiveExerciseFilterChip[] = []
+
+  if (filters.favourites === true) {
+    chips.push({
+      type: 'favourites',
+      prefix: 'Show',
+      label: 'Favourites',
+    })
+  }
 
   if (filters.query.trim()) {
     chips.push({

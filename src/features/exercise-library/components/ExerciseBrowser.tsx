@@ -118,6 +118,22 @@ export default function ExerciseBrowser({
     [onSelectExercise, selectExercise],
   )
 
+  // Favourite-star wiring is gated on (a) a signed-in user and (b) standalone
+  // browser mode — when reused as the in-workout picker (onSelectExercise set)
+  // we leave the picker UX untouched.
+  const toggleFavorite = library.actions.toggleFavorite
+  const handleToggleFavorite = useCallback(
+    (exercise: ExerciseWithParsedFields) => {
+      void toggleFavorite(exercise.id)
+    },
+    [toggleFavorite],
+  )
+  const showFavoriteStars = Boolean(user) && !onSelectExercise
+  const favoriteToggleHandler = showFavoriteStars ? handleToggleFavorite : undefined
+  // One global flag (Codex guardrail): disable every star while any toggle is
+  // in flight, closing the concurrent different-exercise race.
+  const isToggleBusy = library.togglingFavoriteId != null
+
   const openCreateForm = useCallback(() => {
     setEditingExercise(null)
     setFormOpen(true)
@@ -152,10 +168,13 @@ export default function ExerciseBrowser({
       selectedCategoryIds={library.filters.categoryIds}
       selectedEquipment={library.filters.equipment}
       selectedMuscleGroups={library.filters.muscleGroups}
+      favouritesCount={library.favoriteExercises.length}
+      isFavouritesActive={library.filters.favourites === true}
       onQueryChange={library.actions.setQuery}
       onToggleCategory={library.actions.toggleCategory}
       onToggleEquipment={library.actions.toggleEquipment}
       onToggleMuscleGroup={library.actions.toggleMuscleGroup}
+      onToggleFavourites={library.actions.toggleFavouritesFilter}
       onRemoveFilter={(chip) => library.actions.removeFilter(chip.type, chip.value)}
       onResetFilters={library.actions.resetFilters}
     />
@@ -197,6 +216,10 @@ export default function ExerciseBrowser({
               hasMore={library.hasMore}
               onSelectExercise={handleExerciseSelect}
               onLoadMore={library.actions.loadMore}
+              favoriteExerciseIds={library.favoriteExerciseIdSet}
+              onToggleFavorite={favoriteToggleHandler}
+              togglingFavoriteId={library.togglingFavoriteId}
+              isToggleBusy={isToggleBusy}
             />
           </main>
         </div>
@@ -207,6 +230,10 @@ export default function ExerciseBrowser({
             isOpen={Boolean(selectedExercise)}
             onClose={closeModal}
             onSelectExercise={onSelectExercise}
+            isFavorite={library.favoriteExerciseIdSet.has(selectedExercise.id)}
+            onToggleFavorite={favoriteToggleHandler}
+            isFavoriteDisabled={isToggleBusy}
+            isFavoritePending={library.togglingFavoriteId === selectedExercise.id}
             canManage={ownedCustomIds.has(selectedExercise.id)}
             onEditExercise={(exercise) => {
               closeModal()
