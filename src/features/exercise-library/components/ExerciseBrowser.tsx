@@ -36,8 +36,14 @@ export default function ExerciseBrowser({
   const [editingExercise, setEditingExercise] = useState<ExerciseWithParsedFields | null>(null)
   const [ownedCustomIds, setOwnedCustomIds] = useState<Set<string>>(new Set())
 
+  // Key this callback on the stable user id (a primitive), not the user object.
+  // useAuth() now memoizes `user`, but depending on `userId` keeps this robust
+  // even if that memoization ever regresses: an unstable dependency here would
+  // re-create the callback every render and re-fire the effect below, which is
+  // exactly what caused the infinite refetch loop against /api/exercises/custom.
+  const userId = user?.id
   const refreshOwnedCustomIds = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setOwnedCustomIds(new Set())
       return
     }
@@ -46,7 +52,7 @@ export default function ExerciseBrowser({
     } catch (error) {
       console.error('Failed to load custom exercises:', error)
     }
-  }, [user])
+  }, [userId])
 
   useEffect(() => {
     void refreshOwnedCustomIds()

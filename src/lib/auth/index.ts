@@ -12,6 +12,7 @@
 // import `useSupabaseAuth` from './supabase-context' directly instead.
 
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { useMemo } from 'react'
 
 import { SupabaseAuthProvider, useSupabaseAuth } from './supabase-context'
 
@@ -50,8 +51,17 @@ export const AuthProvider = SupabaseAuthProvider
 
 export function useAuth() {
   const supa = useSupabaseAuth()
+  // Memoize the adapted user so its identity only changes when the underlying
+  // Supabase user reference changes. adaptUser() builds a fresh object on every
+  // call, so without this memo every render produced a new `user` reference.
+  // Consumers that put `user` in a useEffect/useCallback dependency array then
+  // re-ran on every render — one such case (ExerciseBrowser) drove an infinite
+  // refetch loop against /api/exercises/custom that burned ~280k Vercel
+  // function invocations per day. supa.user is itself stable across renders
+  // (the provider memoizes it), so keying on it gives us a stable adapted user.
+  const user = useMemo(() => adaptUser(supa.user), [supa.user])
   return {
-    user: adaptUser(supa.user),
+    user,
     isAuthenticated: supa.isAuthenticated,
     isLoading: supa.isLoading,
     signIn: supa.signIn,
