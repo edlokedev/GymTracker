@@ -17,7 +17,7 @@ Automatically identifies friction, undocumented patterns, and improvement opport
 
 ## Prompt
 
-Scan the 5 most recently modified JSONL transcript files under ~/.claude/projects/C--Users-Hii-Documents-Code-GymTracker/ (including subagent subdirs). For each, look at assistant tool_use blocks and user messages to identify:
+Scan the 5 most recently modified JSONL transcript files under ~/.claude/projects/-home-user-GymTracker/ (including subagent subdirs). For each, look at assistant tool_use blocks and user messages to identify:
 
 1. **Friction points** — permission dialog triggers, repeated file searches, commands run multiple times before working, clarifying questions CLAUDE.md should have answered.
 2. **Undocumented patterns** — code patterns used ≥2 times not in CLAUDE.md or .agent/skills/.
@@ -25,7 +25,7 @@ Scan the 5 most recently modified JSONL transcript files under ~/.claude/project
 4. **Skill/workflow gaps** — recurring multi-step sequences that could be a reusable .agent/workflow.
 5. **Permission candidates** — read-only Bash commands that triggered prompts (candidates for permissions.allow in .claude/settings.json).
 
-Also check memory files at ~/.claude/projects/C--Users-Hii-Documents-Code-GymTracker/memory/ — flag anything stale or missing.
+Also check memory files at ~/.claude/projects/-home-user-GymTracker/memory/ — flag anything stale or missing.
 
 Save the report to .agent/reviews/YYYY-MM-DD.md using this structure:
 
