@@ -1,16 +1,12 @@
-import { useRouter } from '@tanstack/react-router'
-import Header from './Header'
-
 export function GlobalErrorBoundary({ error, reset }: { error: Error; reset?: () => void }) {
-  const router = useRouter()
+  // Hard navigation home. The root shell (including auth state) is rebuilt on
+  // the full page load, so a router.invalidate() here would be a no-op race.
   const goHome = () => {
-    router.invalidate()
     window.location.href = '/'
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 border-t-4 border-red-500">
-      <Header />
       <main className="max-w-4xl mx-auto px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden text-center p-8 sm:p-12">
           <div className="mx-auto w-24 h-24 mb-6">
