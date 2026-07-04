@@ -78,6 +78,12 @@ export default function ExerciseSelector({
     openPicker()
   }, [requestOpenSignal, openPicker])
 
+  // Clear the pending query-debounce timer on unmount so a late setQuery
+  // doesn't fire against an unmounted tree (audit suggestion).
+  useEffect(() => {
+    return () => clearTimeout(queryDebounceRef.current)
+  }, [])
+
   const selectedCategory = library.filters.categoryIds[0] || ''
   const selectedEquipment = library.filters.equipment[0] || ''
   const effectiveFavoriteExercises =

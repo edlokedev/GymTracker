@@ -135,13 +135,3 @@ export interface WorkoutEvent {
     duration?: number
   }
 }
-
-export interface CalendarActions {
-  setCurrentDate: (date: Date) => void
-  selectDate: (date: Date | null) => void
-  navigateMonth: (direction: 'prev' | 'next') => void
-  openWorkoutModal: (date: Date) => void
-  closeWorkoutModal: () => void
-  loadCalendarData: (dateRange: { start: Date; end: Date }) => Promise<void>
-  refreshData: () => Promise<void>
-}

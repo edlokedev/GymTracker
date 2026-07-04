@@ -1,11 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { buildSearchParams, readApiData, readApiSuccess } from '@/lib/api'
 import { queryKeys } from '@/lib/api/query-keys'
-import type {
-  NextWorkoutResponse,
-  StartFromTemplateResult,
-  WorkoutTemplateWithExercises,
-} from '@/lib/types/database'
+import type { NextWorkoutResponse, WorkoutTemplateWithExercises } from '@/lib/types/database'
 
 export interface WorkoutTemplateExerciseWriteInput {
   exerciseId: string
@@ -112,19 +108,6 @@ export async function updateWorkoutTemplate(
   })
 
   return readApiData(response, `Failed to update saved workout: ${response.status}`)
-}
-
-export async function startWorkoutFromTemplate(
-  templateId: string,
-): Promise<StartFromTemplateResult> {
-  const params = buildSearchParams({ action: 'startFromTemplate' })
-  const response = await fetch(`/api/workout-sessions?${params.toString()}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ templateId }),
-  })
-
-  return readApiData(response, `Failed to start saved workout: ${response.status}`)
 }
 
 export async function archiveWorkoutTemplate(templateId: string): Promise<void> {
