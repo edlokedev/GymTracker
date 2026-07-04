@@ -1,12 +1,21 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   ExerciseWithParsedFields,
   WorkoutSession,
   WorkoutWithDetails,
 } from '@/lib/types/database'
+import { createQueryWrapper } from '../../../test/queryWrapper'
 import { makeExerciseFixture } from './__fixtures__/exercise'
 import WorkoutSessionManager from './components/WorkoutSessionManager'
+
+// WorkoutSessionManager now consumes TanStack Query via useWorkoutSession
+// (ADR-0007, Phase 4), so every render wraps in a fresh QueryClient.
+function renderManager(ui: ReactElement) {
+  const { wrapper } = createQueryWrapper()
+  return render(ui, { wrapper })
+}
 
 const selectorExercise = vi.hoisted<() => ExerciseWithParsedFields>(() => () => ({
   id: 'bench-press',
@@ -158,7 +167,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeSession() })),
     )
 
-    render(<WorkoutSessionManager />)
+    renderManager(<WorkoutSessionManager />)
 
     expect(screen.queryByText('New Workout')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Start Workout' }))
@@ -175,7 +184,7 @@ describe('WorkoutSessionManager', () => {
       ),
     )
 
-    render(<WorkoutSessionManager />)
+    renderManager(<WorkoutSessionManager />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Start Workout' }))
 
@@ -190,7 +199,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -223,7 +232,7 @@ describe('WorkoutSessionManager', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(
+    renderManager(
       <WorkoutSessionManager
         existingSession={makeSession({ end_time: '2026-05-01T11:00:00.000Z' })}
       />,
@@ -262,7 +271,7 @@ describe('WorkoutSessionManager', () => {
       }),
     )
 
-    render(
+    renderManager(
       <WorkoutSessionManager
         existingSession={makeSession({ end_time: '2026-05-01T11:00:00.000Z' })}
       />,
@@ -285,7 +294,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -317,7 +326,7 @@ describe('WorkoutSessionManager', () => {
       ),
     )
 
-    render(
+    renderManager(
       <WorkoutSessionManager
         existingSession={makeSession({ end_time: '2026-05-01T11:00:00.000Z' })}
       />,
@@ -342,7 +351,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -361,7 +370,7 @@ describe('WorkoutSessionManager', () => {
       ),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -379,7 +388,7 @@ describe('WorkoutSessionManager', () => {
       ),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -405,7 +414,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    const { rerender } = render(<WorkoutSessionManager existingSession={makeSession()} />)
+    const { rerender } = renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -427,7 +436,7 @@ describe('WorkoutSessionManager', () => {
       ),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -462,7 +471,7 @@ describe('WorkoutSessionManager', () => {
       ),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -480,7 +489,7 @@ describe('WorkoutSessionManager', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -519,7 +528,7 @@ describe('WorkoutSessionManager', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getAllByRole('button', { name: 'Save Set' }).length).toBeGreaterThan(0),
@@ -562,7 +571,7 @@ describe('WorkoutSessionManager', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -594,7 +603,7 @@ describe('WorkoutSessionManager', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<WorkoutSessionManager existingSession={makeSession()} />)
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
@@ -635,7 +644,7 @@ describe('WorkoutSessionManager', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(
+    renderManager(
       <WorkoutSessionManager existingSession={makeSession()} onSessionDelete={onSessionDelete} />,
     )
 

@@ -122,6 +122,56 @@ past the gate.
   optimistic toggle is reimplemented on Query's `onMutate`/`onError`/`onSettled`
   in Phase 3, not changed in behaviour.
 
+## Phase 4 addendum — workout-session + templates (2026-07-05)
+
+Highest-care phase. Guiding split held: **Query owns server sync, local state owns
+in-flight editing** — per-keystroke set entry never enters the cache.
+
+- **Reads → queries.** Active-session bootstrap is `workoutSessionDetailOptions`
+  (`['workout-sessions','detail',id]`); last-performance prefill flows through
+  `queryClient.fetchQuery(workoutSetHistoryOptions(exerciseId))`
+  (`['workout-sets','history',exerciseId]`). Local editing state is *seeded* from
+  the bootstrap query (guarded by a once-per-requested-id ref plus a
+  `userEditedExercisesRef` so a late seed never stomps an in-flight edit).
+- **`prefillRequestRef` retired.** The prefill merge is keyed by exercise id, so a
+  result arriving after a session switch is still the correct value for that
+  exercise — Query's per-key identity + dedupe replaces the monotonic token. (The
+  ported race test pins last-request-wins per exercise; note it is a correctness
+  contract, not red-provable against the old token, since that merge was already
+  id-keyed.)
+- **Writes → mutations** with targeted invalidation. Set-touching writes (save/
+  update/delete set, change-exercise, remove-exercise, session delete) invalidate
+  `['workout-sessions']` + `['calendar']` + `['exercises','recent']`; pure session
+  metadata writes (create/update/complete) invalidate `['workout-sessions']` +
+  `['calendar']` only (they don't change `workout_sets`, so recents are untouched).
+- **Templates.** List/detail → `workoutTemplatesListOptions` / `workoutTemplateDetailOptions`
+  (`['workout-templates','list'|'detail',id]`); next-workout →
+  `nextWorkoutOptions` (`['workout-templates','next']`). CRUD (archive, create,
+  update) → mutations invalidating `['workout-templates']`. The lib-layer
+  transactionless delete-then-insert (#0004) is **not** fixed here — invalidation
+  just re-reads whatever the API returns; #0004 stays open.
+- **Issue #0011 closed.** All 5 side-effect-inside-state-updater sites fixed
+  (useWorkoutSession add/removeExercise; WorkoutSessionManager completeExercise +
+  removeExercise; WorkoutTemplateEditor addExercise): compute next value → set
+  state → run effects.
+- **Save-status timers.** The three previously-uncleared `saveStatus` setTimeouts
+  are gone. `saveStatus` is now derived from the save mutation's `isPending`
+  ('saving'), with a single cleaned-up timer for the lingering 'saved'/'error'
+  override (cleared on unmount).
+- **Autosave decision: DELETE the dead debounced-metadata-save machinery.** The
+  `scheduleMetadataSave` / `flushMetadataSave` pair (plus `metadataSaveTimerRef` /
+  `metadataSaveFnRef` and their effects) was exported but had **zero consumers** —
+  no debounce→save UX existed anywhere in the tree. Wiring a brand-new autosave
+  feature is an unrequested feature (repo rule); explicit `saveSession` on blur
+  already persists metadata. Removed the whole apparatus rather than wire it.
+- `useWorkoutSession` LOC: 742 → 862. It grew, not shrank: each write is now a
+  `useMutation` block (mutationFn + onSuccess invalidation) plus a thin action
+  wrapper, versus the old single imperative call. The win is not line count but
+  uniformity — invalidation is centralised and declarative, the stale-response
+  and prefill races are gone, and the dead autosave apparatus is removed. Result
+  contract preserved except the two now-removed dead exports
+  (`scheduleMetadataSave`, `flushMetadataSave`).
+
 ## Notes
 
 - Grounded against the official `start-basic-react-query` example (TanStack

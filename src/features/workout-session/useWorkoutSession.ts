@@ -1,4 +1,6 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { queryKeys } from '@/lib/api/query-keys'
 import type {
   ExerciseWithParsedFields,
   WorkoutSession,
@@ -13,14 +15,14 @@ import {
   createWorkoutSet,
   deleteWorkoutSession,
   deleteWorkoutSet,
-  loadWorkoutSessionDetails,
-  loadWorkoutSetHistory,
   removeExerciseSets,
   startWorkoutSessionFromTemplate,
   updateWorkoutSession,
   updateWorkoutSet,
   type WorkoutSessionWriteInput,
   type WorkoutSetHistoryItem,
+  workoutSessionDetailOptions,
+  workoutSetHistoryOptions,
 } from './client'
 import {
   addExerciseToWorkout,
@@ -70,14 +72,8 @@ export function useWorkoutSession({
   onSessionComplete,
   onSessionDelete,
 }: UseWorkoutSessionOptions) {
+  const queryClient = useQueryClient()
   const existingSessionId = existingSession?.id
-  const existingSessionUserId = existingSession?.user_id
-  const existingSessionName = existingSession?.name
-  const existingSessionDate = existingSession?.date
-  const existingSessionStartTime = existingSession?.start_time
-  const existingSessionEndTime = existingSession?.end_time
-  const existingSessionNotes = existingSession?.notes
-  const existingSessionLocation = existingSession?.location_name
   const [session, setSession] = useState<WorkoutSession | null>(existingSession || null)
   const [exercises, setExercises] = useState<ExerciseInWorkout[]>([])
   const [sessionName, setSessionName] = useState(existingSession?.name || '')
@@ -89,25 +85,23 @@ export function useWorkoutSession({
   const [sessionStartTime, setSessionStartTime] = useState(
     existingSession?.start_time || nowISOString(),
   )
-  const [loading, setLoading] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [commandStatus, setCommandStatus] = useState<WorkoutCommandStatus>('idle')
   const [commandError, setCommandError] = useState<string | null>(null)
   const [lastPerformanceByExerciseId, setLastPerformanceByExerciseId] = useState<
     Record<string, WorkoutSet | undefined>
   >({})
+  // `saveStatus` is derived from the save mutation for saving/error; 'saved'
+  // lingers briefly (UX) via the single cleaned-up timer below.
+  const [saveStatusOverride, setSaveStatusOverride] = useState<SaveStatus | null>(null)
   const startedTemplateIdRef = useRef<string | null>(null)
   // Track whether the user explicitly changed date / start time, so startSession
   // can recompute "now" at submit time (a page left open across midnight must not
   // log yesterday's date or a stale start timestamp).
   const userEditedDateRef = useRef(false)
   const userEditedStartTimeRef = useRef(false)
-  // Monotonic token guarding the batch last-performance prefill against stale
-  // merges after a session/template switch.
-  const prefillRequestRef = useRef(0)
-  // Debounced metadata save: flushes on blur, complete, and unmount.
-  const metadataSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const metadataSaveFnRef = useRef<(() => void) | null>(null)
+  // Single UX timer for the lingering "Saved ✓" / transient error, cleaned up on
+  // unmount and re-arm. Replaces the three previously-uncleared setTimeouts.
+  const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const beginCommand = useCallback(() => {
     setCommandStatus('running')
@@ -128,6 +122,23 @@ export function useWorkoutSession({
     setCommandStatus('idle')
   }, [])
 
+  const armSaveStatus = useCallback((status: SaveStatus, clearAfterMs: number) => {
+    setSaveStatusOverride(status)
+    if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current)
+    saveStatusTimerRef.current = setTimeout(() => {
+      setSaveStatusOverride(null)
+      saveStatusTimerRef.current = null
+    }, clearAfterMs)
+  }, [])
+
+  // Clear the lingering save-status timer on unmount so it never fires against a
+  // deleted session.
+  useEffect(() => {
+    return () => {
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current)
+    }
+  }, [])
+
   const resetSession = useCallback(() => {
     setSession(null)
     setExercises([])
@@ -138,7 +149,7 @@ export function useWorkoutSession({
     setSelectedExercise(null)
     setActiveExerciseId(null)
     setSessionStartTime(nowISOString())
-    setSaveStatus('idle')
+    setSaveStatusOverride(null)
     setCommandStatus('idle')
     setCommandError(null)
     setLastPerformanceByExerciseId({})
@@ -164,10 +175,15 @@ export function useWorkoutSession({
     [],
   )
 
+  // Fetch (through Query — cached + deduped) the last logged set for one
+  // exercise and merge it into the prefill map. Merging is keyed by exercise id,
+  // so it is idempotent and race-safe: a result that arrives after a session
+  // switch is still the correct last-performance for that exercise. This is why
+  // the old `prefillRequestRef` monotonic token is gone (ADR-0007, Phase 4).
   const loadLastPerformanceDefaults = useCallback(
     async (exerciseId: string) => {
       try {
-        const [lastSet] = await loadWorkoutSetHistory(exerciseId, 1)
+        const [lastSet] = await queryClient.fetchQuery(workoutSetHistoryOptions(exerciseId, 1))
         if (!lastSet) return
 
         setLastPerformanceByExerciseId((current) => ({
@@ -178,28 +194,25 @@ export function useWorkoutSession({
         console.error('Failed to load last performance defaults:', error)
       }
     },
-    [mapHistoryItemToWorkoutSet],
+    [mapHistoryItemToWorkoutSet, queryClient],
   )
 
   // Batch variant: load last-performance defaults for several exercises at once
   // (used when starting from a saved workout/template or resuming a session,
-  // where exercises are added without going through addExercise). Mirrors the
-  // manual-add prefill so saved workouts prefill previous values too.
+  // where exercises are added without going through addExercise). Each fetch
+  // flows through Query keyed by exercise id, and the merge stays keyed by
+  // exercise id — last-request-wins per exercise, no monotonic token needed.
   const loadLastPerformanceDefaultsForExercises = useCallback(
     async (exerciseIds: string[]) => {
       const uniqueIds = [...new Set(exerciseIds)].filter(Boolean)
       if (uniqueIds.length === 0) return
 
-      const requestId = ++prefillRequestRef.current
       const results = await Promise.allSettled(
         uniqueIds.map(async (id) => {
-          const [lastSet] = await loadWorkoutSetHistory(id, 1)
+          const [lastSet] = await queryClient.fetchQuery(workoutSetHistoryOptions(id, 1))
           return lastSet ? ([id, mapHistoryItemToWorkoutSet(id, lastSet)] as const) : null
         }),
       )
-
-      // Discard if a newer load started (session/template switched) meanwhile.
-      if (requestId !== prefillRequestRef.current) return
 
       const merged: Record<string, WorkoutSet> = {}
       for (const result of results) {
@@ -211,120 +224,171 @@ export function useWorkoutSession({
 
       setLastPerformanceByExerciseId((current) => ({ ...current, ...merged }))
     },
-    [mapHistoryItemToWorkoutSet],
+    [mapHistoryItemToWorkoutSet, queryClient],
   )
 
-  const loadSessionData = useCallback(
+  // Active-session bootstrap → query (ADR-0007, Phase 4). Query owns the server
+  // read; the effect below seeds the local in-flight editing state from it.
+  const detailQuery = useQuery({
+    ...workoutSessionDetailOptions(existingSessionId ?? ''),
+    enabled: Boolean(existingSessionId),
+  })
+
+  // Seed local editing state from the bootstrap query once its data arrives for
+  // the current session. Guarded by the loaded session id so re-renders (or a
+  // background refetch) don't stomp in-progress edits.
+  const seededSessionIdRef = useRef<string | null>(null)
+  // Set once the user edits the in-flight exercise list (add/remove/save/change),
+  // so a late-arriving bootstrap seed never stomps their work. Reset on session
+  // switch. This is the local-editing-wins half of "Query owns server sync, local
+  // state owns in-flight editing".
+  const userEditedExercisesRef = useRef(false)
+  // The detail query is keyed by the requested session id, so its data is the
+  // response for *this* session even if the payload's own id differs (e.g. a
+  // detail endpoint that returns the day's sessions). Seed once per requested id.
+  const detailFetchStatus = detailQuery.fetchStatus
+  const loadedDetail =
+    detailQuery.isSuccess && detailFetchStatus === 'idle' ? detailQuery.data : undefined
+  useEffect(() => {
+    if (!existingSessionId) return
+    if (!loadedDetail) return
+    if (seededSessionIdRef.current === existingSessionId) return
+    if (userEditedExercisesRef.current) return
+    seededSessionIdRef.current = existingSessionId
+
+    setSession(loadedDetail)
+    setSessionName(loadedDetail.name || '')
+    setSessionNotes(loadedDetail.notes || '')
+    setSessionLocation(loadedDetail.location_name || '')
+    setSessionDate(loadedDetail.date)
+    setSessionStartTime(loadedDetail.start_time)
+    const loadedExercises = mapWorkoutDetailsToExercises(loadedDetail)
+    setExercises(loadedExercises)
+    setActiveExerciseId((currentActiveExerciseId) =>
+      getActiveExerciseId(loadedExercises, currentActiveExerciseId),
+    )
+    // Prefill last-performance only for exercises with no in-session sets —
+    // exercises that already have sets prefill from their last logged set
+    // (previousSet wins over lastPerformance), so fetching history for them
+    // would be wasted requests.
+    void loadLastPerformanceDefaultsForExercises(
+      loadedExercises
+        .filter((exercise) => exercise.sets.length === 0)
+        .map((exercise) => exercise.exercise.id),
+    )
+  }, [existingSessionId, loadedDetail, loadLastPerformanceDefaultsForExercises])
+
+  // Imperative reload used after "change exercise" repoints sets server-side.
+  const reloadSessionData = useCallback(
     async (sessionId: string) => {
-      try {
-        setLoading(true)
-        beginCommand()
-        const workout = await loadWorkoutSessionDetails(sessionId)
-
-        setSession(workout)
-        setSessionName(workout.name || '')
-        setSessionNotes(workout.notes || '')
-        setSessionLocation(workout.location_name || '')
-        setSessionDate(workout.date)
-        setSessionStartTime(workout.start_time)
-        const loadedExercises = mapWorkoutDetailsToExercises(workout)
-        setExercises(loadedExercises)
-        setActiveExerciseId((currentActiveExerciseId) =>
-          getActiveExerciseId(loadedExercises, currentActiveExerciseId),
-        )
-        // Prefill last-performance only for exercises with no in-session sets —
-        // exercises that already have sets prefill from their last logged set
-        // (previousSet wins over lastPerformance), so fetching history for them
-        // would be wasted requests.
-        void loadLastPerformanceDefaultsForExercises(
-          loadedExercises
-            .filter((exercise) => exercise.sets.length === 0)
-            .map((exercise) => exercise.exercise.id),
-        )
-        finishCommand()
-      } catch (error) {
-        console.error('Failed to load session data:', error)
-        failCommand(error, 'Failed to load workout session')
-        setExercises([])
-      } finally {
-        setLoading(false)
-      }
+      const workout = await queryClient.fetchQuery({
+        ...workoutSessionDetailOptions(sessionId),
+        // Force a fresh read; the repoint just mutated the server rows.
+        staleTime: 0,
+      })
+      setSession(workout)
+      setSessionName(workout.name || '')
+      setSessionNotes(workout.notes || '')
+      setSessionLocation(workout.location_name || '')
+      setSessionDate(workout.date)
+      setSessionStartTime(workout.start_time)
+      const loadedExercises = mapWorkoutDetailsToExercises(workout)
+      setExercises(loadedExercises)
+      setActiveExerciseId((currentActiveExerciseId) =>
+        getActiveExerciseId(loadedExercises, currentActiveExerciseId),
+      )
+      void loadLastPerformanceDefaultsForExercises(
+        loadedExercises
+          .filter((exercise) => exercise.sets.length === 0)
+          .map((exercise) => exercise.exercise.id),
+      )
     },
-    [beginCommand, failCommand, finishCommand, loadLastPerformanceDefaultsForExercises],
+    [loadLastPerformanceDefaultsForExercises, queryClient],
   )
 
+  // On a session switch: with no existing session, reset; with one, eagerly seed
+  // `session` from the prop (its id is the requested id) so consumers see the new
+  // session id immediately — the bootstrap query then refines the full detail.
+  // Guarded by seededSessionIdRef so the eager prop-seed runs once per switch and
+  // doesn't stomp in-flight edits on unrelated re-renders.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: session?.id is only an early-return guard; the effect keys off existingSessionId (the requested id), not session state — adding session would re-run it on every save.
   useEffect(() => {
     if (!existingSessionId) {
+      seededSessionIdRef.current = null
+      userEditedExercisesRef.current = false
       resetSession()
       return
     }
+    if (seededSessionIdRef.current === existingSessionId) return
+    if (session?.id === existingSessionId) return
+    // New session requested: allow the bootstrap seed to repopulate.
+    userEditedExercisesRef.current = false
+    setSession(existingSession ?? null)
+    setSessionName(existingSession?.name || '')
+    setSessionNotes(existingSession?.notes || '')
+    setSessionLocation(existingSession?.location_name || '')
+    setSessionDate(existingSession?.date || todayString())
+    setSessionStartTime(existingSession?.start_time || nowISOString())
+    // Exercises / active / last-performance are refreshed by the bootstrap query
+    // seed below (not cleared here) to avoid an empty-list flash between the
+    // eager id swap and the detail arriving.
+  }, [existingSessionId, existingSession, resetSession])
 
-    setSession({
-      id: existingSessionId,
-      user_id: existingSessionUserId || '',
-      name: existingSessionName,
-      date: existingSessionDate || todayString(),
-      notes: existingSessionNotes,
-      start_time: existingSessionStartTime || nowISOString(),
-      end_time: existingSessionEndTime,
-      created_at: new Date(),
-      updated_at: new Date(),
-    })
-    setSessionName(existingSessionName || '')
-    setSessionNotes(existingSessionNotes || '')
-    setSessionLocation(existingSessionLocation || '')
-    setSessionDate(existingSessionDate || todayString())
-    setSessionStartTime(existingSessionStartTime || nowISOString())
-    void loadSessionData(existingSessionId)
-  }, [
-    existingSessionDate,
-    existingSessionEndTime,
-    existingSessionLocation,
-    existingSessionName,
-    existingSessionNotes,
-    existingSessionStartTime,
-    existingSessionId,
-    existingSessionUserId,
-    loadSessionData,
-    resetSession,
-  ])
-
-  const startSession = useCallback(async () => {
-    try {
-      setLoading(true)
-      beginCommand()
-
-      // Recompute "now" at submit time unless the user explicitly set them — a
-      // page mounted before midnight must not log yesterday's date / a stale start.
-      const dateToUse = userEditedDateRef.current ? sessionDate : getLocalCalendarDate()
-      const startTimeToUse = userEditedStartTimeRef.current ? sessionStartTime : nowISOString()
-
-      const sessionData: WorkoutSessionWriteInput = {
-        name: sessionName.trim() || undefined,
-        date: dateToUse,
-        notes: sessionNotes.trim() || undefined,
-        start_time: startTimeToUse,
-        location_name: sessionLocation.trim() || undefined,
+  // Invalidate every server view a session/set mutation can touch. `withSets`
+  // adds exercise recents (only set-touching writes change the workout_sets rows
+  // that feed the recents ranking).
+  const invalidateSessionViews = useCallback(
+    ({ withSets }: { withSets: boolean }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutSessions.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
+      if (withSets) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.exercises.recent() })
       }
+    },
+    [queryClient],
+  )
 
-      const newSession = await createWorkoutSession(sessionData)
+  // --- Session lifecycle mutations ---
+
+  const createSessionMutation = useMutation({
+    mutationFn: (data: WorkoutSessionWriteInput) => createWorkoutSession(data),
+    onSuccess: (newSession) => {
       setSession(newSession)
-      // Reflect the server-stored values in the UI (raw setters — not user edits).
       setSessionDate(newSession.date)
       setSessionStartTime(newSession.start_time)
       onSessionSave?.(newSession)
+      invalidateSessionViews({ withSets: false })
+    },
+  })
+
+  const startSession = useCallback(async () => {
+    beginCommand()
+
+    // Recompute "now" at submit time unless the user explicitly set them — a
+    // page mounted before midnight must not log yesterday's date / a stale start.
+    const dateToUse = userEditedDateRef.current ? sessionDate : getLocalCalendarDate()
+    const startTimeToUse = userEditedStartTimeRef.current ? sessionStartTime : nowISOString()
+
+    const sessionData: WorkoutSessionWriteInput = {
+      name: sessionName.trim() || undefined,
+      date: dateToUse,
+      notes: sessionNotes.trim() || undefined,
+      start_time: startTimeToUse,
+      location_name: sessionLocation.trim() || undefined,
+    }
+
+    try {
+      await createSessionMutation.mutateAsync(sessionData)
       finishCommand()
     } catch (error) {
       console.error('Failed to start session:', error)
       failCommand(error, 'Failed to start workout session')
-    } finally {
-      setLoading(false)
     }
   }, [
     beginCommand,
+    createSessionMutation,
     failCommand,
     finishCommand,
-    onSessionSave,
     sessionDate,
     sessionLocation,
     sessionName,
@@ -332,43 +396,40 @@ export function useWorkoutSession({
     sessionStartTime,
   ])
 
+  const startFromTemplateMutation = useMutation({
+    mutationFn: (templateId: string) => startWorkoutSessionFromTemplate(templateId),
+    onSuccess: (result) => {
+      const plannedExercises = mapWorkoutTemplateToExercises(result.template)
+      setSession(result.session)
+      setSessionName(result.session.name || '')
+      setSessionNotes(result.session.notes || '')
+      setSessionLocation(result.session.location_name || '')
+      setSessionDate(result.session.date)
+      setSessionStartTime(result.session.start_time)
+      setExercises(plannedExercises)
+      setActiveExerciseId(getActiveExerciseId(plannedExercises, null))
+      // Prefill last-performance values for the template's exercises, matching
+      // the manual-add behaviour (this is the saved-workout prefill bug fix).
+      void loadLastPerformanceDefaultsForExercises(
+        plannedExercises.map((exercise) => exercise.exercise.id),
+      )
+      onSessionSave?.(result.session)
+      invalidateSessionViews({ withSets: false })
+    },
+  })
+
   const startSessionFromTemplate = useCallback(
     async (templateId: string) => {
+      beginCommand()
       try {
-        setLoading(true)
-        beginCommand()
-        const result = await startWorkoutSessionFromTemplate(templateId)
-        const plannedExercises = mapWorkoutTemplateToExercises(result.template)
-
-        setSession(result.session)
-        setSessionName(result.session.name || '')
-        setSessionNotes(result.session.notes || '')
-        setSessionLocation(result.session.location_name || '')
-        setSessionDate(result.session.date)
-        setSessionStartTime(result.session.start_time)
-        setExercises(plannedExercises)
-        setActiveExerciseId(getActiveExerciseId(plannedExercises, null))
-        // Prefill last-performance values for the template's exercises, matching
-        // the manual-add behaviour (this is the saved-workout prefill bug fix).
-        void loadLastPerformanceDefaultsForExercises(
-          plannedExercises.map((exercise) => exercise.exercise.id),
-        )
-        onSessionSave?.(result.session)
+        await startFromTemplateMutation.mutateAsync(templateId)
         finishCommand()
       } catch (error) {
         console.error('Failed to start workout from template:', error)
         failCommand(error, 'Failed to start workout from template')
-      } finally {
-        setLoading(false)
       }
     },
-    [
-      beginCommand,
-      failCommand,
-      finishCommand,
-      loadLastPerformanceDefaultsForExercises,
-      onSessionSave,
-    ],
+    [beginCommand, failCommand, finishCommand, startFromTemplateMutation],
   )
 
   useEffect(() => {
@@ -378,115 +439,93 @@ export function useWorkoutSession({
     void startSessionFromTemplate(initialTemplateId)
   }, [existingSessionId, initialTemplateId, session?.id, startSessionFromTemplate])
 
+  const updateSessionMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<WorkoutSessionWriteInput> }) =>
+      updateWorkoutSession(id, data),
+    onSuccess: (updatedSession) => {
+      setSession(updatedSession)
+      onSessionSave?.(updatedSession)
+      invalidateSessionViews({ withSets: false })
+    },
+  })
+
   const saveSession = useCallback(async () => {
     if (!session) return
 
     if (!sessionDate || Number.isNaN(Date.parse(sessionDate))) {
-      setSaveStatus('error')
       setCommandStatus('error')
       setCommandError('Choose a valid workout date before saving.')
-      setTimeout(() => setSaveStatus('idle'), 3000)
+      armSaveStatus('error', 3000)
       return
     }
 
-    setSaveStatus('saving')
     beginCommand()
-
     try {
       const locationValue = sessionLocation.trim()
-      const updatedSession = await updateWorkoutSession(session.id, {
-        name: sessionName.trim(),
-        notes: sessionNotes.trim(),
-        date: sessionDate,
-        location_name: locationValue === '' ? null : locationValue,
+      await updateSessionMutation.mutateAsync({
+        id: session.id,
+        data: {
+          name: sessionName.trim(),
+          notes: sessionNotes.trim(),
+          date: sessionDate,
+          location_name: locationValue === '' ? null : locationValue,
+        },
       })
-
-      setSession(updatedSession)
-      onSessionSave?.(updatedSession)
-      setSaveStatus('saved')
       finishCommand()
-      setTimeout(() => setSaveStatus('idle'), 2500)
+      armSaveStatus('saved', 2500)
     } catch (error) {
       console.error('Failed to update session:', error)
-      setSaveStatus('error')
       failCommand(error, 'Failed to update workout session')
-      setTimeout(() => setSaveStatus('idle'), 3000)
+      armSaveStatus('error', 3000)
     }
   }, [
+    armSaveStatus,
     beginCommand,
     failCommand,
     finishCommand,
-    onSessionSave,
     session,
     sessionDate,
     sessionLocation,
     sessionName,
     sessionNotes,
+    updateSessionMutation,
   ])
 
-  // Keep the save fn ref up-to-date so the debounce timer always calls the
-  // latest closure (avoids stale sessionName/notes/location).
-  useEffect(() => {
-    metadataSaveFnRef.current = () => {
-      void saveSession()
-    }
-  }, [saveSession])
-
-  const scheduleMetadataSave = useCallback((delayMs = 1500) => {
-    if (metadataSaveTimerRef.current) clearTimeout(metadataSaveTimerRef.current)
-    metadataSaveTimerRef.current = setTimeout(() => {
-      metadataSaveFnRef.current?.()
-      metadataSaveTimerRef.current = null
-    }, delayMs)
-  }, [])
-
-  const flushMetadataSave = useCallback(() => {
-    if (metadataSaveTimerRef.current) {
-      clearTimeout(metadataSaveTimerRef.current)
-      metadataSaveTimerRef.current = null
-      metadataSaveFnRef.current?.()
-    }
-  }, [])
-
-  // Cancel pending timer on unmount to prevent saving to a deleted session.
-  useEffect(() => {
-    return () => {
-      if (metadataSaveTimerRef.current) clearTimeout(metadataSaveTimerRef.current)
-    }
-  }, [])
+  const completeSessionMutation = useMutation({
+    mutationFn: (id: string) => completeWorkoutSession(id),
+    onSuccess: (completedSession) => {
+      setSession(completedSession)
+      onSessionComplete?.(completedSession)
+      invalidateSessionViews({ withSets: false })
+    },
+  })
 
   const completeSession = useCallback(async () => {
     if (!session) return
 
+    beginCommand()
     try {
-      setLoading(true)
-      beginCommand()
-      // Flush any pending metadata save before marking the session complete.
-      // Must await — completeWorkoutSession must not race the PATCH for metadata.
-      if (metadataSaveTimerRef.current) {
-        clearTimeout(metadataSaveTimerRef.current)
-        metadataSaveTimerRef.current = null
-        await saveSession()
-      }
-      const completedSession = await completeWorkoutSession(session.id)
-      setSession(completedSession)
-      onSessionComplete?.(completedSession)
+      await completeSessionMutation.mutateAsync(session.id)
       finishCommand()
     } catch (error) {
       console.error('Failed to complete session:', error)
       failCommand(error, 'Failed to complete workout session')
-    } finally {
-      setLoading(false)
     }
-  }, [beginCommand, failCommand, finishCommand, onSessionComplete, saveSession, session])
+  }, [beginCommand, completeSessionMutation, failCommand, finishCommand, session])
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: (id: string) => deleteWorkoutSession(id),
+    onSuccess: () => {
+      invalidateSessionViews({ withSets: true })
+    },
+  })
 
   const deleteSession = useCallback(async () => {
     if (!session) return false
 
+    beginCommand()
     try {
-      setLoading(true)
-      beginCommand()
-      await deleteWorkoutSession(session.id)
+      await deleteSessionMutation.mutateAsync(session.id)
 
       if (onSessionDelete) {
         await onSessionDelete(session.id)
@@ -501,53 +540,71 @@ export function useWorkoutSession({
       console.error('Failed to delete session:', error)
       failCommand(error, 'Failed to delete workout')
       return false
-    } finally {
-      setLoading(false)
     }
-  }, [beginCommand, failCommand, finishCommand, onSessionDelete, resetSession, session])
+  }, [
+    beginCommand,
+    deleteSessionMutation,
+    failCommand,
+    finishCommand,
+    onSessionDelete,
+    resetSession,
+    session,
+  ])
+
+  // --- Exercise + set editing ---
 
   const addExercise = useCallback(
     (exercise: ExerciseWithParsedFields) => {
+      // Compute the result first, then set state, then run the effect (prefill)
+      // — no setState from inside a state updater (issue #0011; StrictMode
+      // double-invokes updaters).
+      setSelectedExercise(null)
+
       if (hasExerciseInWorkout(exercises, exercise.id)) {
         setCommandStatus('error')
         setCommandError('This exercise is already in your workout.')
-        setSelectedExercise(null)
         return
       }
 
-      setExercises((currentExercises) => {
-        const result = addExerciseToWorkout(currentExercises, exercise)
-
-        setCommandStatus('success')
-        setCommandError(null)
-        setActiveExerciseId(exercise.id)
-        return result.exercises
-      })
-
+      const { exercises: nextExercises } = addExerciseToWorkout(exercises, exercise)
+      userEditedExercisesRef.current = true
+      setExercises(nextExercises)
+      setCommandStatus('success')
+      setCommandError(null)
+      setActiveExerciseId(exercise.id)
       void loadLastPerformanceDefaults(exercise.id)
-      setSelectedExercise(null)
     },
     [exercises, loadLastPerformanceDefaults],
   )
+
+  const removeExerciseSetsMutation = useMutation({
+    mutationFn: ({ sessionId, exerciseId }: { sessionId: string; exerciseId: string }) =>
+      removeExerciseSets(sessionId, exerciseId),
+    onSuccess: () => {
+      invalidateSessionViews({ withSets: true })
+    },
+  })
 
   const removeExercise = useCallback(
     async (exerciseId: string) => {
       try {
         if (session?.id) {
           beginCommand()
-          await removeExerciseSets(session.id, exerciseId)
+          await removeExerciseSetsMutation.mutateAsync({ sessionId: session.id, exerciseId })
         }
 
-        setExercises((currentExercises) => {
-          const nextExercises = removeExerciseFromWorkout(currentExercises, exerciseId)
-          setActiveExerciseId((currentActiveExerciseId) =>
-            getActiveExerciseId(
-              nextExercises,
-              currentActiveExerciseId === exerciseId ? null : currentActiveExerciseId,
-            ),
-          )
-          return nextExercises
-        })
+        // Compute the next value first, then set state, then run the effect
+        // (reselect active exercise) — no setState from inside a state updater
+        // (issue #0011).
+        const nextExercises = removeExerciseFromWorkout(exercises, exerciseId)
+        userEditedExercisesRef.current = true
+        setExercises(nextExercises)
+        setActiveExerciseId((currentActiveExerciseId) =>
+          getActiveExerciseId(
+            nextExercises,
+            currentActiveExerciseId === exerciseId ? null : currentActiveExerciseId,
+          ),
+        )
         finishCommand()
         return true
       } catch (error) {
@@ -556,13 +613,28 @@ export function useWorkoutSession({
         return false
       }
     },
-    [beginCommand, failCommand, finishCommand, session?.id],
+    [beginCommand, exercises, failCommand, finishCommand, removeExerciseSetsMutation, session?.id],
   )
 
   // "Change exercise": repoint a logged group to a different exercise, keeping
   // its sets. Persisted workouts go through the atomic RPC then reload; an
   // unsaved workout swaps locally. Fast-fails on a client-visible duplicate
   // (the server still blocks authoritatively with a 409).
+  const changeExerciseMutation = useMutation({
+    mutationFn: ({
+      sessionId,
+      fromExerciseId,
+      toExerciseId,
+    }: {
+      sessionId: string
+      fromExerciseId: string
+      toExerciseId: string
+    }) => changeExerciseSets(sessionId, fromExerciseId, toExerciseId),
+    onSuccess: () => {
+      invalidateSessionViews({ withSets: true })
+    },
+  })
+
   const changeExercise = useCallback(
     async (fromExerciseId: string, toExercise: ExerciseWithParsedFields): Promise<boolean> => {
       if (fromExerciseId === toExercise.id) return false
@@ -575,8 +647,12 @@ export function useWorkoutSession({
       try {
         beginCommand()
         if (session?.id) {
-          await changeExerciseSets(session.id, fromExerciseId, toExercise.id)
-          await loadSessionData(session.id)
+          await changeExerciseMutation.mutateAsync({
+            sessionId: session.id,
+            fromExerciseId,
+            toExerciseId: toExercise.id,
+          })
+          await reloadSessionData(session.id)
         } else {
           setExercises((current) => replaceExerciseInWorkout(current, fromExerciseId, toExercise))
         }
@@ -594,14 +670,22 @@ export function useWorkoutSession({
     },
     [
       beginCommand,
+      changeExerciseMutation,
       exercises,
       failCommand,
       finishCommand,
       loadLastPerformanceDefaults,
-      loadSessionData,
+      reloadSessionData,
       session?.id,
     ],
   )
+
+  const saveSetMutation = useMutation({
+    mutationFn: (setData: WorkoutSetInput) => createWorkoutSet(setData),
+    onSuccess: () => {
+      invalidateSessionViews({ withSets: true })
+    },
+  })
 
   const saveSet = useCallback(
     async (exerciseId: string, setData: WorkoutSetInput): Promise<WorkoutSet | null> => {
@@ -609,7 +693,8 @@ export function useWorkoutSession({
 
       try {
         beginCommand()
-        const newSet = await createWorkoutSet(setData)
+        const newSet = await saveSetMutation.mutateAsync(setData)
+        userEditedExercisesRef.current = true
         setExercises((currentExercises) =>
           appendSetToExercise(currentExercises, exerciseId, newSet),
         )
@@ -621,8 +706,16 @@ export function useWorkoutSession({
         return null
       }
     },
-    [beginCommand, failCommand, finishCommand, session],
+    [beginCommand, failCommand, finishCommand, saveSetMutation, session],
   )
+
+  const updateSetMutation = useMutation({
+    mutationFn: ({ setId, setData }: { setId: string; setData: WorkoutSetInput }) =>
+      updateWorkoutSet(setId, setData),
+    onSuccess: () => {
+      invalidateSessionViews({ withSets: true })
+    },
+  })
 
   const updateSet = useCallback(
     async (
@@ -632,7 +725,7 @@ export function useWorkoutSession({
     ): Promise<WorkoutSet | null> => {
       try {
         beginCommand()
-        const updatedSet = await updateWorkoutSet(setId, setData)
+        const updatedSet = await updateSetMutation.mutateAsync({ setId, setData })
         setExercises((currentExercises) =>
           replaceSetInExercise(currentExercises, exerciseId, setId, updatedSet),
         )
@@ -644,14 +737,21 @@ export function useWorkoutSession({
         return null
       }
     },
-    [beginCommand, failCommand, finishCommand],
+    [beginCommand, failCommand, finishCommand, updateSetMutation],
   )
+
+  const deleteSetMutation = useMutation({
+    mutationFn: (setId: string) => deleteWorkoutSet(setId),
+    onSuccess: () => {
+      invalidateSessionViews({ withSets: true })
+    },
+  })
 
   const deleteSet = useCallback(
     async (exerciseId: string, setId: string) => {
       try {
         beginCommand()
-        await deleteWorkoutSet(setId)
+        await deleteSetMutation.mutateAsync(setId)
         setExercises((currentExercises) =>
           removeSetFromExercise(currentExercises, exerciseId, setId),
         )
@@ -663,7 +763,7 @@ export function useWorkoutSession({
         return false
       }
     },
-    [beginCommand, failCommand, finishCommand],
+    [beginCommand, deleteSetMutation, failCommand, finishCommand],
   )
 
   // Public setters that record an explicit user edit (so startSession knows not
@@ -676,6 +776,22 @@ export function useWorkoutSession({
     userEditedStartTimeRef.current = true
     setSessionStartTime(value)
   }, [])
+
+  // `loading` gates the lifecycle buttons (Start/Complete/Delete) — it reflects
+  // an in-flight session-lifecycle command, plus the very first bootstrap read
+  // when there is no session yet to show (an existing session is prop-seeded, so
+  // its buttons stay live while the detail refetches in the background).
+  const loading =
+    (Boolean(existingSessionId) && !session && detailQuery.isPending) ||
+    createSessionMutation.isPending ||
+    startFromTemplateMutation.isPending ||
+    completeSessionMutation.isPending ||
+    deleteSessionMutation.isPending
+
+  // `saveStatus` is the save mutation's live state, with the lingering
+  // 'saved'/'error' override taking precedence while its timer runs.
+  const saveStatus: SaveStatus =
+    saveStatusOverride ?? (updateSessionMutation.isPending ? 'saving' : 'idle')
 
   const totalSets = useMemo(() => getTotalSets(exercises), [exercises])
   const totalVolume = useMemo(() => getTotalVolume(exercises), [exercises])
@@ -720,8 +836,6 @@ export function useWorkoutSession({
     setSessionLocation,
     setSessionDate: setSessionDateEdited,
     setSessionStartTime: setSessionStartTimeEdited,
-    scheduleMetadataSave,
-    flushMetadataSave,
     actions: {
       startSession,
       startSessionFromTemplate,

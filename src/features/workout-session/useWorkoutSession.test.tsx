@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   ExerciseWithParsedFields,
@@ -7,8 +8,16 @@ import type {
   WorkoutTemplateWithExercises,
   WorkoutWithDetails,
 } from '@/lib/types/database'
+import { createQueryWrapper } from '../../../test/queryWrapper'
 import { makeExerciseFixture } from './__fixtures__/exercise'
 import { useWorkoutSession } from './useWorkoutSession'
+
+// Every useWorkoutSession render wraps in a fresh QueryClient (ADR-0007, Phase
+// 4) — the hook bootstraps via useQuery and prefills via fetchQuery.
+function renderWorkoutSession(props: Parameters<typeof useWorkoutSession>[0]) {
+  const { wrapper } = createQueryWrapper()
+  return renderHook(() => useWorkoutSession(props), { wrapper })
+}
 
 const makeSession = (overrides: Partial<WorkoutSession> = {}): WorkoutSession => ({
   id: 'session-1',
@@ -110,7 +119,7 @@ describe('useWorkoutSession', () => {
       vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
     )
 
-    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }))
+    const { result } = renderWorkoutSession({ existingSession: makeSession() })
 
     await waitFor(() => expect(result.current.exercises).toHaveLength(1))
 
@@ -127,7 +136,7 @@ describe('useWorkoutSession', () => {
     const fetchMock = vi.fn(async () => Response.json({ success: true, data: makeSession() }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useWorkoutSession({ onSessionSave }))
+    const { result } = renderWorkoutSession({ onSessionSave })
 
     await act(async () => {
       result.current.setSessionName('Push Day')
@@ -165,9 +174,7 @@ describe('useWorkoutSession', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useWorkoutSession({ initialTemplateId: 'template-1', onSessionSave }),
-    )
+    const { result } = renderWorkoutSession({ initialTemplateId: 'template-1', onSessionSave })
 
     await waitFor(() => expect(result.current.session?.id).toBe('template-session'))
 
@@ -216,7 +223,7 @@ describe('useWorkoutSession', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useWorkoutSession({ initialTemplateId: 'template-1' }))
+    const { result } = renderWorkoutSession({ initialTemplateId: 'template-1' })
 
     await waitFor(() => expect(result.current.session?.id).toBe('template-session'))
 
@@ -241,7 +248,7 @@ describe('useWorkoutSession', () => {
     vi.stubGlobal('alert', alertMock)
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useWorkoutSession({}))
+    const { result } = renderWorkoutSession({})
 
     await act(async () => {
       await result.current.actions.startSession()
@@ -280,12 +287,10 @@ describe('useWorkoutSession', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useWorkoutSession({
-        existingSession: makeSession(),
-        onSessionSave,
-      }),
-    )
+    const { result } = renderWorkoutSession({
+      existingSession: makeSession(),
+      onSessionSave,
+    })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -332,7 +337,7 @@ describe('useWorkoutSession', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }))
+    const { result } = renderWorkoutSession({ existingSession: makeSession() })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -424,7 +429,7 @@ describe('useWorkoutSession', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }))
+    const { result } = renderWorkoutSession({ existingSession: makeSession() })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -471,13 +476,11 @@ describe('useWorkoutSession', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useWorkoutSession({
-        existingSession: makeSession(),
-        onSessionComplete,
-        onSessionDelete,
-      }),
-    )
+    const { result } = renderWorkoutSession({
+      existingSession: makeSession(),
+      onSessionComplete,
+      onSessionDelete,
+    })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -492,5 +495,166 @@ describe('useWorkoutSession', () => {
       await result.current.actions.deleteSession()
     })
     expect(onSessionDelete).toHaveBeenCalledWith('session-1')
+  })
+
+  // --- Phase 4 regression pins (ADR-0007) ---
+
+  // Prefill race: two sessions loaded in quick succession must each resolve to
+  // their own exercises' last-performance. TanStack Query keys history by
+  // exercise id, so a late-arriving prefill can only ever be the correct value
+  // for that exercise — this replaces the retired `prefillRequestRef` token.
+  // RED: keying the prefill merge by anything other than exercise id (or reading
+  // a shared mutable token) would let session A's in-flight prefill overwrite
+  // session B's map.
+  it('resolves last-performance prefill per exercise across a rapid session switch', async () => {
+    const historyByExercise: Record<string, { reps: number; weight: number }> = {
+      'bench-press': { reps: 5, weight: 60 },
+      squat: { reps: 3, weight: 100 },
+    }
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('includeDetails=true')) {
+        const id = new URL(url, 'http://test').searchParams.get('id')
+        // session-1 has bench-press (no sets), session-2 has squat (no sets).
+        const exerciseId = id === 'session-2' ? 'squat' : 'bench-press'
+        return Response.json({
+          success: true,
+          data: {
+            ...makeSession({ id: id ?? 'session-1' }),
+            exercises: [{ exercise: makeExercise(exerciseId), sets: [] }],
+          },
+        })
+      }
+      if (url.includes('action=history')) {
+        const exerciseId = new URL(url, 'http://test').searchParams.get('exerciseId') ?? ''
+        const hist = historyByExercise[exerciseId]
+        return Response.json({
+          success: true,
+          data: hist
+            ? [
+                {
+                  id: `hist-${exerciseId}`,
+                  set_number: 1,
+                  reps: hist.reps,
+                  weight: hist.weight,
+                  session_date: '2026-05-30',
+                  session_name: 'Prev',
+                },
+              ]
+            : [],
+        })
+      }
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { wrapper } = createQueryWrapper()
+    const { result, rerender } = renderHook(
+      ({ session }: { session: WorkoutSession }) => useWorkoutSession({ existingSession: session }),
+      { wrapper, initialProps: { session: makeSession({ id: 'session-1' }) } },
+    )
+
+    await waitFor(() =>
+      expect(result.current.lastPerformanceByExerciseId['bench-press']).toMatchObject({
+        reps: 5,
+        weight: 60,
+      }),
+    )
+
+    rerender({ session: makeSession({ id: 'session-2' }) })
+
+    await waitFor(() =>
+      expect(result.current.lastPerformanceByExerciseId.squat).toMatchObject({
+        reps: 3,
+        weight: 100,
+      }),
+    )
+    // The bench-press prefill from session-1 is keyed by exercise id, so it is
+    // never mis-attributed to squat.
+    expect(result.current.lastPerformanceByExerciseId.squat?.reps).toBe(3)
+  })
+
+  // Updater-side-effect fix (#0011): addExercise computes the next value first,
+  // sets state, then runs its effects — no setters called from inside the
+  // setExercises updater. This exercises the fixed path under StrictMode's
+  // double-invoked render and pins the resulting state (active exercise +
+  // command status) so a regression back to the in-updater pattern is caught.
+  it('adds an exercise without updating state inside the updater under StrictMode', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('includeDetails=true')) {
+        return Response.json({ success: true, data: { ...makeSession(), exercises: [] } })
+      }
+      if (url.includes('action=history')) {
+        return Response.json({ success: true, data: [] })
+      }
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const { wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }), {
+      wrapper: ({ children }) => <StrictMode>{wrapper({ children })}</StrictMode>,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => {
+      result.current.actions.addExercise(makeExercise('bench-press'))
+    })
+
+    await waitFor(() => expect(result.current.exercises).toHaveLength(1))
+    expect(result.current.activeExerciseId).toBe('bench-press')
+    expect(result.current.commandStatus).toBe('success')
+    // No "update a component while rendering" warning — the updater stayed pure.
+    const badUpdateWarnings = consoleError.mock.calls.filter((call) =>
+      String(call[0]).includes('while rendering a different component'),
+    )
+    expect(badUpdateWarnings).toHaveLength(0)
+  })
+
+  // Optimistic/pending save state: while the metadata save PATCH is in flight,
+  // saveStatus reflects the mutation's isPending as 'saving'; on success it
+  // settles to the lingering 'saved'. RED: deriving saveStatus from a plain
+  // boolean set before/after the await (the old model) can't distinguish an
+  // in-flight save from an idle hook the way mutation.isPending does.
+  it('exposes pending then saved save-status through the mutation lifecycle', async () => {
+    let releaseSave: (() => void) | null = null
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('includeDetails=true')) {
+        return Response.json({ success: true, data: { ...makeSession(), exercises: [] } })
+      }
+      if (init?.method === 'PATCH') {
+        await new Promise<void>((resolve) => {
+          releaseSave = resolve
+        })
+        return Response.json({ success: true, data: makeSession({ name: 'Pull Day' }) })
+      }
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderWorkoutSession({ existingSession: makeSession() })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let savePromise: Promise<void>
+    act(() => {
+      result.current.setSessionName('Pull Day')
+      savePromise = result.current.actions.saveSession()
+    })
+
+    // In flight → 'saving'.
+    await waitFor(() => expect(result.current.saveStatus).toBe('saving'))
+
+    await act(async () => {
+      releaseSave?.()
+      await savePromise
+    })
+
+    // Settled → lingering 'saved'.
+    expect(result.current.saveStatus).toBe('saved')
   })
 })
