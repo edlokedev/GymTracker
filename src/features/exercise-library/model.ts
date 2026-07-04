@@ -72,6 +72,21 @@ export interface SuggestedExercisesResult {
   items: SuggestedExerciseItem[]
 }
 
+// A single historical set for an exercise, as returned by
+// /api/workout-sets?action=history (inside the envelope's `data` array).
+export interface HistoricalExerciseSet {
+  id: string
+  set_number: number
+  reps: number
+  weight: number
+  duration_seconds?: number
+  distance_km?: number
+  incline?: number
+  speed_kmh?: number
+  session_date: string
+  session_name: string | null
+}
+
 export interface ExerciseQuickPickLists {
   favorites: ExerciseWithParsedFields[]
   recent: RecentExerciseItem[]

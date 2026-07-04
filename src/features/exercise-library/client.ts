@@ -1,5 +1,7 @@
-import { buildSearchParams, cachedGet, readApiData } from '@/lib/api'
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
+import { buildSearchParams, readApiData } from '@/lib/api'
 import { EXERCISE_IMAGE_BUCKET } from '@/lib/api/custom-exercise-input'
+import { queryKeys } from '@/lib/api/query-keys'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import type { CustomExercisePayload } from './custom-exercise'
@@ -9,17 +11,12 @@ import type {
   ExerciseLibraryFilters,
   ExerciseSearchResult,
   FavoriteExercisesResult,
+  HistoricalExerciseSet,
   RecentExercisesResult,
   SuggestedExercisesResult,
   ToggleFavoriteResult,
 } from './model'
 import { uniqueValues } from './model'
-
-// Client-cache TTL for the static catalog facets. They only change on a catalog
-// reseed, so a few minutes of reuse across navigations is safe; the HTTP layer
-// (P3) still backs longer-lived caching. Pairs with in-flight de-dup so parallel
-// picker mounts share one request.
-const FACET_CACHE_TTL_MS = 5 * 60 * 1000
 
 export function filtersToApiSearchParams(
   filters: ExerciseLibraryFilters,
@@ -48,14 +45,13 @@ export function suggestedExercisesToApiSearchParams(options: {
 }
 
 async function fetchJsonData<T>(url: string, fallback: T): Promise<T> {
-  // Only used for the static facet endpoints (categories, equipment, muscles),
-  // so it's safe to cache + de-dupe by URL. Dynamic/user reads below call
-  // `fetch` directly and are intentionally not cached here.
-  return cachedGet(url, FACET_CACHE_TTL_MS, async () => {
-    const response = await fetch(url)
-    return readApiData<T>(response, `Failed to fetch ${url}`, {
-      fallbackData: fallback,
-    })
+  // Static facet endpoints (categories, equipment, muscles). De-dup and reuse
+  // across navigations is now handled by TanStack Query (staleTime: Infinity on
+  // the facets query — see exerciseFacetsOptions) rather than a hand-rolled
+  // cache, so this is a plain fetch (ADR-0007, Phase 3 retired src/lib/api/cache.ts).
+  const response = await fetch(url)
+  return readApiData<T>(response, `Failed to fetch ${url}`, {
+    fallbackData: fallback,
   })
 }
 
@@ -167,6 +163,101 @@ export async function fetchSuggestedExercises(options: {
       },
     },
   )
+}
+
+export async function fetchExerciseHistory(
+  exerciseId: string,
+  limit = 50,
+): Promise<HistoricalExerciseSet[]> {
+  const params = buildSearchParams({ action: 'history', exerciseId, limit })
+  const response = await fetch(`/api/workout-sets?${params.toString()}`)
+  return await readApiData<HistoricalExerciseSet[]>(
+    response,
+    `Failed to fetch exercise history: ${response.status}`,
+    { fallbackData: [] },
+  )
+}
+
+// ----------------------------------------------------------------------------
+// TanStack Query option factories (ADR-0007, Phase 3). The imperative fetchers
+// above remain the transport; these wrap them with cache keys + policies so the
+// feature hooks are thin useQuery/useInfiniteQuery/useMutation wrappers. Keys
+// come only from queryKeys factories (single source: src/lib/api/query-keys).
+// ----------------------------------------------------------------------------
+
+const SEARCH_PAGE_SIZE = 20
+
+/** Stable, serialisable filter object for the search query key. */
+export function searchFilterKey(filters: ExerciseLibraryFilters) {
+  return {
+    query: filters.query.trim(),
+    categories: uniqueValues(filters.categoryIds),
+    equipment: uniqueValues(filters.equipment),
+    muscleGroups: uniqueValues(filters.muscleGroups),
+  }
+}
+
+/**
+ * Infinite search over the exercise catalog. Replaces the hand-rolled
+ * offset/append pagination in the old useExerciseLibrary — each page is a
+ * distinct offset and TanStack Query merges them, guaranteeing last-request-wins
+ * on filter flips. `favourites` is intentionally NOT a param here: that filter
+ * is a pure client-side view over the favourites query (ADR-0005).
+ */
+export function exerciseSearchOptions(
+  filters: ExerciseLibraryFilters,
+  pageSize: number = SEARCH_PAGE_SIZE,
+) {
+  return infiniteQueryOptions({
+    queryKey: queryKeys.exercises.search(searchFilterKey(filters)),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      searchExerciseLibrary(filters, { limit: pageSize, offset: pageParam }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.reduce((sum, page) => sum + page.items.length, 0) : undefined,
+  })
+}
+
+/** Static catalog facets — never change outside a reseed, so cache forever. */
+export function exerciseFacetsOptions() {
+  return queryOptions({
+    queryKey: queryKeys.exercises.facets(),
+    queryFn: fetchExerciseFacetCatalog,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function favoriteExercisesOptions() {
+  return queryOptions({
+    queryKey: queryKeys.exercises.favourites(),
+    queryFn: fetchFavoriteExercises,
+  })
+}
+
+export function recentExercisesOptions(limit = 10) {
+  return queryOptions({
+    queryKey: queryKeys.exercises.recent(),
+    queryFn: () => fetchRecentExercises(limit),
+  })
+}
+
+export function suggestedExercisesOptions(options: {
+  exerciseId?: string
+  muscle?: string
+  limit?: number
+}) {
+  return queryOptions({
+    queryKey: [...queryKeys.exercises.suggestions(), options] as const,
+    queryFn: () => fetchSuggestedExercises(options),
+  })
+}
+
+export function exerciseHistoryOptions(exerciseId: string, limit = 50) {
+  return queryOptions({
+    queryKey: queryKeys.workoutSets.history(exerciseId),
+    queryFn: () => fetchExerciseHistory(exerciseId, limit),
+    enabled: Boolean(exerciseId),
+  })
 }
 
 // ----------------------------------------------------------------------------

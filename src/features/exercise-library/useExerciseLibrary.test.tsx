@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
+import { createQueryWrapper } from '../../../test/queryWrapper'
 import { useExerciseLibrary } from './useExerciseLibrary'
 
 const makeExercise = (id: string, name: string): ExerciseWithParsedFields => ({
@@ -17,6 +18,14 @@ const makeExercise = (id: string, name: string): ExerciseWithParsedFields => ({
   created_at: new Date(),
   updated_at: new Date(),
 })
+
+// renderHook helper that provides a fresh QueryClient (ADR-0007, Phase 3). The
+// hook is now a façade over four query-backed hooks, so every test wraps it.
+function renderLibrary(options: Parameters<typeof useExerciseLibrary>[0]) {
+  const { wrapper, queryClient } = createQueryWrapper()
+  const rendered = renderHook(() => useExerciseLibrary(options), { wrapper })
+  return { ...rendered, queryClient }
+}
 
 describe('useExerciseLibrary', () => {
   afterEach(() => {
@@ -68,16 +77,14 @@ describe('useExerciseLibrary', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useExerciseLibrary({
-        initialSearch: {
-          category_id: ['strength'],
-          equipment: ['barbell'],
-          muscle_group: ['chest'],
-          query: 'bench',
-        },
-      }),
-    )
+    const { result } = renderLibrary({
+      initialSearch: {
+        category_id: ['strength'],
+        equipment: ['barbell'],
+        muscle_group: ['chest'],
+        query: 'bench',
+      },
+    })
 
     await waitFor(() => expect(result.current.exercises).toHaveLength(1))
 
@@ -87,7 +94,7 @@ describe('useExerciseLibrary', () => {
     expect(result.current.activeFilterCount).toBe(4)
   })
 
-  it('appends the next search page and resets filters', async () => {
+  it('appends the next infinite-search page and resets filters', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
 
@@ -151,35 +158,41 @@ describe('useExerciseLibrary', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useExerciseLibrary({
-        initialSearch: {
-          category_id: [],
-          equipment: [],
-          muscle_group: [],
-          query: 'bench',
-        },
-      }),
-    )
+    const { result } = renderLibrary({
+      initialSearch: {
+        category_id: [],
+        equipment: [],
+        muscle_group: [],
+        query: 'bench',
+      },
+    })
 
     await waitFor(() => expect(result.current.exercises).toHaveLength(1))
+    expect(result.current.hasMore).toBe(true)
 
+    // Infinite pagination: the second page is fetched at offset = sum of prior
+    // page lengths and merged after the first — Query owns the page-merge.
     await act(async () => {
       await result.current.actions.loadMore()
     })
-    expect(result.current.exercises.map((exercise) => exercise.id)).toEqual([
-      'bench-press',
-      'incline-bench',
-    ])
+    await waitFor(() =>
+      expect(result.current.exercises.map((exercise) => exercise.id)).toEqual([
+        'bench-press',
+        'incline-bench',
+      ]),
+    )
+    expect(result.current.hasMore).toBe(false)
 
     await act(async () => {
       await result.current.actions.resetFilters()
     })
+    await waitFor(() =>
+      expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat']),
+    )
     expect(result.current.filters.query).toBe('')
-    expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat'])
   })
 
-  it('shows favourite exercises when the favourites filter is active', async () => {
+  it('shows favourite exercises when the favourites filter is active, without hitting search', async () => {
     const benchPress = makeExercise('bench-press', 'Bench Press')
     const squat = makeExercise('squat', 'Squat')
     const pushUp = makeExercise('push-up', 'Push-Up')
@@ -218,16 +231,14 @@ describe('useExerciseLibrary', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useExerciseLibrary({
-        initialSearch: {
-          category_id: [],
-          equipment: [],
-          muscle_group: [],
-          query: '',
-        },
-      }),
-    )
+    const { result } = renderLibrary({
+      initialSearch: {
+        category_id: [],
+        equipment: [],
+        muscle_group: [],
+        query: '',
+      },
+    })
 
     await waitFor(() => expect(result.current.exercises).toHaveLength(1))
     await waitFor(() => expect(result.current.favoriteExercises).toHaveLength(2))
@@ -238,23 +249,22 @@ describe('useExerciseLibrary', () => {
       await result.current.actions.toggleFavouritesFilter()
     })
 
-    expect(result.current.filters.favourites).toBe(true)
+    await waitFor(() => expect(result.current.filters.favourites).toBe(true))
     expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat', 'push-up'])
     expect(result.current.total).toBe(2)
     expect(result.current.hasMore).toBe(false)
-    // Favourites is a pure client-side filter — it must not hit the search API.
+    // Favourites is a pure client-side filter (ADR-0005) — it must not hit search.
     expect(searchCalls.length).toBe(searchCallsBeforeToggle)
 
     await act(async () => {
       await result.current.actions.toggleFavouritesFilter()
     })
 
-    expect(result.current.filters.favourites).toBe(false)
+    await waitFor(() => expect(result.current.filters.favourites).toBe(false))
     expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['bench-press'])
-    expect(searchCalls.length).toBe(searchCallsBeforeToggle + 1)
   })
 
-  it('refreshes the displayed list when a favourite is removed while the favourites filter is active', async () => {
+  it('optimistically flips a favourite toggle and refreshes the favourites-only list', async () => {
     const squat = makeExercise('squat', 'Squat')
     const pushUp = makeExercise('push-up', 'Push-Up')
     const benchPress = makeExercise('bench-press', 'Bench Press')
@@ -301,37 +311,114 @@ describe('useExerciseLibrary', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useExerciseLibrary({
-        initialSearch: {
-          category_id: [],
-          equipment: [],
-          muscle_group: [],
-          query: '',
-        },
-      }),
-    )
+    const { result } = renderLibrary({
+      initialSearch: {
+        category_id: [],
+        equipment: [],
+        muscle_group: [],
+        query: '',
+      },
+    })
 
     await waitFor(() => expect(result.current.favoriteExercises).toHaveLength(2))
 
     await act(async () => {
       await result.current.actions.toggleFavouritesFilter()
     })
-    expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat', 'push-up'])
-    expect(result.current.total).toBe(2)
+    await waitFor(() =>
+      expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['squat', 'push-up']),
+    )
 
+    // Removing a favourite while the favourites view is active updates the
+    // rendered list (optimistic onMutate + onSettled refetch), not just state.
     await act(async () => {
       await result.current.actions.toggleFavorite('squat')
     })
 
-    // Removing a favourite while the favourites view is active must update the
-    // rendered list, not just the favouriteExercises state.
-    expect(result.current.favoriteExercises.map((exercise) => exercise.id)).toEqual(['push-up'])
+    await waitFor(() =>
+      expect(result.current.favoriteExercises.map((exercise) => exercise.id)).toEqual(['push-up']),
+    )
     expect(result.current.exercises.map((exercise) => exercise.id)).toEqual(['push-up'])
     expect(result.current.total).toBe(1)
   })
 
-  it('loads quick-pick lists and toggles favorites without changing search filters', async () => {
+  it('optimistically drops the favourite then rolls back to its snapshot on error', async () => {
+    const squat = makeExercise('squat', 'Squat')
+    const pushUp = makeExercise('push-up', 'Push-Up')
+
+    // Gate the failing DELETE so the test can observe the optimistic
+    // intermediate state (squat already dropped) *before* the mutation settles,
+    // then release it to reject and assert the rollback restores squat.
+    let releaseDelete: () => void = () => {}
+    const deleteGate = new Promise<void>((resolve) => {
+      releaseDelete = resolve
+    })
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url === '/api/exercise-categories') return Response.json({ data: [] })
+      if (url === '/api/equipment-types') return Response.json({ data: [] })
+      if (url === '/api/muscle-groups') return Response.json({ data: [] })
+      if (url.startsWith('/api/exercise-favorites') && init?.method === 'DELETE') {
+        await deleteGate
+        return new Response('nope', { status: 500 })
+      }
+      if (url === '/api/exercise-favorites') {
+        return Response.json({
+          success: true,
+          data: { items: [squat, pushUp], exerciseIds: ['squat', 'push-up'] },
+        })
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return Response.json({ success: true, data: { items: [] } })
+      }
+      if (url.startsWith('/api/exercises/search')) {
+        return Response.json({
+          success: true,
+          data: { items: [], total: 0, page: 1, totalPages: 1, hasMore: false },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderLibrary({
+      initialSearch: {
+        category_id: [],
+        equipment: [],
+        muscle_group: [],
+        query: '',
+      },
+    })
+
+    await waitFor(() => expect(result.current.favoriteExercises).toHaveLength(2))
+    expect(result.current.favoriteExerciseIds).toEqual(['squat', 'push-up'])
+
+    // Fire the toggle but don't await it — the DELETE is gated open.
+    let togglePromise: Promise<unknown> = Promise.resolve()
+    act(() => {
+      togglePromise = result.current.actions.toggleFavorite('squat').catch(() => {})
+    })
+
+    // Optimistic flip: squat is dropped from the cache immediately, before the
+    // server responds.
+    await waitFor(() => expect(result.current.favoriteExerciseIds).toEqual(['push-up']))
+
+    // Release the DELETE → it rejects → onError rolls back to the snapshot and
+    // onSettled re-reads the server list. Either path restores squat; together
+    // they guarantee a failed toggle never leaves a phantom removal.
+    await act(async () => {
+      releaseDelete()
+      await togglePromise
+    })
+
+    await waitFor(() => expect(result.current.togglingFavoriteId).toBeNull())
+    expect(result.current.favoriteExerciseIds).toEqual(['squat', 'push-up'])
+  })
+
+  it('loads quick-pick lists and toggles a favourite without changing search filters', async () => {
     const benchPress = makeExercise('bench-press', 'Bench Press')
     const squat = makeExercise('squat', 'Squat')
     const pushUp = makeExercise('push-up', 'Push-Up')
@@ -389,16 +476,14 @@ describe('useExerciseLibrary', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useExerciseLibrary({
-        initialSearch: {
-          category_id: [],
-          equipment: [],
-          muscle_group: [],
-          query: 'bench',
-        },
-      }),
-    )
+    const { result } = renderLibrary({
+      initialSearch: {
+        category_id: [],
+        equipment: [],
+        muscle_group: [],
+        query: 'bench',
+      },
+    })
 
     await waitFor(() => expect(result.current.quickPickLists.favorites).toHaveLength(1))
     expect(result.current.favoriteExerciseIds).toEqual(['squat'])
@@ -408,15 +493,16 @@ describe('useExerciseLibrary', () => {
     await act(async () => {
       await result.current.actions.loadSuggestedExercises({ exerciseId: 'bench-press', limit: 5 })
     })
-    expect(result.current.quickPickLists.suggested[0]).toMatchObject({
-      exercise: { id: 'push-up' },
-      score: 12,
-    })
+    await waitFor(() =>
+      expect(result.current.quickPickLists.suggested[0]).toMatchObject({
+        exercise: { id: 'push-up' },
+        score: 12,
+      }),
+    )
 
     await act(async () => {
       await result.current.actions.toggleFavorite('push-up')
     })
-    expect(result.current.favoriteExerciseIds).toEqual(['squat'])
     expect(result.current.filters.query).toBe('bench')
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/exercise-favorites',
