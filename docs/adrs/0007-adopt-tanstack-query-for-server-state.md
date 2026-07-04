@@ -2,10 +2,11 @@
 
 ## Status
 
-Accepted — Phase 0 (enablement) and Phase 1 (calendar pilot) implemented on
-`feat/tanstack-query-phase0` / `feat/tanstack-query-phase1`. Rollout is phased
-(see `docs/plans/tanstack-query-migration.md`); this ADR governs the whole
-migration and is updated as phases land.
+Accepted — **all five phases implemented** across the `feat/tanstack-query-phase0`
+→ `feat/tanstack-query-phase5` branch stack (see
+`docs/plans/tanstack-query-migration.md`). This ADR governs the whole migration;
+per-phase addenda below record each phase's outcome. Awaiting operator PR review
+of the stack (not merged to `master`).
 
 ## Context
 
@@ -171,6 +172,110 @@ in-flight editing** — per-keystroke set entry never enters the cache.
   and prefill races are gone, and the dead autosave apparatus is removed. Result
   contract preserved except the two now-removed dead exports
   (`scheduleMetadataSave`, `flushMetadataSave`).
+
+## Phase 5 addendum — loaders, preload & cleanup (2026-07-05)
+
+Final phase. Loader/SSR prefetch, dead-code sweep, architecture grep-gates.
+
+### Loaders — public data only (pre-P13 constraint held)
+
+The `/exercises` browser route now has a route `loader` that
+`ensureQueryData(exerciseFacetsOptions())` +
+`ensureInfiniteQueryData(exerciseSearchOptions(filtersFromRouteSearch(search)))`,
+plus `defaultPreload: 'intent'` on the router.
+
+Public/private verdict was decided by **evidence, not assumption** — the two
+endpoints the first paint needs are both `publicMethod`:
+
+- `/api/exercises/search` → `publicMethod` (`api.exercises.search.ts`).
+- Facets — `/api/exercise-categories`, `/api/equipment-types`,
+  `/api/muscle-groups` → all `publicMethod` (with `cacheControl: CATALOG_CACHE_CONTROL`).
+
+So a server-rendered loader has the data with **no user**, which is exactly what
+the pre-P13 constraint permits. The private exercise slices
+(favourites/recents/suggestions → all `privateMethod`) stay client-fetch; the
+loader deliberately does not touch them. Favourites is a client-side *view*
+(ADR-0005), so the loader always prefetches the base (non-favourites) search
+regardless of the incoming `favourites` flag.
+
+This was **not** a no-op: because search + facets are public, real loader
+prefetch was viable and shipped. Had they been private, the loader would have
+been documented as a no-op and skipped — that branch did not fire.
+
+### P13 follow-up (unchanged obligation)
+
+When server-session bootstrap (P13) lands, promote the **private** queries
+(calendar, workout-sessions list/detail, workout-sets history, exercise
+favourites/recents/suggestions) to loader prefetch on their routes — the
+`ensureQueryData` machinery is already proven on the public `/exercises` loader;
+P13 only removes the "no user during SSR" blocker.
+
+### Dead-code sweep (each verified still-dead before deletion)
+
+- `startWorkoutFromTemplate` (workout-templates/client.ts) — **deleted** (+ its
+  test). Test-only consumer; the live path is
+  `startWorkoutSessionFromTemplate` in workout-session/client.ts, which sends the
+  client's local calendar day. The dead duplicate omitted the date and so
+  carried the old UTC-midnight date bug — now gone.
+- `CategoryFilter.tsx` + `MuscleGroupFilter.tsx` (exercise-library/components) —
+  **deleted**. Zero real importers (only self-references + a stale graphify
+  cache blob). Superseded by the facet chip UI during the Phase 3 split.
+- `copyFlash` dead prop plumbing in `SetEntry.tsx` — **removed**. It was a
+  `const copyFlash = false` threaded through all three field groups into
+  `inputClass(copyFlash)`; the `motion-field-flash` branch could never fire.
+  Removed the prop from `FieldGroupProps` and all three signatures/call sites.
+- `CalendarActions` interface (`lib/types/calendar.ts`) — **deleted**. A
+  pre-Query shape (including a `loadCalendarData` member) left entirely
+  unreferenced after the Phase 1 calendar rewrite; the hook returns an
+  inline-typed actions object instead.
+- `ExerciseSelector.tsx` `queryDebounceRef` — the ref still exists post-Phase-3,
+  so per the audit suggestion an **unmount-cleanup effect** was added
+  (`clearTimeout` on unmount) so a late debounced `setQuery` can't fire against
+  an unmounted tree.
+
+### Architecture grep-gates (final state)
+
+- **No component/hook fetch outside Query.** `grep "fetch(" src/features
+  src/components src/app` returns only `.refetch()` calls (Query's own method);
+  zero raw `fetch(` outside `client.ts` transport functions.
+- **`readApiResult`** — gone from all migrated features; remaining hits are the
+  lib helper (`lib/api/client.ts`, the intended home) and `progress/client.ts`,
+  which is an **un-migrated feature with no migration phase** (progress was never
+  in the 5-phase scope). Left as-is; flagged as a follow-up if progress is ever
+  migrated.
+- **Manual race tokens / mirror refs** — `exercisesRef`, `favoriteExercisesRef`,
+  `prefillRequestRef` are all gone (only retirement comments/test names remain).
+  `filtersRef` in `useExerciseFilters.ts` survives **and is correct to keep**: it
+  is a latest-value ref for stable local-filter callbacks (the hook holds *no
+  server state*), not a server-state mirror ref or a race token — it is not one
+  of the three god-hook mirror refs the audit flagged.
+
+### Open follow-ups (carried, not closed here)
+
+- **#0004** — transactionless delete-then-insert in workout-templates `update()`
+  (and the workout-sessions `duplicate()` family). Query invalidation just
+  re-reads whatever the API returns; the lib-layer write is unchanged. Stays open.
+- Remaining audit **Importants** untouched by this migration: sibling
+  inconsistency (auth guards / HTTP verbs / pagination parsing / body
+  validation / not-found conventions), type/shape triplication and the
+  permissive `database.types.ts` placeholder, `exercise-discovery` unbounded
+  `listRecentRows` (#0007), `set_order: 0` falsy check (#0006), the
+  `{ source: null as never }` type-lie (#0005), and `ExerciseGrid` "Reset
+  Filters" `window.location.reload()` (#0008).
+
+### LOC honesty note (whole migration)
+
+Query did **not** shrink the codebase line-for-line. `useExerciseLibrary` (530
+lines, 3 mirror refs) became four focused hooks + a ~125-line façade;
+`useWorkoutSession` grew 742 → 862 (each write is now a `useMutation` block).
+What died is the *bespoke machinery*: `src/lib/api/cache.ts` (TTL/dedupe) deleted
+outright, the hand-rolled optimistic favourites toggle, the `prefillRequestRef`
+monotonic race token, three mirror refs, several uncleared `setTimeout`s, and the
+dead debounced-metadata-save apparatus. The stale-response races (calendar
+month-flip, history filter-flip, prefill) are gone as a *class*, replaced by
+Query's last-request-wins identity. Net: fewer mechanisms, uniform declarative
+invalidation, more lines — a deliberate trade of line count for correctness and
+one well-known dependency over four hand-rolled ones.
 
 ## Notes
 
