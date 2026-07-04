@@ -1,175 +1,138 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { CalendarState } from '@/lib/types/calendar'
+import { useQuery } from '@tanstack/react-query'
+import { useCallback, useMemo, useState } from 'react'
+import type { CalendarState, WorkoutSessionWithSets } from '@/lib/types/calendar'
 import { getRolling30DayRange } from '@/lib/utils/calendar'
-import { fetchCalendarData, fetchWorkoutDetails } from './client'
-import { createInitialCalendarState, toWorkoutEvents } from './model'
+import { calendarDataOptions, workoutDayOptions } from './client'
+import { emptyCalendarSummary, toWorkoutEvents } from './model'
 
+/**
+ * Calendar server state via TanStack Query (ADR-0007, Phase 1).
+ *
+ * Local state owns only navigation/UI: the anchor `currentDate` (which derives
+ * the rolling window), the selected date, modal open/closed, view mode, and an
+ * optional location override applied after an inline edit. All server reads are
+ * `useQuery`:
+ *   - calendar window  → `calendarDataOptions(currentDate)`
+ *   - day drill-down   → `workoutDayOptions(selectedDate)` (enabled with modal)
+ *
+ * This replaces the old imperative `loadCalendarData`/`loadWorkoutDetails`, the
+ * fetch-inside-setState bug in `navigateMonth` (issue #0003 calendar site), and
+ * the hand-rolled stale-response race — Query's last-request-wins guarantees the
+ * rendered window matches the most recent navigation.
+ */
 export const useCalendarData = (userId: string) => {
-  const [state, setState] = useState<CalendarState>(() => createInitialCalendarState())
+  const enabled = Boolean(userId)
 
-  // Load calendar data for a date range
-  const loadCalendarData = useCallback(
-    async (dateRange: { start: Date; end: Date }) => {
-      if (!userId) return
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [calendarView, setCalendarView] = useState<CalendarState['calendarView']>('rolling')
+  const [locationOverride, setLocationOverride] = useState<{
+    sessionId: string
+    locationName: string | null
+  } | null>(null)
 
-      setState((prev) => ({ ...prev, isLoading: true, error: null }))
+  const dateRange = useMemo(() => getRolling30DayRange(currentDate), [currentDate])
 
-      try {
-        const data = await fetchCalendarData({ dateRange })
+  const calendarQuery = useQuery({ ...calendarDataOptions(currentDate), enabled })
 
-        if (data.success && data.data) {
-          setState((prev) => ({
-            ...prev,
-            workoutData: data.data.workouts,
-            summaryStats: data.data.summary,
-            dateRange,
-            isLoading: false,
-            error: null,
-          }))
-        } else {
-          throw new Error(data.error || 'Failed to load calendar data')
-        }
-      } catch (error) {
-        console.error('Error loading calendar data:', error)
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to load calendar data',
-        }))
-      }
-    },
-    [userId],
-  )
+  const dayQuery = useQuery({
+    ...workoutDayOptions(selectedDate ?? new Date(0)),
+    enabled: enabled && isModalOpen && selectedDate !== null,
+  })
 
-  // Load workout details for a specific date
-  const loadWorkoutDetails = useCallback(
-    async (date: Date) => {
-      if (!userId) return
+  const workoutData = calendarQuery.data?.workouts ?? []
+  const summaryStats = calendarQuery.data?.summary ?? emptyCalendarSummary
 
-      setState((prev) => ({ ...prev, isLoading: true }))
+  // First session for the selected day (parity with the old behaviour), with an
+  // optimistic location override applied after an inline edit.
+  const selectedWorkout = useMemo<WorkoutSessionWithSets | null>(() => {
+    const first = dayQuery.data?.[0] ?? null
+    if (!first) return null
+    if (locationOverride && locationOverride.sessionId === first.id) {
+      return { ...first, locationName: locationOverride.locationName ?? undefined }
+    }
+    return first
+  }, [dayQuery.data, locationOverride])
 
-      try {
-        const data = await fetchWorkoutDetails(date)
+  const error = calendarQuery.error
+    ? calendarQuery.error instanceof Error
+      ? calendarQuery.error.message
+      : 'Failed to load calendar data'
+    : null
 
-        if (data.success && data.data.length > 0) {
-          setState((prev) => ({
-            ...prev,
-            selectedWorkout: data.data[0], // For now, take the first session
-            isLoading: false,
-          }))
-        } else {
-          setState((prev) => ({
-            ...prev,
-            selectedWorkout: null,
-            isLoading: false,
-          }))
-        }
-      } catch (error) {
-        console.error('Error loading workout details:', error)
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to load workout details',
-        }))
-      }
-    },
-    [userId],
-  )
+  const isLoading =
+    (calendarQuery.isPending && enabled) || (isModalOpen && dayQuery.isPending && enabled)
 
-  // Calendar actions
+  const state: CalendarState = {
+    currentDate,
+    selectedDate,
+    dateRange,
+    workoutData,
+    selectedWorkout,
+    isLoading,
+    error,
+    isModalOpen,
+    calendarView,
+    summaryStats,
+  }
+
   const actions = {
-    setCurrentDate: useCallback(
-      (date: Date) => {
-        setState((prev) => ({ ...prev, currentDate: date }))
-
-        // Update date range to rolling 30-day window around the new current date
-        const newRange = getRolling30DayRange(date)
-        loadCalendarData(newRange)
-      },
-      [loadCalendarData],
-    ),
-
-    selectDate: useCallback((date: Date | null) => {
-      setState((prev) => ({ ...prev, selectedDate: date }))
+    setCurrentDate: useCallback((date: Date) => {
+      setCurrentDate(date)
     }, []),
 
-    navigateMonth: useCallback(
-      (direction: 'prev' | 'next') => {
-        setState((prev) => {
-          const newDate = new Date(prev.currentDate)
-          newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1))
+    selectDate: useCallback((date: Date | null) => {
+      setSelectedDate(date)
+    }, []),
 
-          const newRange = getRolling30DayRange(newDate)
-          loadCalendarData(newRange)
+    navigateMonth: useCallback((direction: 'prev' | 'next') => {
+      // Compute the next anchor and set it — no fetch inside the updater. The
+      // derived query key changes, so Query fetches the new window (issue #0003
+      // calendar-site fix).
+      setCurrentDate((prev) => {
+        const next = new Date(prev)
+        next.setMonth(next.getMonth() + (direction === 'next' ? 1 : -1))
+        return next
+      })
+    }, []),
 
-          return {
-            ...prev,
-            currentDate: newDate,
-            dateRange: newRange,
-          }
-        })
-      },
-      [loadCalendarData],
-    ),
-
-    openWorkoutModal: useCallback(
-      (date: Date) => {
-        setState((prev) => ({
-          ...prev,
-          isModalOpen: true,
-          selectedDate: date,
-        }))
-        loadWorkoutDetails(date)
-      },
-      [loadWorkoutDetails],
-    ),
+    openWorkoutModal: useCallback((date: Date) => {
+      setLocationOverride(null)
+      setSelectedDate(date)
+      setIsModalOpen(true)
+    }, []),
 
     closeWorkoutModal: useCallback(() => {
-      setState((prev) => ({
-        ...prev,
-        isModalOpen: false,
-        selectedDate: null,
-        selectedWorkout: null,
-      }))
+      setIsModalOpen(false)
+      setSelectedDate(null)
+      setLocationOverride(null)
     }, []),
 
     refreshData: useCallback(() => {
-      const range = getRolling30DayRange(state.currentDate)
-      loadCalendarData(range)
-    }, [loadCalendarData, state.currentDate]),
+      void calendarQuery.refetch()
+    }, [calendarQuery]),
 
     setCalendarView: useCallback((view: CalendarState['calendarView']) => {
-      setState((prev) => ({ ...prev, calendarView: view }))
+      setCalendarView(view)
     }, []),
 
-    updateSelectedWorkoutLocation: useCallback((locationName: string | null) => {
-      setState((prev) => {
-        if (!prev.selectedWorkout) return prev
-        return {
-          ...prev,
-          selectedWorkout: { ...prev.selectedWorkout, locationName: locationName ?? undefined },
-        }
-      })
-    }, []),
+    updateSelectedWorkoutLocation: useCallback(
+      (locationName: string | null) => {
+        const sessionId = dayQuery.data?.[0]?.id
+        if (!sessionId) return
+        setLocationOverride({ sessionId, locationName })
+      },
+      [dayQuery.data],
+    ),
   }
 
-  // Transform workout data to calendar events for ilamy Calendar
-  const workoutEvents = useMemo(() => toWorkoutEvents(state.workoutData), [state.workoutData])
-
-  // Initialize calendar data on mount
-  useEffect(() => {
-    if (userId) {
-      const initialRange = getRolling30DayRange()
-      setState((prev) => ({ ...prev, dateRange: initialRange }))
-      loadCalendarData(initialRange)
-    }
-  }, [userId, loadCalendarData])
+  const workoutEvents = useMemo(() => toWorkoutEvents(workoutData), [workoutData])
 
   return {
     state,
     actions,
     workoutEvents,
-    loadCalendarData,
-    loadWorkoutDetails,
+    refetchCalendar: calendarQuery.refetch,
   }
 }
