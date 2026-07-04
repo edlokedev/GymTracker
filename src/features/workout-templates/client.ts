@@ -1,4 +1,6 @@
+import { queryOptions } from '@tanstack/react-query'
 import { buildSearchParams, readApiData, readApiSuccess } from '@/lib/api'
+import { queryKeys } from '@/lib/api/query-keys'
 import type {
   NextWorkoutResponse,
   StartFromTemplateResult,
@@ -33,6 +35,41 @@ export async function loadWorkoutTemplate(id: string): Promise<WorkoutTemplateWi
 export async function loadNextWorkout(): Promise<NextWorkoutResponse> {
   const response = await fetch('/api/next-workout')
   return readApiData(response, `Failed to load next workout: ${response.status}`)
+}
+
+/**
+ * Query options for the saved-workouts list (ADR-0007, Phase 4), keyed
+ * `['workout-templates','list']`. Replaces the imperative `loadWorkoutTemplates`
+ * in `useWorkoutTemplates`; CRUD mutations invalidate `queryKeys.workoutTemplates.all`.
+ */
+export function workoutTemplatesListOptions() {
+  return queryOptions({
+    queryKey: queryKeys.workoutTemplates.list(),
+    queryFn: loadWorkoutTemplates,
+  })
+}
+
+/**
+ * Query options for a single saved workout's detail (ADR-0007, Phase 4), keyed
+ * `['workout-templates','detail',id]`.
+ */
+export function workoutTemplateDetailOptions(id: string) {
+  return queryOptions({
+    queryKey: queryKeys.workoutTemplates.detail(id),
+    queryFn: () => loadWorkoutTemplate(id),
+  })
+}
+
+/**
+ * Query options for the next-workout recommendation (ADR-0007, Phase 4), keyed
+ * `['workout-templates','next']`. Selects the recommendation out of the envelope
+ * so consumers get `NextWorkoutRecommendation | null` directly.
+ */
+export function nextWorkoutOptions() {
+  return queryOptions({
+    queryKey: queryKeys.workoutTemplates.nextWorkout(),
+    queryFn: async () => (await loadNextWorkout()).recommendation,
+  })
 }
 
 export async function createWorkoutTemplate(

@@ -1,16 +1,18 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, SaveIcon } from '@/components/ui/ActionIcons'
 import { InlineError } from '@/components/ui/InlineError'
 import { TrashButton } from '@/components/ui/TrashButton'
 import ExerciseSelector from '@/features/exercise-library/components/ExerciseSelector'
+import { queryKeys } from '@/lib/api/query-keys'
 import type { ExerciseWithParsedFields, WorkoutTemplateWithExercises } from '@/lib/types/database'
 import { formatExerciseName } from '@/lib/utils/text'
 import {
   createWorkoutTemplate,
-  loadWorkoutTemplate,
   updateWorkoutTemplate,
   type WorkoutTemplateExerciseWriteInput,
+  workoutTemplateDetailOptions,
 } from '../client'
 
 interface TemplateEditorExercise {
@@ -25,49 +27,55 @@ interface WorkoutTemplateEditorProps {
 
 export function WorkoutTemplateEditor({ templateId }: WorkoutTemplateEditorProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const isEditing = Boolean(templateId)
   const [name, setName] = useState('')
   const [notes, setNotes] = useState('')
   const [exercises, setExercises] = useState<TemplateEditorExercise[]>([])
   const [selectedExercise, setSelectedExercise] = useState<ExerciseWithParsedFields | null>(null)
-  const [isLoading, setIsLoading] = useState(Boolean(templateId))
-  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const loadTemplate = useCallback(async () => {
-    if (!templateId) return
+  // Detail load → query (ADR-0007, Phase 4). Local editor state is seeded from
+  // the query on arrival; the in-flight edits (name/notes/exercises) stay local
+  // — the query owns the server read, not the draft.
+  const detailQuery = useQuery({
+    ...workoutTemplateDetailOptions(templateId ?? ''),
+    enabled: Boolean(templateId),
+  })
 
-    try {
-      setIsLoading(true)
-      setError(null)
-      const template = await loadWorkoutTemplate(templateId)
-      setName(template.name)
-      setNotes(template.notes ?? '')
-      setExercises(mapTemplateToEditorExercises(template))
-    } catch (loadError) {
-      console.error('Failed to load saved workout:', loadError)
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load saved workout')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [templateId])
-
+  // Seed the editor draft from the query data when it arrives. `detailQuery.data`
+  // identity only changes on a fresh load/refetch, so this doesn't stomp edits on
+  // unrelated re-renders.
   useEffect(() => {
-    void loadTemplate()
-  }, [loadTemplate])
+    const template = detailQuery.data
+    if (!template) return
+    setName(template.name)
+    setNotes(template.notes ?? '')
+    setExercises(mapTemplateToEditorExercises(template))
+  }, [detailQuery.data])
+
+  const isLoading = Boolean(templateId) && detailQuery.isPending
+  const loadError = detailQuery.error
+    ? detailQuery.error instanceof Error
+      ? detailQuery.error.message
+      : 'Failed to load saved workout'
+    : null
 
   const canSave = useMemo(() => name.trim().length > 0 && exercises.length > 0, [exercises, name])
 
   const addExercise = (exercise: ExerciseWithParsedFields) => {
     setSelectedExercise(null)
+    // Compute the next value first, then set state, then run the effect (surface
+    // a duplicate error) — no setState called from inside a state updater
+    // (issue #0011; StrictMode double-invokes updaters, so effects there fire
+    // twice).
+    const isDuplicate = exercises.some((item) => item.exercise.id === exercise.id)
+    if (isDuplicate) {
+      setError('This exercise is already in this saved workout.')
+      return
+    }
     setError(null)
-    setExercises((current) => {
-      if (current.some((item) => item.exercise.id === exercise.id)) {
-        setError('This exercise is already in this saved workout.')
-        return current
-      }
-      return [...current, { exercise, targetSets: 3, notes: '' }]
-    })
+    setExercises((current) => [...current, { exercise, targetSets: 3, notes: '' }])
   }
 
   const moveExercise = (index: number, direction: -1 | 1) => {
@@ -80,6 +88,23 @@ export function WorkoutTemplateEditor({ templateId }: WorkoutTemplateEditorProps
       return next
     })
   }
+
+  // Create/update → mutation (ADR-0007, Phase 4). On success, invalidate the
+  // whole templates subtree (list + this detail) so re-reads reflect the write,
+  // then navigate back. Invalidation just re-reads the API result — it does NOT
+  // fix the lib-layer transactionless delete-then-insert (#0004), which stays
+  // its own issue.
+  const saveMutation = useMutation({
+    mutationFn: (input: {
+      name: string
+      notes?: string
+      exercises: WorkoutTemplateExerciseWriteInput[]
+    }) => (templateId ? updateWorkoutTemplate(templateId, input) : createWorkoutTemplate(input)),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutTemplates.all })
+      navigate({ to: '/workouts' })
+    },
+  })
 
   const save = async () => {
     if (!canSave) {
@@ -97,22 +122,23 @@ export function WorkoutTemplateEditor({ templateId }: WorkoutTemplateEditorProps
       })),
     }
 
+    setError(null)
     try {
-      setIsSaving(true)
-      setError(null)
-      if (templateId) {
-        await updateWorkoutTemplate(templateId, input)
-      } else {
-        await createWorkoutTemplate(input)
-      }
-      navigate({ to: '/workouts' })
+      await saveMutation.mutateAsync(input)
     } catch (saveError) {
       console.error('Failed to save workout:', saveError)
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save workout')
-    } finally {
-      setIsSaving(false)
     }
   }
+
+  const isSaving = saveMutation.isPending
+  const saveError = saveMutation.error
+    ? saveMutation.error instanceof Error
+      ? saveMutation.error.message
+      : 'Failed to save workout'
+    : null
+  // Local validation error (`error`) plus the load/save errors surfaced by the
+  // query/mutation. Validation and save share the same banner as before.
+  const displayError = error ?? saveError ?? loadError
 
   if (isLoading) {
     return (
@@ -145,7 +171,7 @@ export function WorkoutTemplateEditor({ templateId }: WorkoutTemplateEditorProps
           </Link>
         </div>
 
-        <InlineError message={error} className="mb-4" />
+        <InlineError message={displayError} className="mb-4" />
 
         <div className="space-y-4">
           <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">

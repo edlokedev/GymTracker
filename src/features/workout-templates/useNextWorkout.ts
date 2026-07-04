@@ -1,36 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { NextWorkoutRecommendation } from '@/lib/types/database'
-import { loadNextWorkout } from './client'
+import { useQuery } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { nextWorkoutOptions } from './client'
 
 export function useNextWorkout({ enabled = true }: { enabled?: boolean } = {}) {
-  const [recommendation, setRecommendation] = useState<NextWorkoutRecommendation | null>(null)
-  const [isLoading, setIsLoading] = useState(enabled)
-  const [error, setError] = useState<string | null>(null)
+  // Next-workout recommendation — a thin useQuery (ADR-0007, Phase 4). The
+  // factory selects the recommendation out of the envelope, so `data` is already
+  // `NextWorkoutRecommendation | null`.
+  const query = useQuery({
+    ...nextWorkoutOptions(),
+    enabled,
+  })
 
   const refresh = useCallback(async () => {
-    if (!enabled) {
-      setRecommendation(null)
-      setIsLoading(false)
-      return
-    }
+    await query.refetch()
+  }, [query])
 
-    try {
-      setIsLoading(true)
-      setError(null)
-      const result = await loadNextWorkout()
-      setRecommendation(result.recommendation)
-    } catch (loadError) {
-      console.error('Failed to load next workout:', loadError)
-      setError('Failed to load next workout')
-      setRecommendation(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [enabled])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  return { recommendation, isLoading, error, refresh }
+  return {
+    recommendation: query.data ?? null,
+    isLoading: query.isPending && enabled,
+    error: query.error ? 'Failed to load next workout' : null,
+    refresh,
+  }
 }

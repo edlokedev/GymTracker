@@ -67,6 +67,8 @@ export const queryKeys = {
     all: ['workout-templates'] as const,
     list: () => ['workout-templates', 'list'] as const,
     detail: (id: string) => ['workout-templates', 'detail', id] as const,
+    /** Next-workout recommendation (derived from templates + recent sessions). */
+    nextWorkout: () => ['workout-templates', 'next'] as const,
   },
 
   progress: {

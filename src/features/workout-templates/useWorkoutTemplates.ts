@@ -1,58 +1,54 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { WorkoutTemplateWithExercises } from '@/lib/types/database'
-import { archiveWorkoutTemplate, loadWorkoutTemplates } from './client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { queryKeys } from '@/lib/api/query-keys'
+import { archiveWorkoutTemplate, workoutTemplatesListOptions } from './client'
 
 export function useWorkoutTemplates({ enabled = true }: { enabled?: boolean } = {}) {
-  const [templates, setTemplates] = useState<WorkoutTemplateWithExercises[]>([])
-  const [isLoading, setIsLoading] = useState(enabled)
-  const [error, setError] = useState<string | null>(null)
-  const [archivingId, setArchivingId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  // Saved-workouts list — a thin useQuery (ADR-0007, Phase 4). TanStack Query's
+  // last-request-wins retires the old loadWorkoutTemplates race, and a rejected
+  // load surfaces `error` the same way the previous state field did.
+  const listQuery = useQuery({
+    ...workoutTemplatesListOptions(),
+    enabled,
+  })
+
+  const templates = listQuery.data ?? []
+  const isLoading = listQuery.isPending && enabled
+  const error = listQuery.error ? 'Failed to load saved workouts' : null
 
   const refresh = useCallback(async () => {
-    if (!enabled) {
-      setTemplates([])
-      setIsLoading(false)
-      return
-    }
+    await listQuery.refetch()
+  }, [listQuery])
 
-    try {
-      setIsLoading(true)
-      setError(null)
-      setTemplates(await loadWorkoutTemplates())
-    } catch (loadError) {
-      console.error('Failed to load saved workouts:', loadError)
-      setError('Failed to load saved workouts')
-      setTemplates([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [enabled])
+  // Archive removes the template server-side; invalidation re-reads the list so
+  // the row disappears (matches the previous local-filter behaviour).
+  const archiveMutation = useMutation({
+    mutationFn: (templateId: string) => archiveWorkoutTemplate(templateId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutTemplates.all })
+    },
+  })
 
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  const archive = useCallback(async (templateId: string) => {
-    try {
-      setArchivingId(templateId)
-      setError(null)
-      await archiveWorkoutTemplate(templateId)
-      setTemplates((current) => current.filter((template) => template.id !== templateId))
-      return true
-    } catch (archiveError) {
-      console.error('Failed to archive saved workout:', archiveError)
-      setError('Failed to archive saved workout')
-      return false
-    } finally {
-      setArchivingId(null)
-    }
-  }, [])
+  const archive = useCallback(
+    async (templateId: string) => {
+      try {
+        await archiveMutation.mutateAsync(templateId)
+        return true
+      } catch (archiveError) {
+        console.error('Failed to archive saved workout:', archiveError)
+        return false
+      }
+    },
+    [archiveMutation],
+  )
 
   return {
     templates,
     isLoading,
-    error,
-    archivingId,
+    error: archiveMutation.error ? 'Failed to archive saved workout' : error,
+    archivingId: archiveMutation.isPending ? archiveMutation.variables : null,
     actions: {
       refresh,
       archive,
