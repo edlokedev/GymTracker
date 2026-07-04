@@ -68,6 +68,11 @@ export const createRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // Preload a route's loader on link hover/touch (intent). Public/catalog
+    // loaders (Phase 5, e.g. /exercises) then have their data warm before
+    // navigation completes; private routes have no loaders pre-P13 so this is
+    // a no-op for them.
+    defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     parseSearch,
     stringifySearch,
