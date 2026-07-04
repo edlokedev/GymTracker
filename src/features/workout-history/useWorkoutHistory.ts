@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo, useState } from 'react'
+import { queryKeys } from '@/lib/api/query-keys'
 import type { WorkoutSession } from '@/lib/types/database'
 import { parseCalendarDate } from '@/lib/utils/calendar'
 import {
   deleteWorkoutHistorySession,
   duplicateWorkoutHistorySession,
-  loadWorkoutDetailsForSession,
-  loadWorkoutHistorySessions,
+  loadWorkoutHistoryPage,
+  workoutDetailOptions,
+  workoutHistoryListOptions,
 } from './client'
 import {
   getDeleteCandidateLabel,
   getLastWorkoutDate,
   removeSessionById,
-  type SelectedWorkout,
   type WorkoutHistoryMode,
 } from './model'
 
@@ -28,208 +30,218 @@ export function useWorkoutHistory({
   limit = mode === 'recent' ? 5 : 20,
   onDuplicated,
 }: UseWorkoutHistoryOptions) {
-  const [sessions, setSessions] = useState<WorkoutSession[]>([])
-  const [isLoading, setIsLoading] = useState(Boolean(userId))
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const enabled = Boolean(userId)
+
   const [locationFilter, setLocationFilter] = useState<string | undefined>(undefined)
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteCandidate, setDeleteCandidate] = useState<WorkoutSession | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isModalLoading, setIsModalLoading] = useState(false)
-  const [selectedWorkout, setSelectedWorkout] = useState<SelectedWorkout | null>(null)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  // Pages 2+ from "load more" are appended here; the query owns page 1. A filter
+  // change or refresh resets this back to the query-only page-1 view.
+  const [appendedPages, setAppendedPages] = useState<WorkoutSession[]>([])
+  const [page, setPage] = useState(1)
+  const [hasMoreAppended, setHasMoreAppended] = useState<boolean | null>(null)
 
-  // Ref so loadMore can always read the latest filter without needing it in
-  // loadSessions's dep array (which would cause a double-fetch on filter change).
-  const locationFilterRef = useRef<string | undefined>(undefined)
-  useEffect(() => {
-    locationFilterRef.current = locationFilter
-  }, [locationFilter])
+  // Sessions list — a thin useQuery. TanStack Query's last-request-wins retires
+  // the old loadSessions stale-response race (it had no request token).
+  const listQuery = useQuery({
+    ...workoutHistoryListOptions({ limit, locationName: locationFilter }),
+    enabled,
+  })
 
-  const loadSessions = useCallback(
-    async (pageNum = 1, append = false, overrideLocationFilter?: string | undefined | null) => {
-      if (!userId) {
-        setSessions([])
-        setHasMore(false)
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        setError(null)
-        setIsLoading(true)
-        const offset = mode === 'recent' ? undefined : (pageNum - 1) * limit
-        // `null` = clear filter; `undefined` = use ref (avoids stale closure)
-        const activeFilter =
-          overrideLocationFilter === undefined
-            ? locationFilterRef.current
-            : (overrideLocationFilter ?? undefined)
-        const result = await loadWorkoutHistorySessions({
-          limit,
-          offset,
-          locationName: activeFilter,
-        })
-
-        setSessions((currentSessions) =>
-          append ? [...currentSessions, ...result.data] : result.data,
-        )
-        setHasMore(mode === 'history' ? result.hasMore : false)
-        setPage(pageNum)
-      } catch (loadError) {
-        console.error('Error loading workout history:', loadError)
-        setError('Failed to load workout history')
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [limit, mode, userId],
+  const firstPage = listQuery.data?.data ?? []
+  const sessions = useMemo(
+    () => (mode === 'history' ? [...firstPage, ...appendedPages] : firstPage),
+    [firstPage, appendedPages, mode],
   )
 
-  useEffect(() => {
-    void loadSessions(1, false)
-  }, [loadSessions])
+  const hasMore = mode === 'history' ? (hasMoreAppended ?? listQuery.data?.hasMore ?? false) : false
+
+  const isLoading = listQuery.isPending && enabled
+  const error = listQuery.error ? 'Failed to load workout history' : null
 
   const loadMore = useCallback(async () => {
-    if (mode !== 'history' || !hasMore || isLoading) return
-    await loadSessions(page + 1, true)
-  }, [hasMore, isLoading, loadSessions, mode, page])
+    if (mode !== 'history' || !hasMore || listQuery.isFetching) return
+    const nextPage = page + 1
+    const offset = (nextPage - 1) * limit
+    try {
+      const result = await loadWorkoutHistoryPage({ limit, offset, locationName: locationFilter })
+      setAppendedPages((current) => [...current, ...result.data])
+      setHasMoreAppended(result.hasMore)
+      setPage(nextPage)
+    } catch (loadError) {
+      console.error('Error loading more workout history:', loadError)
+    }
+  }, [hasMore, limit, listQuery.isFetching, locationFilter, mode, page])
 
-  const duplicateSession = useCallback(
-    async (sessionId: string) => {
-      setDuplicatingId(sessionId)
-      setDeleteError(null)
+  const resetPagination = useCallback(() => {
+    setAppendedPages([])
+    setHasMoreAppended(null)
+    setPage(1)
+  }, [])
 
-      try {
-        const duplicatedSession = await duplicateWorkoutHistorySession(sessionId)
-        onDuplicated?.(duplicatedSession)
-        return duplicatedSession
-      } catch (duplicateError) {
-        console.error('Failed to duplicate workout:', duplicateError)
-        setDeleteError(
-          duplicateError instanceof Error && duplicateError.message
-            ? duplicateError.message
-            : 'Failed to duplicate workout',
-        )
-        return null
-      } finally {
-        setDuplicatingId(null)
-      }
+  const refresh = useCallback(async () => {
+    resetPagination()
+    await listQuery.refetch()
+  }, [listQuery, resetPagination])
+
+  const filterByLocation = useCallback(
+    (name: string | undefined) => {
+      resetPagination()
+      setLocationFilter(name)
     },
-    [onDuplicated],
+    [resetPagination],
   )
 
-  const requestDelete = useCallback((session: WorkoutSession) => {
-    setDeleteError(null)
-    setDeleteCandidate(session)
-  }, [])
+  // Invalidate every server view a session mutation can touch: the sessions
+  // list, the calendar summary, and exercise recents (duplicate/delete both add
+  // or remove workout_sets rows that feed the recents ranking).
+  const invalidateSessionViews = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workoutSessions.all })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.exercises.recent() })
+  }, [queryClient])
+
+  // --- Detail modal (driven by a keyed detail query) ---
+  const [selectedSession, setSelectedSession] = useState<WorkoutSession | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const detailQuery = useQuery({
+    ...workoutDetailOptions(selectedSession ?? ({ id: '', date: '1970-01-01' } as WorkoutSession)),
+    enabled: enabled && isModalOpen && selectedSession !== null,
+  })
+
+  const selectedWorkout = selectedSession ? (detailQuery.data ?? null) : null
+  const isModalLoading = isModalOpen && selectedSession !== null && detailQuery.isPending
 
   const closeDetailModal = useCallback(() => {
     setIsModalOpen(false)
   }, [])
 
   const clearSelectedWorkout = useCallback(() => {
-    setSelectedWorkout(null)
+    setSelectedSession(null)
     setSelectedDate(null)
     setIsModalOpen(false)
   }, [])
 
-  const removeDeletedSession = useCallback(
-    (sessionId: string) => {
-      setSessions((currentSessions) => removeSessionById(currentSessions, sessionId))
-
-      if (selectedWorkout?.id === sessionId) {
-        clearSelectedWorkout()
-      }
-    },
-    [clearSelectedWorkout, selectedWorkout?.id],
-  )
-
-  const confirmDelete = useCallback(async () => {
-    if (!deleteCandidate) return
-
-    const session = deleteCandidate
-    setDeleteError(null)
-    setDeletingId(session.id)
-
-    try {
-      await deleteWorkoutHistorySession(session.id)
-      removeDeletedSession(session.id)
-      setDeleteCandidate(null)
-    } catch (deleteErrorResult) {
-      console.error('Failed to delete workout:', deleteErrorResult)
-      setDeleteError('Failed to delete workout')
-    } finally {
-      setDeletingId(null)
-    }
-  }, [deleteCandidate, removeDeletedSession])
-
-  const deleteSession = useCallback(
-    async (sessionId: string) => {
-      setDeleteError(null)
-      setDeletingId(sessionId)
-
-      try {
-        await deleteWorkoutHistorySession(sessionId)
-        removeDeletedSession(sessionId)
-      } catch (deleteErrorResult) {
-        console.error('Failed to delete workout:', deleteErrorResult)
-        setDeleteError('Failed to delete workout')
-        throw deleteErrorResult
-      } finally {
-        setDeletingId(null)
-      }
-    },
-    [removeDeletedSession],
-  )
-
-  const cancelDelete = useCallback(() => {
-    setDeleteCandidate(null)
-    setDeleteError(null)
-  }, [])
-
   const openWorkoutDetails = useCallback(
-    async (session: WorkoutSession) => {
+    (session: WorkoutSession) => {
       if (!userId) return
-
+      setSelectedSession(session)
       setSelectedDate(parseCalendarDate(session.date))
       setIsModalOpen(true)
-      setIsModalLoading(true)
-
-      try {
-        setSelectedWorkout(await loadWorkoutDetailsForSession({ session }))
-      } catch (detailsError) {
-        console.error('Failed to load workout details:', detailsError)
-        setSelectedWorkout(null)
-      } finally {
-        setIsModalLoading(false)
-      }
     },
     [userId],
   )
 
-  const filterByLocation = useCallback(
-    (name: string | undefined) => {
-      setLocationFilter(name)
-      void loadSessions(1, false, name ?? null)
+  // --- Duplicate (its own mutation → its own error, never the delete UI) ---
+  const duplicateMutation = useMutation({
+    mutationFn: (sessionId: string) => duplicateWorkoutHistorySession(sessionId),
+    onSuccess: (duplicated) => {
+      onDuplicated?.(duplicated)
+      invalidateSessionViews()
     },
-    [loadSessions],
+  })
+
+  const duplicateSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        return await duplicateMutation.mutateAsync(sessionId)
+      } catch (duplicateError) {
+        console.error('Failed to duplicate workout:', duplicateError)
+        return null
+      }
+    },
+    [duplicateMutation],
   )
 
-  const updateSessionLocation = useCallback((workoutId: string, locationName: string | null) => {
-    setSessions((current) =>
-      current.map((s) =>
-        s.id === workoutId ? { ...s, location_name: locationName ?? undefined } : s,
-      ),
-    )
-    setSelectedWorkout((prev) => {
-      if (!prev || prev.id !== workoutId) return prev
-      return { ...prev, locationName: locationName ?? undefined }
-    })
-  }, [])
+  const duplicateError = duplicateMutation.error
+    ? duplicateMutation.error instanceof Error && duplicateMutation.error.message
+      ? duplicateMutation.error.message
+      : 'Failed to duplicate workout'
+    : null
+
+  // --- Delete (its own mutation → its own error) ---
+  const [deleteCandidate, setDeleteCandidate] = useState<WorkoutSession | null>(null)
+
+  const removeDeletedSession = useCallback(
+    (sessionId: string) => {
+      setAppendedPages((current) => removeSessionById(current, sessionId))
+      if (selectedSession?.id === sessionId) {
+        clearSelectedWorkout()
+      }
+      invalidateSessionViews()
+    },
+    [clearSelectedWorkout, invalidateSessionViews, selectedSession?.id],
+  )
+
+  const deleteMutation = useMutation({
+    mutationFn: (sessionId: string) => deleteWorkoutHistorySession(sessionId),
+    onSuccess: (_data, sessionId) => {
+      removeDeletedSession(sessionId)
+    },
+  })
+
+  const deleteError = deleteMutation.error ? 'Failed to delete workout' : null
+  const deletingId = deleteMutation.isPending ? deleteMutation.variables : null
+
+  const requestDelete = useCallback(
+    (session: WorkoutSession) => {
+      deleteMutation.reset()
+      setDeleteCandidate(session)
+    },
+    [deleteMutation],
+  )
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteCandidate) return
+    try {
+      await deleteMutation.mutateAsync(deleteCandidate.id)
+      setDeleteCandidate(null)
+    } catch (deleteErr) {
+      console.error('Failed to delete workout:', deleteErr)
+    }
+  }, [deleteCandidate, deleteMutation])
+
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      await deleteMutation.mutateAsync(sessionId)
+    },
+    [deleteMutation],
+  )
+
+  const cancelDelete = useCallback(() => {
+    setDeleteCandidate(null)
+    deleteMutation.reset()
+  }, [deleteMutation])
+
+  const updateSessionLocation = useCallback(
+    (workoutId: string, locationName: string | null) => {
+      // Patch the page-1 query cache (its rows are the query's, not local state)
+      // and any appended pages so the list reflects the edit immediately.
+      queryClient.setQueryData(
+        workoutHistoryListOptions({ limit, locationName: locationFilter }).queryKey,
+        (current) =>
+          current
+            ? {
+                ...current,
+                data: current.data.map((s) =>
+                  s.id === workoutId ? { ...s, location_name: locationName ?? undefined } : s,
+                ),
+              }
+            : current,
+      )
+      setAppendedPages((current) =>
+        current.map((s) =>
+          s.id === workoutId ? { ...s, location_name: locationName ?? undefined } : s,
+        ),
+      )
+      setSelectedSession((prev) => {
+        if (!prev || prev.id !== workoutId) return prev
+        return { ...prev, location_name: locationName ?? undefined }
+      })
+    },
+    [limit, locationFilter, queryClient],
+  )
 
   const lastWorkoutDate = useMemo(() => getLastWorkoutDate(sessions), [sessions])
   const deleteCandidateLabel = useMemo(
@@ -243,8 +255,9 @@ export function useWorkoutHistory({
     hasMore,
     error,
     lastWorkoutDate,
-    duplicatingId,
+    duplicatingId: duplicateMutation.isPending ? duplicateMutation.variables : null,
     deletingId,
+    duplicateError,
     deleteCandidate,
     deleteCandidateLabel,
     deleteError,
@@ -255,7 +268,7 @@ export function useWorkoutHistory({
     locationFilter,
     actions: {
       loadMore,
-      refresh: () => loadSessions(1, false),
+      refresh,
       duplicateSession,
       requestDelete,
       confirmDelete,

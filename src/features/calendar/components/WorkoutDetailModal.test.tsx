@@ -1,7 +1,15 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { MouseEventHandler, ReactNode } from 'react'
+import type { MouseEventHandler, ReactElement, ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createQueryWrapper } from '../../../../test/queryWrapper'
 import { WorkoutDetailModal } from './WorkoutDetailModal'
+
+// useWorkoutDetailActions now reads a QueryClient (invalidation on the fallback
+// mutation path), so the modal must render inside a provider.
+function renderModal(ui: ReactElement) {
+  const { wrapper } = createQueryWrapper()
+  return render(ui, { wrapper })
+}
 
 vi.mock('@/features/workout-session/client', () => ({
   fetchLocationNames: vi.fn().mockResolvedValue([]),
@@ -58,7 +66,7 @@ describe('WorkoutDetailModal', () => {
   })
 
   it('shows workout details without redundant footer close action', () => {
-    render(
+    renderModal(
       <WorkoutDetailModal
         isOpen
         onClose={vi.fn()}
@@ -84,7 +92,7 @@ describe('WorkoutDetailModal', () => {
   it('closes on backdrop click but keeps clicks inside the modal open', () => {
     const onClose = vi.fn()
 
-    render(
+    renderModal(
       <WorkoutDetailModal
         isOpen
         onClose={onClose}
@@ -108,7 +116,7 @@ describe('WorkoutDetailModal', () => {
     const onClose = vi.fn()
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
 
-    render(
+    renderModal(
       <WorkoutDetailModal
         isOpen
         onClose={onClose}

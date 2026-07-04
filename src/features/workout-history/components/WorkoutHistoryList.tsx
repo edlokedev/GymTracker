@@ -31,6 +31,7 @@ export function WorkoutHistoryList({
     error,
     duplicatingId,
     deletingId,
+    duplicateError,
     deleteCandidate,
     deleteCandidateLabel,
     deleteError,
@@ -51,7 +52,9 @@ export function WorkoutHistoryList({
 
   return (
     <>
-      <InlineError message={error || deleteError} className="mb-4" />
+      {/* Duplicate errors surface here (list-level), never in the delete
+          ConfirmDialog — each mutation carries its own error now. */}
+      <InlineError message={error || duplicateError} className="mb-4" />
 
       {availableLocations.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
