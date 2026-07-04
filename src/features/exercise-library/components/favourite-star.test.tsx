@@ -1,9 +1,19 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
+import { createQueryWrapper } from '../../../../test/queryWrapper'
 import ExerciseBrowser from './ExerciseBrowser'
 import ExerciseCard from './ExerciseCard'
 import ExerciseDetailModal from './ExerciseDetailModal'
+
+// ExerciseBrowser is TanStack Query-backed (ADR-0007, Phase 3) and needs a
+// fresh QueryClientProvider. The plain ExerciseCard/ExerciseDetailModal tests
+// below don't consume Query and use bare render().
+function renderWithQuery(ui: ReactElement) {
+  const { wrapper } = createQueryWrapper()
+  return render(ui, { wrapper })
+}
 
 const navigateMock = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({ user: null as { id: string } | null }))
@@ -168,7 +178,7 @@ describe('favourite star on /exercises', () => {
     authState.user = null
     const calls = installFetch({ searchItems: [makeExercise('bench-press', 'bench press')] })
 
-    render(
+    renderWithQuery(
       <ExerciseBrowser
         initialFilters={{ category_id: [], equipment: [], muscle_group: [], query: '' }}
       />,
@@ -200,7 +210,7 @@ describe('favourite star on /exercises', () => {
       },
     })
 
-    render(
+    renderWithQuery(
       <ExerciseBrowser
         initialFilters={{ category_id: [], equipment: [], muscle_group: [], query: '' }}
       />,
@@ -241,7 +251,7 @@ describe('favourite star on /exercises', () => {
       },
     })
 
-    render(
+    renderWithQuery(
       <ExerciseBrowser
         initialFilters={{
           category_id: [],
@@ -274,7 +284,7 @@ describe('favourite star on /exercises', () => {
       },
     })
 
-    render(
+    renderWithQuery(
       <ExerciseBrowser
         initialFilters={{
           category_id: [],
@@ -287,12 +297,11 @@ describe('favourite star on /exercises', () => {
     )
 
     await waitFor(() => expect(screen.getByText('Alpha Lift')).toBeInTheDocument())
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Alpha Lift from favorites' }))
 
-    // Failure logged, both cards still shown, star reverts to favourited.
-    await waitFor(() => expect(errorSpy).toHaveBeenCalled())
+    // Toggle rejects → onError rolls back and onSettled re-reads the server
+    // favourites, so both cards stay shown and the star reverts to favourited.
     await waitFor(() =>
       expect(
         screen.getByRole('button', { name: 'Remove Alpha Lift from favorites' }),
