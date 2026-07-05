@@ -21,13 +21,16 @@ import { getSupabaseServiceRoleClient } from '../server'
 
 // 2026-07-05: upstream hasaneyldrm/exercises-dataset purged all media from the
 // repo and its git history (ownership dispute — see its README notice), which
-// 404'd every seeded URL. Repointed to a pre-purge fork, pinned to a commit
-// hash so a fork rebase can't break us again. Archival copy of the media:
-// NAS N:\TOBESORTED\exercises-dataset-media-archive. Issue #0013.
+// 404'd every seeded URL. Media is now SELF-HOSTED in our own public repo
+// (edlokedev/gymmie-exercise-media, preserved from a pre-purge fork), pinned
+// to a commit hash. Dataset JSON still comes from a pre-purge fork snapshot.
+// Archival copy: NAS N:\TOBESORTED\exercises-dataset-media-archive. Issue #0013.
 const DATASET_REPO = 'Aleyhan/exercises-dataset'
 const DATASET_REF = '29cd1b88f2925ac3a604bd8a7c0566c30e968053'
+const MEDIA_REPO = 'edlokedev/gymmie-exercise-media'
+const MEDIA_REF = '19268b2fea5295477c2083b2b77fb8e5882401c1'
 const DATASET_JSON_URL = `https://raw.githubusercontent.com/${DATASET_REPO}/${DATASET_REF}/data/exercises.json`
-const JSDELIVR_BASE = `https://cdn.jsdelivr.net/gh/${DATASET_REPO}@${DATASET_REF}`
+const JSDELIVR_BASE = `https://cdn.jsdelivr.net/gh/${MEDIA_REPO}@${MEDIA_REF}`
 
 interface UpstreamExercise {
   id: string
