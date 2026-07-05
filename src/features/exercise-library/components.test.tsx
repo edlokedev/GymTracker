@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
+import { createQueryWrapper } from '../../../test/queryWrapper'
 import ExerciseBrowser from './components/ExerciseBrowser'
 import { MobileFilterDrawer } from './components/ExerciseBrowserFilters'
 import ExerciseCard from './components/ExerciseCard'
@@ -37,6 +39,13 @@ const makeExercise = (id: string, name: string): ExerciseWithParsedFields => ({
   updated_at: new Date(),
 })
 
+// TanStack Query-backed components (ExerciseBrowser, ExerciseSelector,
+// ExerciseHistory) must render inside a fresh QueryClientProvider (ADR-0007).
+function renderWithQuery(ui: ReactElement) {
+  const { wrapper } = createQueryWrapper()
+  return render(ui, { wrapper })
+}
+
 function mockExerciseLibraryFetch() {
   const exercise = makeExercise('bench-press', 'bench press')
 
@@ -55,6 +64,15 @@ function mockExerciseLibraryFetch() {
       }
       if (url === '/api/muscle-groups') {
         return Response.json({ data: ['chest'] })
+      }
+      if (url === '/api/exercise-favorites') {
+        return Response.json({ success: true, data: { items: [], exerciseIds: [] } })
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return Response.json({ success: true, data: { items: [] } })
+      }
+      if (url.startsWith('/api/exercises/suggested')) {
+        return Response.json({ success: true, data: { items: [] } })
       }
       if (url.startsWith('/api/exercises/search')) {
         return Response.json({
@@ -87,7 +105,7 @@ describe('Exercise Library components', () => {
   it('renders browser results and updates route search when a filter is removed', async () => {
     mockExerciseLibraryFetch()
 
-    render(
+    renderWithQuery(
       <ExerciseBrowser
         initialFilters={{
           category_id: ['strength'],
@@ -120,7 +138,7 @@ describe('Exercise Library components', () => {
     const exercise = mockExerciseLibraryFetch()
     const onSelectExercise = vi.fn()
 
-    render(<ExerciseSelector onSelectExercise={onSelectExercise} />)
+    renderWithQuery(<ExerciseSelector onSelectExercise={onSelectExercise} />)
 
     fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
     await waitFor(() => expect(screen.getByText('Bench Press')).toBeInTheDocument())
@@ -133,7 +151,7 @@ describe('Exercise Library components', () => {
     mockExerciseLibraryFetch()
     const onSelectExercise = vi.fn()
 
-    render(
+    renderWithQuery(
       <ExerciseSelector
         onSelectExercise={onSelectExercise}
         favoriteExerciseIds={['front-squat']}
@@ -172,7 +190,7 @@ describe('Exercise Library components', () => {
   it('collapses extra quick picks behind an inline expander', async () => {
     mockExerciseLibraryFetch()
 
-    render(
+    renderWithQuery(
       <ExerciseSelector
         onSelectExercise={vi.fn()}
         recentlyUsedExercises={[
@@ -216,7 +234,7 @@ describe('Exercise Library components', () => {
     }))
     vi.stubGlobal('matchMedia', matchMediaMock)
 
-    render(
+    renderWithQuery(
       <ExerciseSelector
         onSelectExercise={vi.fn()}
         recentlyUsedExercises={[
@@ -274,7 +292,7 @@ describe('Exercise Library components', () => {
       ),
     )
 
-    render(<ExerciseHistory exerciseId="lever-front-pulldown" />)
+    renderWithQuery(<ExerciseHistory exerciseId="lever-front-pulldown" />)
 
     await waitFor(() => expect(screen.getByText('Set 1')).toBeInTheDocument())
 
@@ -289,12 +307,32 @@ describe('Exercise Library components', () => {
     expect(setTwo?.compareDocumentPosition(setThree as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
+  it('settles to the empty state (no stuck spinner) when the history request fails', async () => {
+    // Regression contract for the client-layer migration (audit finding: the
+    // component bypassed the client with a raw fetch that silently ignored
+    // !res.ok). It now goes through readApiData, which rejects on a failed
+    // response; the query lands in error state and the component shows the
+    // empty state rather than hanging on the loading spinner.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('boom', { status: 500 })),
+    )
+
+    renderWithQuery(<ExerciseHistory exerciseId="lever-front-pulldown" />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('No progressive overload history found for this exercise.'),
+      ).toBeInTheDocument(),
+    )
+  })
+
   it('toggles favorites from an accessible star without selecting the card', () => {
     const exercise = makeExercise('bench-press', 'bench press')
     const onSelect = vi.fn()
     const onToggleFavorite = vi.fn()
 
-    render(
+    renderWithQuery(
       <ExerciseCard
         exercise={exercise}
         onSelect={onSelect}
@@ -317,7 +355,7 @@ describe('Exercise Library components', () => {
     const onSelectExercise = vi.fn()
     const onClearExercise = vi.fn()
 
-    render(
+    renderWithQuery(
       <ExerciseSelector
         selectedExercise={makeExercise('bench-press', 'bench press')}
         onSelectExercise={onSelectExercise}

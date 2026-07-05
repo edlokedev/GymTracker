@@ -1,4 +1,6 @@
+import { QueryClient } from '@tanstack/react-query'
 import { createRouter as createTanstackRouter } from '@tanstack/react-router'
+import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
@@ -53,13 +55,35 @@ function stringifySearch(search: Record<string, unknown>): string {
 // name TanStack Start expects) and `getRouter` (the legacy name still used by
 // existing call sites) so the rename is non-breaking.
 export const createRouter = () => {
-  return createTanstackRouter({
+  // One QueryClient per router instance (per request under SSR). App-wide
+  // defaults per ADR-0007: 30s staleTime (single-user gym data — aggressive
+  // refetch buys nothing) and a single retry.
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { staleTime: 30_000, retry: 1 },
+    },
+  })
+
+  const router = createTanstackRouter({
     routeTree,
+    context: { queryClient },
     scrollRestoration: true,
+    // Preload a route's loader on link hover/touch (intent). Public/catalog
+    // loaders (Phase 5, e.g. /exercises) then have their data warm before
+    // navigation completes; private routes have no loaders pre-P13 so this is
+    // a no-op for them.
+    defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     parseSearch,
     stringifySearch,
   })
+
+  // Wires Query's SSR dehydrate/hydrate into the router lifecycle so query
+  // state prefetched in loaders survives the server→client handoff. Harmless
+  // until loaders start prefetching (Phase 5, public data only pre-P13).
+  setupRouterSsrQueryIntegration({ router, queryClient })
+
+  return router
 }
 
 export const getRouter = createRouter

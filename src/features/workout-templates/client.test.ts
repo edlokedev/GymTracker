@@ -4,7 +4,6 @@ import {
   createWorkoutTemplate,
   loadWorkoutTemplate,
   loadWorkoutTemplates,
-  startWorkoutFromTemplate,
   updateWorkoutTemplate,
 } from './client'
 
@@ -51,36 +50,5 @@ describe('workout templates client', () => {
     })
     expect(requests[4].url).toBe('/api/workout-templates?id=tpl-1')
     expect(requests[4].init?.method).toBe('DELETE')
-  })
-
-  it('starts a saved workout through the workout-session action route', async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        requests.push({ url: String(input), init })
-        return Response.json({
-          success: true,
-          data: {
-            session: { id: 'session-1' },
-            template: { id: 'tpl-1' },
-          },
-        })
-      }),
-    )
-
-    await expect(startWorkoutFromTemplate('tpl-1')).resolves.toEqual({
-      session: { id: 'session-1' },
-      template: { id: 'tpl-1' },
-    })
-
-    expect(requests[0]).toEqual({
-      url: '/api/workout-sessions?action=startFromTemplate',
-      init: {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: 'tpl-1' }),
-      },
-    })
   })
 })

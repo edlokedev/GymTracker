@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createQueryWrapper } from '../../../../test/queryWrapper'
 import { CalendarDashboard } from './CalendarDashboard'
 
 // Mock the dependencies
@@ -99,7 +100,8 @@ describe('CalendarDashboard', () => {
       }),
     } as Response)
 
-    render(<CalendarDashboard />)
+    const { wrapper } = createQueryWrapper()
+    render(<CalendarDashboard />, { wrapper })
 
     // Check date range text
     // Logic: Today (Feb 25) - 30 days = Jan 26

@@ -1,19 +1,28 @@
-import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/react-query'
+import { createRootRouteWithContext, HeadContent, Scripts } from '@tanstack/react-router'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { lazy, Suspense } from 'react'
 
+import { GlobalErrorBoundary } from '@/app/components/GlobalErrorBoundary'
 import Header from '@/app/components/Header'
 import { AuthProvider, useAuth } from '../lib/auth'
 
 import appCss from '../styles.css?url'
+
+// Router context shared across every route. The QueryClient is created in
+// `getRouter()` (src/router.tsx) and threaded here so loaders can reach it via
+// `context.queryClient` once loader-based prefetch lands (Phase 5, ADR-0007).
+export interface RouterAppContext {
+  queryClient: QueryClient
+}
 
 // Devtools are dev-only. Vite replaces `import.meta.env.DEV` with a literal
 // boolean at build time, so the production bundle never references the
 // devtools chunk and tree-shakes the import expression away.
 const DevtoolsPanel = import.meta.env.DEV ? lazy(() => import('@/app/devtools')) : null
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({
     meta: [
       {
@@ -38,6 +47,7 @@ export const Route = createRootRoute({
   }),
 
   shellComponent: RootDocument,
+  errorComponent: ({ error, reset }) => <GlobalErrorBoundary error={error} reset={reset} />,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {

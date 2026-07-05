@@ -1,5 +1,7 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
+import { queryKeys } from '@/lib/api/query-keys'
 import { deleteWorkoutDetail, duplicateWorkoutDetail } from './client'
 
 interface UseWorkoutDetailActionsOptions {
@@ -18,6 +20,15 @@ export function useWorkoutDetailActions({
   onDeleteWorkout,
 }: UseWorkoutDetailActionsOptions) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  // Invalidate the server views a session mutation touches when this hook runs
+  // the mutation itself (the fallback path, e.g. from the calendar modal). When
+  // a parent supplies onDeleteWorkout/onDuplicateWorkout it owns invalidation.
+  const invalidateSessionViews = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workoutSessions.all })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.exercises.recent() })
+  }, [queryClient])
   const [isDuplicating, setIsDuplicating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -45,6 +56,7 @@ export function useWorkoutDetailActions({
         }
 
         const duplicatedWorkout = await duplicateWorkoutDetail(workoutId)
+        invalidateSessionViews()
         onClose()
         navigate({
           to: '/workout',
@@ -57,7 +69,7 @@ export function useWorkoutDetailActions({
         setIsDuplicating(false)
       }
     },
-    [navigate, onClose, onDuplicateWorkout],
+    [invalidateSessionViews, navigate, onClose, onDuplicateWorkout],
   )
 
   const requestDelete = useCallback(() => {
@@ -80,6 +92,7 @@ export function useWorkoutDetailActions({
           await onDeleteWorkout(workoutId)
         } else {
           await deleteWorkoutDetail(workoutId)
+          invalidateSessionViews()
         }
 
         await onWorkoutDeleted?.(workoutId)
@@ -92,7 +105,7 @@ export function useWorkoutDetailActions({
         setIsDeleting(false)
       }
     },
-    [onClose, onDeleteWorkout, onWorkoutDeleted],
+    [invalidateSessionViews, onClose, onDeleteWorkout, onWorkoutDeleted],
   )
 
   return {

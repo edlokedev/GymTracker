@@ -1,4 +1,6 @@
+import { queryOptions } from '@tanstack/react-query'
 import { buildSearchParams, readApiData, readApiSuccess } from '@/lib/api'
+import { queryKeys } from '@/lib/api/query-keys'
 import type {
   StartFromTemplateResult,
   WorkoutSession,
@@ -28,6 +30,35 @@ export async function loadWorkoutSessionDetails(sessionId: string): Promise<Work
   const params = buildSearchParams({ id: sessionId, includeDetails: true })
   const response = await fetch(`/api/workout-sessions?${params.toString()}`)
   return readApiData(response, `Failed to load session data: ${response.status}`)
+}
+
+/**
+ * Query options for the active-session bootstrap (ADR-0007, Phase 4), keyed
+ * `['workout-sessions','detail',sessionId]`. The hook seeds its local in-flight
+ * editing state from this query's data — Query owns the server read, local state
+ * owns keystroke-level set entry (never in the cache).
+ */
+export function workoutSessionDetailOptions(sessionId: string) {
+  return queryOptions({
+    queryKey: queryKeys.workoutSessions.detail(sessionId),
+    queryFn: () => loadWorkoutSessionDetails(sessionId),
+  })
+}
+
+/**
+ * Query options for an exercise's set history (ADR-0007, Phase 4), keyed
+ * `['workout-sets','history',exerciseId]`. Used for last-performance prefill via
+ * `queryClient.fetchQuery` — Query's per-key request identity + dedupe retires
+ * the hand-rolled `prefillRequestRef` monotonic race token: a prefill result is
+ * keyed by exercise id, so a session switch mid-flight can only ever resolve to
+ * the correct last-performance for that exercise. `limit` is part of the key so
+ * a 1-item prefill and a 15-item history view don't collide.
+ */
+export function workoutSetHistoryOptions(exerciseId: string, limit = 1) {
+  return queryOptions({
+    queryKey: [...queryKeys.workoutSets.history(exerciseId), limit] as const,
+    queryFn: () => loadWorkoutSetHistory(exerciseId, limit),
+  })
 }
 
 export async function createWorkoutSession(

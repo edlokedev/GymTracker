@@ -88,7 +88,6 @@ export default function SetEntry({
   )
   const saveFeedbackTimeoutRef = useRef<number | null>(null)
   const submitSignalRef = useRef(submitSignal)
-  const copyFlash = false
 
   const set = (field: keyof SetEntryFormValues, value: string) =>
     setValues((prev) => ({ ...prev, [field]: value }))
@@ -240,7 +239,6 @@ export default function SetEntry({
             <StrengthFields
               values={values}
               set={set}
-              copyFlash={copyFlash}
               entryId={entryId}
               bumpNumber={bumpNumber}
               inputClass={inputClass}
@@ -251,7 +249,6 @@ export default function SetEntry({
             <CardioFields
               values={values}
               set={set}
-              copyFlash={copyFlash}
               entryId={entryId}
               bumpNumber={bumpNumber}
               inputClass={inputClass}
@@ -262,7 +259,6 @@ export default function SetEntry({
             <TimedFields
               values={values}
               set={set}
-              copyFlash={copyFlash}
               entryId={entryId}
               bumpNumber={bumpNumber}
               inputClass={inputClass}
@@ -358,20 +354,12 @@ export default function SetEntry({
 interface FieldGroupProps {
   values: SetEntryFormValues
   set: (field: keyof SetEntryFormValues, value: string) => void
-  copyFlash: boolean
   entryId: string
   bumpNumber: (value: string, amount: number, min?: number) => string
   inputClass: (flash?: boolean) => string
 }
 
-function StrengthFields({
-  values,
-  set,
-  copyFlash,
-  entryId,
-  bumpNumber,
-  inputClass,
-}: FieldGroupProps) {
+function StrengthFields({ values, set, entryId, bumpNumber, inputClass }: FieldGroupProps) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
@@ -390,7 +378,7 @@ function StrengthFields({
           placeholder="0"
           min="1"
           max="100"
-          className={inputClass(copyFlash)}
+          className={inputClass()}
         />
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
@@ -427,7 +415,7 @@ function StrengthFields({
           placeholder="0"
           min="0"
           step="0.5"
-          className={inputClass(copyFlash)}
+          className={inputClass()}
         />
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
@@ -452,14 +440,7 @@ function StrengthFields({
   )
 }
 
-function CardioFields({
-  values,
-  set,
-  copyFlash,
-  entryId,
-  bumpNumber,
-  inputClass,
-}: FieldGroupProps) {
+function CardioFields({ values, set, entryId, bumpNumber, inputClass }: FieldGroupProps) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -479,7 +460,7 @@ function CardioFields({
             placeholder="30"
             min="0.5"
             step="0.5"
-            className={inputClass(copyFlash)}
+            className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
@@ -516,7 +497,7 @@ function CardioFields({
             placeholder="0"
             min="0"
             step="0.1"
-            className={inputClass(copyFlash)}
+            className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
@@ -555,7 +536,7 @@ function CardioFields({
             placeholder="0"
             min="0"
             step="0.5"
-            className={inputClass(copyFlash)}
+            className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
@@ -592,7 +573,7 @@ function CardioFields({
             placeholder="0"
             min="0"
             step="0.5"
-            className={inputClass(copyFlash)}
+            className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
@@ -618,7 +599,7 @@ function CardioFields({
   )
 }
 
-function TimedFields({ values, set, copyFlash, entryId, bumpNumber, inputClass }: FieldGroupProps) {
+function TimedFields({ values, set, entryId, bumpNumber, inputClass }: FieldGroupProps) {
   return (
     <div>
       <label
@@ -636,7 +617,7 @@ function TimedFields({ values, set, copyFlash, entryId, bumpNumber, inputClass }
         placeholder="60"
         min="1"
         step="5"
-        className={inputClass(copyFlash)}
+        className={inputClass()}
       />
       <div className="mt-2 grid grid-cols-2 gap-2">
         <button

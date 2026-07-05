@@ -1,23 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { parseCalendarDate } from '@/lib/utils/calendar'
+import { exerciseHistoryOptions } from '../client'
+import type { HistoricalExerciseSet } from '../model'
 
 export interface ExerciseHistoryProps {
   exerciseId: string
   limit?: number
 }
 
-interface HistoricalSet {
-  id: string
-  set_number: number
-  reps: number
-  weight: number
-  duration_seconds?: number
-  distance_km?: number
-  incline?: number
-  speed_kmh?: number
-  session_date: string
-  session_name: string | null
-}
+type HistoricalSet = HistoricalExerciseSet
 
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
@@ -39,39 +30,13 @@ function formatHistoricalSet(set: HistoricalSet): string {
 }
 
 export function ExerciseHistory({ exerciseId, limit = 50 }: ExerciseHistoryProps) {
-  const [history, setHistory] = useState<HistoricalSet[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let active = true
-
-    async function load() {
-      try {
-        setLoading(true)
-        const res = await fetch(
-          `/api/workout-sets?action=history&exerciseId=${encodeURIComponent(exerciseId)}&limit=${limit}`,
-        )
-        if (res.ok) {
-          const json = await res.json()
-          if (json.success && active) {
-            setHistory(json.data)
-          }
-        }
-      } catch (err) {
-        console.error(err)
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
-    if (exerciseId) {
-      load()
-    }
-
-    return () => {
-      active = false
-    }
-  }, [exerciseId, limit])
+  // Server state via the shared client (ADR-0007, Phase 3). Replaces the old
+  // raw fetch + hand-rolled envelope unwrap that silently swallowed !res.ok:
+  // readApiData now throws on a failed response, so an error surfaces as an
+  // empty-history state instead of a stuck spinner.
+  const { data, isPending } = useQuery(exerciseHistoryOptions(exerciseId, limit))
+  const history: HistoricalSet[] = data ?? []
+  const loading = isPending && Boolean(exerciseId)
 
   if (loading) {
     return (

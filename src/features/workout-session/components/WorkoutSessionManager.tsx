@@ -199,20 +199,21 @@ export default function WorkoutSessionManager({
         const remainingExercises = exercises.filter((e) => e.exercise.id !== exerciseId)
         const didRemove = await actions.removeExercise(exerciseId)
         if (didRemove) {
-          setCompletedExerciseIds((current) => {
-            const next = new Set(current)
-            next.delete(exerciseId)
-            if (activeExerciseId === exerciseId) {
-              const nextActiveExerciseId = getNextActiveExerciseId(
-                remainingExercises,
-                exerciseId,
-                next,
-              )
-              actions.selectActiveExercise(nextActiveExerciseId)
-              focusExercise(nextActiveExerciseId)
-            }
-            return next
-          })
+          // Compute the next completed set first, then set state, then run the
+          // effects (reselect + focus) — no side effects inside the updater
+          // (issue #0011; StrictMode double-invokes updaters).
+          const nextCompletedExerciseIds = new Set(completedExerciseIds)
+          nextCompletedExerciseIds.delete(exerciseId)
+          setCompletedExerciseIds(nextCompletedExerciseIds)
+          if (activeExerciseId === exerciseId) {
+            const nextActiveExerciseId = getNextActiveExerciseId(
+              remainingExercises,
+              exerciseId,
+              nextCompletedExerciseIds,
+            )
+            actions.selectActiveExercise(nextActiveExerciseId)
+            focusExercise(nextActiveExerciseId)
+          }
           setConfirmModal((prev) => ({ ...prev, isOpen: false }))
         }
       },
@@ -279,17 +280,18 @@ export default function WorkoutSessionManager({
     const exerciseToComplete = exercises.find((exercise) => exercise.exercise.id === exerciseId)
     if (!exerciseToComplete || exerciseToComplete.sets.length === 0) return
 
-    setCompletedExerciseIds((current) => {
-      const nextCompletedExerciseIds = new Set(current).add(exerciseId)
-      const nextActiveExerciseId = getNextActiveExerciseId(
-        exercises,
-        exerciseId,
-        nextCompletedExerciseIds,
-      )
-      actions.selectActiveExercise(nextActiveExerciseId)
-      focusExercise(nextActiveExerciseId)
-      return nextCompletedExerciseIds
-    })
+    // Compute the next completed set first, then set state, then run the effects
+    // (reselect + focus) — no side effects inside the updater (issue #0011;
+    // StrictMode double-invokes updaters).
+    const nextCompletedExerciseIds = new Set(completedExerciseIds).add(exerciseId)
+    setCompletedExerciseIds(nextCompletedExerciseIds)
+    const nextActiveExerciseId = getNextActiveExerciseId(
+      exercises,
+      exerciseId,
+      nextCompletedExerciseIds,
+    )
+    actions.selectActiveExercise(nextActiveExerciseId)
+    focusExercise(nextActiveExerciseId)
   }
 
   const resumeExercise = (exerciseId: string) => {
