@@ -46,7 +46,7 @@ Caveman mode, always: drop articles, filler, pleasantries, hedging. Fragments OK
 - Target: Vercel + Supabase (Postgres + Supabase Auth + RLS). Not Zo Sites — rejected because it would require a SQLite→Postgres rewrite, TanStack Start removal, a Hono API, and auth re-adaptation.
 - API responses use a shared envelope unless the route is a redirect.
 - Private routes derive the authed user server-side. Never trust `userId` from query/body. Supabase RLS is the auth boundary for private tables.
-- Exercise media: jsDelivr URLs from a public dataset; images/GIFs are not committed.
+- Exercise media: jsDelivr URLs pinned to a COMMIT HASH of the pre-purge fork `Aleyhan/exercises-dataset@29cd1b8` (original upstream purged all media 2026-06-30, ownership dispute — issue #0013). Never repoint to a mutable ref. Archival copy: NAS `N:\TOBESORTED\exercises-dataset-media-archive` (263 MB, 1324 gifs + 1324 jpgs); images/GIFs are not committed to this repo.
 
 Docs: `CONTEXT.md` · `docs/supabase-vercel-migration-plan.md` · `docs/adrs/` · `graphify-out/GRAPH_REPORT.md`.
 
