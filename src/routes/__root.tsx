@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { lazy, Suspense } from 'react'
 
+import { GlobalErrorBoundary } from '@/app/components/GlobalErrorBoundary'
 import Header from '@/app/components/Header'
 import { AuthProvider, useAuth } from '../lib/auth'
 
@@ -46,6 +47,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   }),
 
   shellComponent: RootDocument,
+  errorComponent: ({ error, reset }) => <GlobalErrorBoundary error={error} reset={reset} />,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {

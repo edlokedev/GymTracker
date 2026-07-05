@@ -1,33 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GlobalErrorBoundary } from './GlobalErrorBoundary'
-
-const invalidateMock = vi.hoisted(() => vi.fn())
-
-vi.mock('@/lib/auth', () => ({
-  useAuth: () => ({
-    isAuthenticated: true,
-    user: { name: 'Ada Lovelace', email: 'ada@example.com', image: null },
-    signOut: vi.fn(),
-  }),
-}))
-
-vi.mock('@tanstack/react-router', () => ({
-  Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
-    <a href={to} {...props}>
-      {children}
-    </a>
-  ),
-  useRouter: () => ({
-    invalidate: invalidateMock,
-  }),
-}))
 
 describe('GlobalErrorBoundary', () => {
   afterEach(() => {
     cleanup()
-    invalidateMock.mockReset()
   })
 
   it('shows the error message and lets the caller reset', () => {
@@ -47,5 +24,13 @@ describe('GlobalErrorBoundary', () => {
 
     expect(screen.queryByRole('button', { name: 'Try Again' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back to Home' })).toBeInTheDocument()
+  })
+
+  it('does not render its own Header (the root shell already provides it)', () => {
+    render(<GlobalErrorBoundary error={new Error('boom')} />)
+
+    // No app navigation from a nested Header — avoids doubling under the root layout.
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /gymmie/i })).not.toBeInTheDocument()
   })
 })

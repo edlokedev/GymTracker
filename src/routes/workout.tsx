@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import LoginPage from '@/features/auth/components/LoginPage'
 import WorkoutSessionManager from '@/features/workout-session/components/WorkoutSessionManager'
 import { getLocalCalendarDate } from '@/lib/utils/calendar'
 import { useAuth } from '../lib/auth'
@@ -26,7 +27,7 @@ export const Route = createFileRoute('/workout')({
   component: WorkoutPage,
 })
 
-function WorkoutPage() {
+export function WorkoutPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const { sessionId, templateId } = Route.useSearch()
   const [currentSession, setCurrentSession] = useState<WorkoutSession | null>(null)
@@ -50,45 +51,32 @@ function WorkoutPage() {
     })
   }, [sessionId, user, currentSession?.id])
 
-  // Show loading state
+  // Mirror index.tsx: render the dashboard shell + skeleton while auth
+  // resolves so first paint isn't blank and the layout doesn't shift.
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-6 h-28 animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
+          <div className="h-96 animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
+          <span className="sr-only">Loading your workout…</span>
         </div>
       </div>
     )
   }
 
-  // Show login prompt if not authenticated
+  // Signed-out visitors get the shared login page (matching index.tsx),
+  // instead of a dead-end prompt with no sign-in control.
   if (!isAuthenticated || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Please sign in to track your workouts
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
-            Sign in with Google to access your workout tracking dashboard
-          </p>
-          {/* The Header component should handle the sign-in button */}
-        </div>
-      </div>
-    )
+    return <LoginPage />
   }
 
   const handleSessionSave = (session: WorkoutSession) => {
     if (isStartingTemplate) return
     setCurrentSession(session)
-    console.log('Session saved:', session)
   }
 
-  const handleSessionComplete = (session: WorkoutSession) => {
-    console.log('Session completed:', session)
-    // In a real app, you might redirect to a summary page or workout history
-  }
+  const handleSessionComplete = (_session: WorkoutSession) => {}
 
   // Heading reflects whether this is a new session or an editor view.
   const isEditing = Boolean(sessionId)
