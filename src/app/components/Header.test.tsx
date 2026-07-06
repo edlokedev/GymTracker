@@ -62,7 +62,7 @@ describe('Header', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Sign Out' })[0])
     expect(authState.signOut).toHaveBeenCalledOnce()
 
-    expect(container.querySelector('header')?.className).toContain('dark:bg-slate-900')
+    expect(container.querySelector('header')?.className).toContain('dark:bg-slate-800')
   })
 
   it('keeps the public header free of removed demo routes', () => {
