@@ -4,6 +4,7 @@ import { DATE_PRESETS } from '@/lib/types/progress'
 import { formatExerciseName } from '@/lib/utils/text'
 import { PROGRESS_METRIC_OPTIONS } from '../model'
 import { useProgressDashboard } from '../useProgressDashboard'
+import { ProgressChart } from './ProgressChart'
 
 type ProgressDashboardState = ReturnType<typeof useProgressDashboard>['state']
 type ProgressDashboardActions = ReturnType<typeof useProgressDashboard>['actions']
@@ -47,7 +48,7 @@ export default function ProgressDashboard() {
 
   return (
     <div className="space-y-6">
-      <ProgressControls state={state} chartPointsCount={chartPoints.length} actions={actions} />
+      <ProgressControls state={state} actions={actions} />
 
       {state.data.length === 0 ? (
         <div className="text-center py-12">
@@ -90,6 +91,19 @@ export default function ProgressDashboard() {
                 {summary.personalRecords}
               </p>
             </div>
+          </div>
+
+          <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 sm:p-6">
+            <ProgressChart
+              points={chartPoints}
+              chartType={state.selectedChart}
+              showTrendLines={state.showTrendLines}
+              highlightPRs={state.highlightPRs}
+              metricLabel={
+                PROGRESS_METRIC_OPTIONS.find((option) => option.value === state.filters.metric)
+                  ?.label ?? state.filters.metric
+              }
+            />
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -166,11 +180,9 @@ export default function ProgressDashboard() {
 
 function ProgressControls({
   state,
-  chartPointsCount,
   actions,
 }: {
   state: ProgressDashboardState
-  chartPointsCount: number
   actions: ProgressDashboardActions
 }) {
   return (
@@ -294,10 +306,6 @@ function ProgressControls({
             />
             Highlight PRs
           </label>
-
-          <span className="text-gray-500 text-xs dark:text-gray-400 sm:text-sm">
-            {chartPointsCount} chart points ready
-          </span>
         </div>
       </div>
     </div>
