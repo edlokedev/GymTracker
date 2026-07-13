@@ -173,7 +173,7 @@ function ExerciseQuickSections({
   const shouldHideSections = isCompactViewport && isCollapsed
 
   return (
-    <div className="space-y-2 border-gray-200 border-b px-3 py-2.5 dark:border-gray-700 sm:px-5 sm:py-3">
+    <div className="max-h-[40dvh] shrink-0 space-y-2 overflow-y-auto overscroll-contain border-gray-200 border-b px-3 py-2.5 dark:border-gray-700 sm:px-5 sm:py-3">
       {isCompactViewport && (
         <button
           type="button"
@@ -533,7 +533,7 @@ function ExerciseSelectorList({
   }, [hasMore, onLoadMore])
 
   return (
-    <ScrollArea className="flex-1 overflow-y-auto p-3 pb-[max(env(safe-area-inset-bottom),1rem)] sm:p-6">
+    <ScrollArea className="min-h-0 flex-1 overflow-y-auto p-3 pb-[max(env(safe-area-inset-bottom),1rem)] sm:p-6">
       {isLoading && exercises.length === 0 ? (
         <div className="flex h-full min-h-[280px] items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-blue-600 border-b-2" />
