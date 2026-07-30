@@ -59,11 +59,9 @@ export interface ProgressFilters {
 export interface ProgressState {
   filters: ProgressFilters
   data: ExerciseProgress[]
+  selectedExerciseId: string | null
   isLoading: boolean
   error: string | null
-  selectedChart: 'line' | 'bar'
-  showTrendLines: boolean
-  highlightPRs: boolean
 }
 
 // API Request/Response Types
@@ -102,29 +100,10 @@ export interface ChartDataPoint {
   speedKmh: number | null
 }
 
-export interface ChartConfig {
-  type: 'line' | 'bar'
-  showTrendLine: boolean
-  highlightPRs: boolean
-  metric: ProgressMetric
-  colors: {
-    primary: string
-    secondary: string
-    accent: string
-    pr: string
-  }
-}
-
 // Component Props Types
 export interface ProgressDashboardProps {
   userId: string
   initialFilters?: Partial<ProgressFilters>
-}
-
-export interface ExerciseProgressChartProps {
-  data: ExerciseProgress
-  config: ChartConfig
-  onDataPointClick?: (dataPoint: ProgressDataPoint) => void
 }
 
 export interface ProgressFiltersProps {

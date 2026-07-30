@@ -13,7 +13,6 @@ export type ProgressDatePresetValue = (typeof DATE_PRESETS)[number]['value']
 
 export const DEFAULT_PROGRESS_DATE_PRESET: ProgressDatePresetValue = '90d'
 export const PROGRESS_METRIC_OPTIONS: Array<{ value: ProgressMetric; label: string }> = [
-  { value: 'volume', label: 'Volume' },
   { value: 'weight', label: 'Weight' },
   { value: 'reps', label: 'Reps' },
   { value: 'duration', label: 'Duration' },
@@ -37,7 +36,7 @@ export function createProgressFilters(now = dayjs()): ProgressFilters {
   return {
     exerciseIds: [],
     dateRange: getProgressDateRange(DEFAULT_PROGRESS_DATE_PRESET, now),
-    metric: 'volume',
+    metric: 'weight',
   }
 }
 
@@ -45,12 +44,26 @@ export function createProgressState(now = dayjs()): ProgressState {
   return {
     filters: createProgressFilters(now),
     data: [],
+    selectedExerciseId: null,
     isLoading: false,
     error: null,
-    selectedChart: 'line',
-    showTrendLines: true,
-    highlightPRs: true,
   }
+}
+
+export function findMostRecentExerciseId(data: ExerciseProgress[]): string | null {
+  let selectedExerciseId: string | null = null
+  let latestDate = ''
+
+  for (const exercise of data) {
+    for (const point of exercise.dataPoints) {
+      if (point.date >= latestDate) {
+        latestDate = point.date
+        selectedExerciseId = exercise.exerciseId
+      }
+    }
+  }
+
+  return selectedExerciseId
 }
 
 export function applyProgressDatePreset(
@@ -83,55 +96,56 @@ function metricValue(point: {
   durationSeconds: number | null
   distanceKm: number | null
   speedKmh: number | null
-}): Record<ProgressMetric, number> {
+}): Record<ProgressMetric, number | null> {
   return {
-    weight: point.weight || 0,
-    reps: point.reps || 0,
-    volume: point.volume,
-    duration: point.durationSeconds || 0,
-    distance: point.distanceKm || 0,
-    speed: point.speedKmh || 0,
+    weight: point.weight,
+    reps: point.reps,
+    volume: point.volume > 0 ? point.volume : null,
+    duration: point.durationSeconds,
+    distance: point.distanceKm,
+    speed: point.speedKmh,
   }
+}
+
+export function getAvailableProgressMetrics(exercise: ExerciseProgress): ProgressMetric[] {
+  return PROGRESS_METRIC_OPTIONS.map((option) => option.value).filter((metric) =>
+    exercise.dataPoints.some((point) => {
+      const value = metricValue(point)[metric]
+      return value !== null && Number.isFinite(value) && value > 0
+    }),
+  )
 }
 
 export function buildProgressChartPoints(
   data: ExerciseProgress[],
   metric: ProgressMetric,
-  options: { highlightPRs?: boolean } = {},
+  options: { exerciseId?: string | null } = {},
 ): ChartDataPoint[] {
-  return data
-    .flatMap((exercise) =>
-      exercise.dataPoints
-        .filter((point) => options.highlightPRs !== false || !point.isPersonalRecord)
-        .map((point) => ({
-          date: point.date,
-          value: metricValue(point)[metric],
-          exerciseName: exercise.exerciseName,
-          isPersonalRecord: point.isPersonalRecord,
-          volume: point.volume,
-          weight: point.weight,
-          reps: point.reps,
-          durationSeconds: point.durationSeconds,
-          distanceKm: point.distanceKm,
-          speedKmh: point.speedKmh,
-        })),
-    )
-    .sort((left, right) => left.date.localeCompare(right.date))
-}
+  const exercise = data.find((item) => item.exerciseId === options.exerciseId) ?? data.at(0) ?? null
+  if (!exercise) return []
 
-export function summarizeProgress(data: ExerciseProgress[]) {
-  return {
-    exercisesTracked: data.length,
-    totalWorkouts: data.reduce((sum, exercise) => sum + exercise.statistics.totalWorkouts, 0),
-    personalRecords: data.reduce((sum, exercise) => {
-      let count = 0
-      if (exercise.personalRecords.maxWeight) count += 1
-      if (exercise.personalRecords.maxReps) count += 1
-      if (exercise.personalRecords.maxVolume) count += 1
-      if (exercise.personalRecords.maxDuration) count += 1
-      if (exercise.personalRecords.maxDistance) count += 1
-      if (exercise.personalRecords.maxSpeed) count += 1
-      return sum + count
-    }, 0),
+  const bestByWorkout = new Map<string, ChartDataPoint>()
+  for (const point of exercise.dataPoints) {
+    const value = metricValue(point)[metric]
+    if (value === null || !Number.isFinite(value)) continue
+
+    const chartPoint = {
+      date: point.date,
+      value,
+      exerciseName: exercise.exerciseName,
+      isPersonalRecord: point.isPersonalRecord,
+      volume: point.volume,
+      weight: point.weight,
+      reps: point.reps,
+      durationSeconds: point.durationSeconds,
+      distanceKm: point.distanceKm,
+      speedKmh: point.speedKmh,
+    }
+    const currentBest = bestByWorkout.get(point.sessionId)
+    if (!currentBest || chartPoint.value > currentBest.value) {
+      bestByWorkout.set(point.sessionId, chartPoint)
+    }
   }
+
+  return [...bestByWorkout.values()].sort((left, right) => left.date.localeCompare(right.date))
 }

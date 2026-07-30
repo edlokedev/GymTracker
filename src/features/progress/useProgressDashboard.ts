@@ -5,8 +5,9 @@ import {
   applyProgressDatePreset,
   buildProgressChartPoints,
   createProgressState,
+  findMostRecentExerciseId,
+  getAvailableProgressMetrics,
   type ProgressDatePresetValue,
-  summarizeProgress,
 } from './model'
 
 interface UseProgressDashboardOptions {
@@ -28,6 +29,14 @@ export function useProgressDashboard({ userId, initialFilters }: UseProgressDash
       },
     }
   })
+  const dataFilters = useMemo<ProgressFilters>(
+    () => ({
+      exerciseIds: state.filters.exerciseIds,
+      dateRange: state.filters.dateRange,
+      metric: 'volume',
+    }),
+    [state.filters.exerciseIds, state.filters.dateRange],
+  )
 
   const loadProgressData = useCallback(async () => {
     if (!userId) return
@@ -35,13 +44,32 @@ export function useProgressDashboard({ userId, initialFilters }: UseProgressDash
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
     try {
-      const data = await fetchProgressData(state.filters)
-      setState((prev) => ({
-        ...prev,
-        data: data.progress,
-        isLoading: false,
-        error: null,
-      }))
+      const data = await fetchProgressData(dataFilters)
+      setState((prev) => {
+        const selectedExerciseId = data.progress.some(
+          (exercise) => exercise.exerciseId === prev.selectedExerciseId,
+        )
+          ? prev.selectedExerciseId
+          : findMostRecentExerciseId(data.progress)
+        const selectedExercise = data.progress.find(
+          (exercise) => exercise.exerciseId === selectedExerciseId,
+        )
+        const availableMetrics = selectedExercise
+          ? getAvailableProgressMetrics(selectedExercise)
+          : []
+        const metric = availableMetrics.includes(prev.filters.metric)
+          ? prev.filters.metric
+          : (availableMetrics[0] ?? prev.filters.metric)
+
+        return {
+          ...prev,
+          data: data.progress,
+          selectedExerciseId,
+          filters: metric === prev.filters.metric ? prev.filters : { ...prev.filters, metric },
+          isLoading: false,
+          error: null,
+        }
+      })
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -49,7 +77,7 @@ export function useProgressDashboard({ userId, initialFilters }: UseProgressDash
         error: error instanceof Error ? error.message : 'Failed to fetch progress data',
       }))
     }
-  }, [state.filters, userId])
+  }, [dataFilters, userId])
 
   useEffect(() => {
     void loadProgressData()
@@ -96,34 +124,40 @@ export function useProgressDashboard({ userId, initialFilters }: UseProgressDash
       }))
     }, []),
 
-    setSelectedChart: useCallback((selectedChart: ProgressState['selectedChart']) => {
-      setState((prev) => ({ ...prev, selectedChart }))
-    }, []),
+    setSelectedExerciseId: useCallback((selectedExerciseId: string) => {
+      setState((prev) => {
+        const selectedExercise = prev.data.find(
+          (exercise) => exercise.exerciseId === selectedExerciseId,
+        )
+        const availableMetrics = selectedExercise
+          ? getAvailableProgressMetrics(selectedExercise)
+          : []
+        const metric = availableMetrics.includes(prev.filters.metric)
+          ? prev.filters.metric
+          : (availableMetrics[0] ?? prev.filters.metric)
 
-    setShowTrendLines: useCallback((showTrendLines: boolean) => {
-      setState((prev) => ({ ...prev, showTrendLines }))
-    }, []),
-
-    setHighlightPRs: useCallback((highlightPRs: boolean) => {
-      setState((prev) => ({ ...prev, highlightPRs }))
+        return {
+          ...prev,
+          selectedExerciseId,
+          filters: metric === prev.filters.metric ? prev.filters : { ...prev.filters, metric },
+        }
+      })
     }, []),
 
     setFilters,
     refresh: loadProgressData,
   }
 
-  const summary = useMemo(() => summarizeProgress(state.data), [state.data])
   const chartPoints = useMemo(
     () =>
       buildProgressChartPoints(state.data, state.filters.metric, {
-        highlightPRs: state.highlightPRs,
+        exerciseId: state.selectedExerciseId,
       }),
-    [state.data, state.filters.metric, state.highlightPRs],
+    [state.data, state.filters.metric, state.selectedExerciseId],
   )
 
   return {
     state,
-    summary,
     chartPoints,
     actions,
   }

@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChartDataPoint } from '@/lib/types/progress'
-import { buildSeries, linearTrend, ProgressChart } from './ProgressChart'
+import { buildChartGeometry, getProgressChartDimensions, ProgressChart } from './ProgressChart'
 
 const point = (overrides: Partial<ChartDataPoint>): ChartDataPoint => ({
   date: '2026-07-01',
@@ -27,88 +27,70 @@ const points: ChartDataPoint[] = [
 describe('ProgressChart', () => {
   afterEach(() => {
     cleanup()
+    vi.unstubAllGlobals()
   })
 
-  it('renders one line per exercise with PR points highlighted', () => {
-    const { container } = render(
-      <ProgressChart
-        points={points}
-        chartType="line"
-        showTrendLines={false}
-        highlightPRs={true}
-        metricLabel="Volume"
-      />,
-    )
+  it('renders one focused series with its best workout emphasized and no legend', () => {
+    const benchPoints = points.filter((item) => item.exerciseName === 'bench press')
+    const { container } = render(<ProgressChart points={benchPoints} metricLabel="Weight" />)
 
     expect(screen.getByTestId('series-line-bench press')).toBeInTheDocument()
-    expect(screen.getByTestId('series-line-squat')).toBeInTheDocument()
-    expect(screen.getAllByTestId('pr-point')).toHaveLength(1)
+    expect(screen.getAllByTestId('chart-point')).toHaveLength(2)
+    expect(screen.getByTestId('best-point')).toBeInTheDocument()
+    expect(screen.queryByText('Bench Press')).not.toBeInTheDocument()
     expect(container.querySelector('rect')).not.toBeInTheDocument()
   })
 
-  it('renders bars instead of lines for bar type, and trend lines when enabled', () => {
-    const { container } = render(
-      <ProgressChart
-        points={points}
-        chartType="bar"
-        showTrendLines={true}
-        highlightPRs={false}
-        metricLabel="Volume"
-      />,
-    )
+  it('uses one accessible line chart instead of visualization mode controls', () => {
+    const benchPoints = points.filter((item) => item.exerciseName === 'bench press')
+    const { container } = render(<ProgressChart points={benchPoints} metricLabel="Volume" />)
 
-    expect(screen.getAllByTestId('series-bar-squat')).toHaveLength(2)
-    expect(container.querySelector('polyline')).not.toBeInTheDocument()
-    expect(screen.getByTestId('trend-line-bench press')).toBeInTheDocument()
+    const chart = screen.getByRole('img', {
+      name: 'Bench Press Volume progress across 2 workouts',
+    })
+    expect(chart).toHaveAttribute('viewBox', '0 0 720 200')
+    expect(chart).not.toHaveClass('min-h-56')
+    expect(screen.getByTestId('series-line-bench press')).toBeInTheDocument()
+    expect(container.querySelector('rect')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-testid^="trend-line-"]')).not.toBeInTheDocument()
   })
 
   it('shows an empty message when there are no points', () => {
-    render(
-      <ProgressChart
-        points={[]}
-        chartType="line"
-        showTrendLines={false}
-        highlightPRs={false}
-        metricLabel="Volume"
-      />,
+    render(<ProgressChart points={[]} metricLabel="Volume" />)
+
+    expect(screen.getByText('No volume data in this period.')).toBeInTheDocument()
+  })
+
+  it('starts responsive sizing when data appears after the empty state', () => {
+    const observe = vi.fn()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = observe
+        disconnect = vi.fn()
+      },
+    )
+    const { rerender } = render(<ProgressChart points={[]} metricLabel="Weight" />)
+
+    rerender(<ProgressChart points={points.slice(0, 2)} metricLabel="Weight" />)
+
+    expect(observe).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('buildChartGeometry', () => {
+  it('keeps the chart compact on desktop and readable on mobile', () => {
+    expect(getProgressChartDimensions(390)).toEqual({ width: 390, height: 180 })
+    expect(getProgressChartDimensions(1169)).toEqual({ width: 1169, height: 200 })
+  })
+
+  it('maps higher values upward without forcing a zero baseline', () => {
+    const geometry = buildChartGeometry(
+      points.filter((item) => item.exerciseName === 'bench press'),
     )
 
-    expect(
-      screen.getByText('No data points for this metric in the selected period.'),
-    ).toBeInTheDocument()
-  })
-})
-
-describe('buildSeries', () => {
-  it('groups points by exercise and maps higher values to smaller y (SVG up)', () => {
-    const series = buildSeries(points)
-    expect(series.map((s) => s.name).sort()).toEqual(['bench press', 'squat'])
-    const bench = series.find((s) => s.name === 'bench press')
-    expect(bench).toBeDefined()
-    if (!bench) return
-    expect(bench.points[1].y).toBeLessThan(bench.points[0].y)
-  })
-})
-
-describe('linearTrend', () => {
-  it('fits an upward slope through ascending points', () => {
-    const trend = linearTrend([
-      { x: 0, y: 10 },
-      { x: 10, y: 20 },
-      { x: 20, y: 30 },
-    ])
-    expect(trend).not.toBeNull()
-    if (!trend) return
-    expect(trend.y2).toBeGreaterThan(trend.y1)
-  })
-
-  it('returns null for fewer than two points or zero x-spread', () => {
-    expect(linearTrend([{ x: 1, y: 1 }])).toBeNull()
-    expect(
-      linearTrend([
-        { x: 5, y: 1 },
-        { x: 5, y: 9 },
-      ]),
-    ).toBeNull()
+    expect(geometry.points[1].y).toBeLessThan(geometry.points[0].y)
+    expect(geometry.domainMin).toBeGreaterThan(0)
+    expect(geometry.points[1].isBest).toBe(true)
   })
 })

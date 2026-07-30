@@ -1,251 +1,247 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChartDataPoint } from '@/lib/types/progress'
 import { formatExerciseName } from '@/lib/utils/text'
 
-const CHART_WIDTH = 800
-const CHART_HEIGHT = 320
-const PAD_LEFT = 48
-const PAD_RIGHT = 16
-const PAD_TOP = 16
-const PAD_BOTTOM = 32
+const CHART_WIDTH = 720
+const CHART_HEIGHT = 200
+const MOBILE_CHART_BREAKPOINT = 640
+const MOBILE_CHART_HEIGHT = 180
+const PAD_LEFT = 52
+const PAD_RIGHT = 18
+const PAD_TOP = 12
+const PAD_BOTTOM = 30
 
-const SERIES_COLORS = [
-  '#3b82f6', // blue-500
-  '#10b981', // emerald-500
-  '#8b5cf6', // violet-500
-  '#f59e0b', // amber-500
-  '#f43f5e', // rose-500
-  '#06b6d4', // cyan-500
-]
+interface ProgressChartDimensions {
+  width: number
+  height: number
+}
 
-interface Series {
-  name: string
-  color: string
-  points: Array<{ x: number; y: number; isPersonalRecord: boolean }>
+const DEFAULT_CHART_DIMENSIONS: ProgressChartDimensions = {
+  width: CHART_WIDTH,
+  height: CHART_HEIGHT,
+}
+
+interface GeometryPoint {
+  x: number
+  y: number
+  source: ChartDataPoint
+  isBest: boolean
+}
+
+interface ChartGeometry {
+  points: GeometryPoint[]
+  domainMin: number
+  domainMax: number
 }
 
 export interface ProgressChartProps {
   points: ChartDataPoint[]
-  chartType: 'line' | 'bar'
-  showTrendLines: boolean
-  highlightPRs: boolean
   metricLabel: string
 }
 
-export function buildSeries(points: ChartDataPoint[]): Series[] {
-  const byExercise = new Map<string, ChartDataPoint[]>()
-  for (const point of points) {
-    if (!Number.isFinite(point.value)) continue
-    const list = byExercise.get(point.exerciseName) ?? []
-    list.push(point)
-    byExercise.set(point.exerciseName, list)
+export function getProgressChartDimensions(containerWidth: number): ProgressChartDimensions {
+  const width = Math.max(280, Math.round(containerWidth))
+  return {
+    width,
+    height: width < MOBILE_CHART_BREAKPOINT ? MOBILE_CHART_HEIGHT : CHART_HEIGHT,
+  }
+}
+
+export function buildChartGeometry(
+  points: ChartDataPoint[],
+  dimensions = DEFAULT_CHART_DIMENSIONS,
+): ChartGeometry {
+  const sortedPoints = points
+    .filter((point) => Number.isFinite(point.value))
+    .sort((left, right) => left.date.localeCompare(right.date))
+
+  if (sortedPoints.length === 0) {
+    return { points: [], domainMin: 0, domainMax: 1 }
   }
 
-  const dates = [...byExercise.values()].flat().map((p) => Date.parse(p.date))
-  const maxValue = Math.max(...[...byExercise.values()].flat().map((p) => p.value), 0)
-  const minDate = Math.min(...dates)
-  const maxDate = Math.max(...dates)
+  const values = sortedPoints.map((point) => point.value)
+  const minValue = Math.min(...values)
+  const maxValue = Math.max(...values)
+  const valueRange = maxValue - minValue
+  const domainPadding = valueRange > 0 ? valueRange * 0.15 : Math.max(Math.abs(maxValue) * 0.1, 1)
+  const domainMin = Math.max(0, minValue - domainPadding)
+  const domainMax = maxValue + domainPadding
+  const domainSpan = Math.max(domainMax - domainMin, 1)
+  const parsedDates = sortedPoints.map((point) => Date.parse(point.date))
+  const minDate = Math.min(...parsedDates)
+  const maxDate = Math.max(...parsedDates)
   const dateSpan = Math.max(maxDate - minDate, 1)
-  const valueSpan = maxValue > 0 ? maxValue : 1
+  const plotWidth = dimensions.width - PAD_LEFT - PAD_RIGHT
+  const plotHeight = dimensions.height - PAD_TOP - PAD_BOTTOM
 
-  const plotWidth = CHART_WIDTH - PAD_LEFT - PAD_RIGHT
-  const plotHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM
-
-  return [...byExercise.entries()].map(([name, exercisePoints], index) => ({
-    name,
-    color: SERIES_COLORS[index % SERIES_COLORS.length],
-    points: exercisePoints.map((point) => ({
-      x: PAD_LEFT + ((Date.parse(point.date) - minDate) / dateSpan) * plotWidth,
-      y: PAD_TOP + plotHeight - (point.value / valueSpan) * plotHeight,
-      isPersonalRecord: point.isPersonalRecord,
+  return {
+    points: sortedPoints.map((point, index) => ({
+      x:
+        sortedPoints.length === 1
+          ? PAD_LEFT + plotWidth / 2
+          : PAD_LEFT + ((parsedDates[index] - minDate) / dateSpan) * plotWidth,
+      y: PAD_TOP + ((domainMax - point.value) / domainSpan) * plotHeight,
+      source: point,
+      isBest: point.value === maxValue,
     })),
-  }))
+    domainMin,
+    domainMax,
+  }
 }
 
-export function linearTrend(
-  points: Array<{ x: number; y: number }>,
-): { x1: number; y1: number; x2: number; y2: number } | null {
-  if (points.length < 2) return null
-  const n = points.length
-  const meanX = points.reduce((sum, p) => sum + p.x, 0) / n
-  const meanY = points.reduce((sum, p) => sum + p.y, 0) / n
-  const denominator = points.reduce((sum, p) => sum + (p.x - meanX) ** 2, 0)
-  if (denominator === 0) return null
-  const slope = points.reduce((sum, p) => sum + (p.x - meanX) * (p.y - meanY), 0) / denominator
-  const intercept = meanY - slope * meanX
-  const xs = points.map((p) => p.x)
-  const x1 = Math.min(...xs)
-  const x2 = Math.max(...xs)
-  return { x1, y1: slope * x1 + intercept, x2, y2: slope * x2 + intercept }
-}
+export function ProgressChart({ points, metricLabel }: ProgressChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [dimensions, setDimensions] = useState(DEFAULT_CHART_DIMENSIONS)
+  const geometry = useMemo(() => buildChartGeometry(points, dimensions), [dimensions, points])
+  const hasChartPoints = geometry.points.length > 0
 
-export function ProgressChart({
-  points,
-  chartType,
-  showTrendLines,
-  highlightPRs,
-  metricLabel,
-}: ProgressChartProps) {
-  const series = useMemo(() => buildSeries(points), [points])
-  const maxValue = useMemo(
-    () => Math.max(...points.map((p) => p.value).filter(Number.isFinite), 0),
-    [points],
-  )
+  useEffect(() => {
+    const container = containerRef.current
+    if (!hasChartPoints || !container || typeof ResizeObserver === 'undefined') return
 
-  if (points.length === 0) {
+    const updateDimensions = (width: number) => {
+      if (width <= 0) return
+      const nextDimensions = getProgressChartDimensions(width)
+      setDimensions((currentDimensions) =>
+        currentDimensions.width === nextDimensions.width &&
+        currentDimensions.height === nextDimensions.height
+          ? currentDimensions
+          : nextDimensions,
+      )
+    }
+
+    updateDimensions(container.getBoundingClientRect().width)
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (width) updateDimensions(width)
+    })
+    observer.observe(container)
+
+    return () => observer.disconnect()
+  }, [hasChartPoints])
+
+  if (!hasChartPoints) {
     return (
-      <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-        No data points for this metric in the selected period.
+      <p className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+        No {metricLabel.toLowerCase()} data in this period.
       </p>
     )
   }
 
-  const plotHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM
-  const gridLines = [0, 0.25, 0.5, 0.75, 1]
-  const firstDate = points[0]?.date
-  const lastDate = points[points.length - 1]?.date
-  const barWidth = Math.max(
-    2,
-    Math.min(16, (CHART_WIDTH - PAD_LEFT - PAD_RIGHT) / (points.length * 2)),
-  )
+  const exerciseName = formatExerciseName(geometry.points[0].source.exerciseName)
+  const gridFractions = [0, 0.5, 1]
+  const firstPoint = geometry.points[0]
+  const lastPoint = geometry.points.at(-1) ?? firstPoint
+  const linePoints = geometry.points.map((point) => `${point.x},${point.y}`).join(' ')
 
   return (
-    <div>
+    <div ref={containerRef} className="w-full">
       <svg
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        className="h-auto w-full"
+        viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+        className="block w-full overflow-visible"
+        style={{ height: dimensions.height }}
         role="img"
-        aria-label={`${chartType === 'line' ? 'Line' : 'Bar'} chart of ${metricLabel} over time`}
+        aria-label={`${exerciseName} ${metricLabel} progress across ${geometry.points.length} workouts`}
       >
-        {gridLines.map((fraction) => {
-          const y = PAD_TOP + plotHeight - fraction * plotHeight
+        {gridFractions.map((fraction) => {
+          const plotHeight = dimensions.height - PAD_TOP - PAD_BOTTOM
+          const y = PAD_TOP + fraction * plotHeight
+          const value = geometry.domainMax - fraction * (geometry.domainMax - geometry.domainMin)
+
           return (
             <g key={fraction}>
               <line
                 x1={PAD_LEFT}
-                x2={CHART_WIDTH - PAD_RIGHT}
+                x2={dimensions.width - PAD_RIGHT}
                 y1={y}
                 y2={y}
-                className="stroke-gray-200 dark:stroke-gray-700"
+                className="stroke-slate-200 dark:stroke-slate-700"
                 strokeWidth={1}
               />
               <text
-                x={PAD_LEFT - 8}
+                x={PAD_LEFT - 10}
                 y={y + 4}
                 textAnchor="end"
-                className="fill-gray-500 text-[11px] dark:fill-gray-400"
+                className="fill-slate-500 text-[11px] dark:fill-slate-400"
               >
-                {formatAxisValue(maxValue * fraction)}
+                {formatAxisValue(value)}
               </text>
             </g>
           )
         })}
 
-        {series.map((s) => (
-          <g key={s.name}>
-            {chartType === 'line' && s.points.length > 1 && (
-              <polyline
-                data-testid={`series-line-${s.name}`}
-                points={s.points.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={2}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            )}
+        {geometry.points.length > 1 && (
+          <polyline
+            data-testid={`series-line-${geometry.points[0].source.exerciseName}`}
+            points={linePoints}
+            fill="none"
+            className="stroke-blue-500 dark:stroke-blue-400"
+            strokeWidth={3}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        )}
 
-            {chartType === 'bar' &&
-              s.points.map((p, i) => (
-                <rect
-                  key={i}
-                  data-testid={`series-bar-${s.name}`}
-                  x={p.x - barWidth / 2}
-                  y={p.y}
-                  width={barWidth}
-                  height={Math.max(PAD_TOP + plotHeight - p.y, 1)}
-                  fill={s.color}
-                  fillOpacity={0.85}
-                  rx={1.5}
-                />
-              ))}
-
-            {chartType === 'line' &&
-              s.points.map((p, i) => (
-                <circle
-                  key={i}
-                  cx={p.x}
-                  cy={p.y}
-                  r={highlightPRs && p.isPersonalRecord ? 5 : 3}
-                  fill={s.color}
-                  stroke={highlightPRs && p.isPersonalRecord ? '#f59e0b' : 'transparent'}
-                  strokeWidth={highlightPRs && p.isPersonalRecord ? 2.5 : 0}
-                  data-testid={highlightPRs && p.isPersonalRecord ? 'pr-point' : undefined}
-                />
-              ))}
-
-            {showTrendLines &&
-              (() => {
-                const trend = linearTrend(s.points)
-                return trend ? (
-                  <line
-                    data-testid={`trend-line-${s.name}`}
-                    x1={trend.x1}
-                    y1={trend.y1}
-                    x2={trend.x2}
-                    y2={trend.y2}
-                    stroke={s.color}
-                    strokeWidth={1.5}
-                    strokeDasharray="6 4"
-                    strokeOpacity={0.6}
-                  />
-                ) : null
-              })()}
+        {geometry.points.map((point, index) => (
+          <g
+            key={`${point.source.date}-${index}`}
+            data-testid={point.isBest ? 'best-point' : undefined}
+          >
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={point.isBest ? 6 : 4}
+              className={
+                point.isBest
+                  ? 'fill-blue-500 stroke-amber-500 dark:fill-blue-400'
+                  : 'fill-blue-500 stroke-slate-200 dark:fill-blue-400 dark:stroke-slate-700'
+              }
+              strokeWidth={point.isBest ? 3 : 2}
+              data-testid="chart-point"
+            >
+              <title>
+                {formatChartDate(point.source.date)}: {formatAxisValue(point.source.value)}{' '}
+                {metricLabel}
+                {point.isBest ? ', best in range' : ''}
+              </title>
+            </circle>
           </g>
         ))}
 
-        {firstDate && (
+        <text
+          x={firstPoint.x}
+          y={dimensions.height - 8}
+          textAnchor={geometry.points.length === 1 ? 'middle' : 'start'}
+          className="fill-slate-500 text-[11px] dark:fill-slate-400"
+        >
+          {formatChartDate(firstPoint.source.date)}
+        </text>
+        {geometry.points.length > 1 && (
           <text
-            x={PAD_LEFT}
-            y={CHART_HEIGHT - 8}
-            textAnchor="start"
-            className="fill-gray-500 text-[11px] dark:fill-gray-400"
-          >
-            {firstDate}
-          </text>
-        )}
-        {lastDate && lastDate !== firstDate && (
-          <text
-            x={CHART_WIDTH - PAD_RIGHT}
-            y={CHART_HEIGHT - 8}
+            x={lastPoint.x}
+            y={dimensions.height - 8}
             textAnchor="end"
-            className="fill-gray-500 text-[11px] dark:fill-gray-400"
+            className="fill-slate-500 text-[11px] dark:fill-slate-400"
           >
-            {lastDate}
+            {formatChartDate(lastPoint.source.date)}
           </text>
         )}
       </svg>
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-        {series.map((s) => (
-          <span
-            key={s.name}
-            className="inline-flex items-center gap-1.5 text-gray-600 text-xs dark:text-gray-300"
-          >
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: s.color }}
-            />
-            {formatExerciseName(s.name)}
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
 
 function formatAxisValue(value: number): string {
-  if (value >= 1000)
+  if (Math.abs(value) >= 1000) {
     return `${(value / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k`
+  }
   return value.toLocaleString(undefined, { maximumFractionDigits: 1 })
+}
+
+function formatChartDate(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  })
 }
