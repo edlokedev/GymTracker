@@ -134,7 +134,7 @@ describe('Exercise Library components', () => {
     )
   })
 
-  it('selects an exercise from the selector modal', async () => {
+  it('selects an exercise from the selector modal and closes it', async () => {
     const exercise = mockExerciseLibraryFetch()
     const onSelectExercise = vi.fn()
 
@@ -145,49 +145,98 @@ describe('Exercise Library components', () => {
     fireEvent.click(screen.getByText('Bench Press'))
 
     expect(onSelectExercise).toHaveBeenCalledWith(expect.objectContaining({ id: exercise.id }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('renders quick sections before selector search and selects quick picks', async () => {
+  it('renders a three-tab picker with Search active by default', async () => {
+    mockExerciseLibraryFetch()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    const tablist = screen.getByRole('tablist', { name: /exercise picker/i })
+    const tabs = within(tablist).getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Search', 'Recent', 'Favourites'])
+
+    const [searchTab, recentTab, favouritesTab] = tabs
+    expect(searchTab).toHaveAttribute('aria-selected', 'true')
+    expect(searchTab).toHaveAttribute('tabindex', '0')
+    expect(recentTab).toHaveAttribute('aria-selected', 'false')
+    expect(recentTab).toHaveAttribute('tabindex', '-1')
+    expect(favouritesTab).toHaveAttribute('aria-selected', 'false')
+    expect(favouritesTab).toHaveAttribute('tabindex', '-1')
+
+    for (const tab of tabs) {
+      const panelId = tab.getAttribute('aria-controls')
+      const panel = panelId ? document.getElementById(panelId) : null
+      expect(panel).not.toBeNull()
+      expect(panel).toHaveAttribute('role', 'tabpanel')
+      expect(panel).toHaveAttribute('aria-labelledby', tab.id)
+    }
+
+    expect(document.getElementById('exercise-picker-panel-search')).not.toHaveAttribute('hidden')
+    expect(document.getElementById('exercise-picker-panel-recent')).toHaveAttribute('hidden')
+    expect(document.getElementById('exercise-picker-panel-favorites')).toHaveAttribute('hidden')
+  })
+
+  it('moves and activates tabs with arrow, Home and End keys', async () => {
+    mockExerciseLibraryFetch()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    const searchTab = screen.getByRole('tab', { name: /search/i })
+    const recentTab = screen.getByRole('tab', { name: /recent/i })
+    const favouritesTab = screen.getByRole('tab', { name: /favourites/i })
+
+    searchTab.focus()
+    fireEvent.keyDown(searchTab, { key: 'ArrowRight' })
+    expect(recentTab).toHaveAttribute('aria-selected', 'true')
+    expect(recentTab).toHaveFocus()
+    expect(document.getElementById('exercise-picker-panel-recent')).not.toHaveAttribute('hidden')
+    expect(document.getElementById('exercise-picker-panel-search')).toHaveAttribute('hidden')
+
+    fireEvent.keyDown(recentTab, { key: 'ArrowLeft' })
+    expect(searchTab).toHaveAttribute('aria-selected', 'true')
+    expect(searchTab).toHaveFocus()
+
+    fireEvent.keyDown(searchTab, { key: 'End' })
+    expect(favouritesTab).toHaveAttribute('aria-selected', 'true')
+    expect(favouritesTab).toHaveFocus()
+
+    fireEvent.keyDown(favouritesTab, { key: 'Home' })
+    expect(searchTab).toHaveAttribute('aria-selected', 'true')
+    expect(searchTab).toHaveFocus()
+  })
+
+  it('selects a favourite from the Favourites tab; star clicks never select', async () => {
     mockExerciseLibraryFetch()
     const onSelectExercise = vi.fn()
+    const onToggleFavorite = vi.fn()
 
     renderWithQuery(
       <ExerciseSelector
         onSelectExercise={onSelectExercise}
+        onToggleFavorite={onToggleFavorite}
         favoriteExerciseIds={['front-squat']}
         favoriteExercises={[makeExercise('front-squat', 'front squat')]}
-        recentlyUsedExercises={[
-          {
-            exercise: makeExercise('romanian-deadlift', 'romanian deadlift'),
-            useCount: 3,
-          },
-        ]}
-        suggestedExercises={[
-          {
-            exercise: makeExercise('incline-press', 'incline press'),
-            reasons: ['same muscle', 'same equipment'],
-          },
-        ]}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /favourites/i }))
 
-    const favoritesSection = screen.getByRole('region', { name: 'Favorites' })
-    const searchInput = screen.getByPlaceholderText(/search by name or muscle group/i)
+    const panel = document.getElementById('exercise-picker-panel-favorites') as HTMLElement
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove Front Squat from favorites' }))
+    expect(onToggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ id: 'front-squat' }))
+    expect(onSelectExercise).not.toHaveBeenCalled()
 
-    expect(favoritesSection.compareDocumentPosition(searchInput)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    )
-    expect(screen.getByRole('region', { name: 'Recently Used' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Suggested' })).toBeInTheDocument()
-
-    fireEvent.click(within(favoritesSection).getAllByRole('button', { name: /front squat/i })[0])
-
+    fireEvent.click(within(panel).getAllByRole('button', { name: /front squat/i })[0])
     expect(onSelectExercise).toHaveBeenCalledWith(expect.objectContaining({ id: 'front-squat' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('collapses extra quick picks behind an inline expander', async () => {
+  it('shows the full recent list with use-count meta in the Recent tab', async () => {
     mockExerciseLibraryFetch()
 
     renderWithQuery(
@@ -197,63 +246,90 @@ describe('Exercise Library components', () => {
           { exercise: makeExercise('recent-1', 'recent one'), useCount: 4 },
           { exercise: makeExercise('recent-2', 'recent two'), useCount: 3 },
           { exercise: makeExercise('recent-3', 'recent three'), useCount: 2 },
-          { exercise: makeExercise('recent-4', 'recent four'), useCount: 1 },
+          { exercise: makeExercise('recent-4', 'recent four'), useCount: 1, lastUsedAt: '2026-08-20' },
         ]}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /recent/i }))
 
-    const recentSection = screen.getByRole('region', { name: 'Recently Used' })
-    expect(within(recentSection).getByText('Recent One')).toBeInTheDocument()
-    expect(within(recentSection).getByText('Recent Three')).toBeInTheDocument()
-    expect(within(recentSection).queryByText('Recent Four')).toBeNull()
-
-    const showMore = within(recentSection).getByRole('button', { name: 'Show 1 more' })
-    expect(showMore).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(showMore)
-
-    expect(within(recentSection).getByText('Recent Four')).toBeInTheDocument()
-    expect(within(recentSection).getByRole('button', { name: 'Show less' })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    )
+    const panel = document.getElementById('exercise-picker-panel-recent') as HTMLElement
+    expect(within(panel).getByText('Recent One')).toBeInTheDocument()
+    expect(within(panel).getByText('Recent Four')).toBeInTheDocument()
+    expect(within(panel).getByText('Used 4 times')).toBeInTheDocument()
+    expect(within(panel).getByText('Used recently')).toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: /show \d+ more/i })).toBeNull()
   })
 
-  it('collapses selector quick picks by default on mobile', async () => {
+  it('caps Suggested at three and hides it once a query or filter is active', async () => {
     mockExerciseLibraryFetch()
-    const matchMediaMock = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(max-width: 639px)',
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-    vi.stubGlobal('matchMedia', matchMediaMock)
 
     renderWithQuery(
       <ExerciseSelector
         onSelectExercise={vi.fn()}
-        recentlyUsedExercises={[
-          { exercise: makeExercise('recent-1', 'recent one'), useCount: 4 },
-          { exercise: makeExercise('recent-2', 'recent two'), useCount: 3 },
+        suggestedExercises={[
+          {
+            exercise: makeExercise('suggest-1', 'suggest one'),
+            reasons: ['same muscle', 'same equipment'],
+          },
+          { exercise: makeExercise('suggest-2', 'suggest two') },
+          { exercise: makeExercise('suggest-3', 'suggest three') },
+          { exercise: makeExercise('suggest-4', 'suggest four') },
         ]}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
 
-    const quickPicksToggle = screen.getByRole('button', { name: /quick picks/i })
-    expect(quickPicksToggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('region', { name: 'Recently Used' })).toBeNull()
+    const suggested = screen.getByRole('region', { name: 'Suggested' })
+    expect(within(suggested).getByText('Suggest One')).toBeInTheDocument()
+    expect(within(suggested).getByText('Suggest Three')).toBeInTheDocument()
+    expect(within(suggested).queryByText('Suggest Four')).toBeNull()
+    expect(within(suggested).getByText('1')).toBeInTheDocument()
+    expect(within(suggested).getByText('same muscle + same equipment')).toBeInTheDocument()
 
-    fireEvent.click(quickPicksToggle)
+    const searchInput = screen.getByPlaceholderText(/search by name or muscle group/i)
+    fireEvent.change(searchInput, { target: { value: 'bench' } })
+    expect(screen.queryByRole('region', { name: 'Suggested' })).toBeNull()
 
-    expect(quickPicksToggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('region', { name: 'Recently Used' })).toBeInTheDocument()
+    fireEvent.change(searchInput, { target: { value: '   ' } })
+    expect(screen.getByRole('region', { name: 'Suggested' })).toBeInTheDocument()
+
+    fireEvent.change(searchInput, { target: { value: '' } })
+    expect(screen.getByRole('region', { name: 'Suggested' })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'strength' } })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Suggested' })).toBeNull())
+  })
+
+  it('resets to the Search tab when the picker is reopened', async () => {
+    mockExerciseLibraryFetch()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /recent/i }))
+    expect(screen.getByRole('tab', { name: /recent/i })).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close exercise selector' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+    expect(screen.getByRole('tab', { name: /search/i })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('does not move focus when the picker opens', async () => {
+    mockExerciseLibraryFetch()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: /select an exercise/i })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 
   it('renders exercise history in recorded set order', async () => {
