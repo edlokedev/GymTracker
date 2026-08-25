@@ -6,7 +6,7 @@ import {
   buildProgressChartPoints,
   createProgressState,
   findDatePresetForRange,
-  summarizeProgress,
+  getAvailableProgressMetrics,
 } from './model'
 
 const makeProgress = (): ExerciseProgress => ({
@@ -83,7 +83,7 @@ describe('progress model', () => {
       start: '2026-02-14',
       end: '2026-05-15',
     })
-    expect(state.filters.metric).toBe('volume')
+    expect(state.filters.metric).toBe('weight')
 
     const nextFilters = applyProgressDatePreset(state.filters, '30d', now)
     expect(nextFilters.dateRange).toEqual({
@@ -105,13 +105,11 @@ describe('progress model', () => {
     })
   })
 
-  it('can omit personal records from chart-ready points', () => {
-    const points = buildProgressChartPoints([makeProgress()], 'volume', {
-      highlightPRs: false,
-    })
+  it('preserves personal-record metadata in chart points', () => {
+    const points = buildProgressChartPoints([makeProgress()], 'volume')
 
-    expect(points).toHaveLength(1)
-    expect(points[0].isPersonalRecord).toBe(false)
+    expect(points).toHaveLength(2)
+    expect(points.some((point) => point.isPersonalRecord)).toBe(true)
   })
 
   it('builds chart points for cardio metrics', () => {
@@ -129,16 +127,53 @@ describe('progress model', () => {
     expect(speedPoints.at(-1)?.value).toBe(5)
   })
 
-  it('summarizes dashboard totals', () => {
+  it('omits sets without the selected metric instead of drawing zeroes', () => {
     const progress = makeProgress()
-    progress.personalRecords.maxWeight = progress.dataPoints[1]
-    progress.personalRecords.maxVolume = progress.dataPoints[0]
-    progress.personalRecords.maxDistance = progress.dataPoints[0]
+    progress.dataPoints[0].durationSeconds = 1800
 
-    expect(summarizeProgress([progress])).toEqual({
-      exercisesTracked: 1,
-      totalWorkouts: 2,
-      personalRecords: 3,
+    const points = buildProgressChartPoints([progress], 'duration')
+
+    expect(points.map((point) => point.value)).toEqual([1800])
+  })
+
+  it('shows one best set per workout for only the selected exercise', () => {
+    const bench = makeProgress()
+    bench.dataPoints.push({
+      ...bench.dataPoints[1],
+      id: 'set-1-backoff',
+      weight: 75,
+      volume: 450,
+      setNumber: 2,
     })
+    const squat = makeProgress()
+    squat.exerciseId = 'squat'
+    squat.exerciseName = 'Back Squat'
+    squat.dataPoints = squat.dataPoints.map((point) => ({
+      ...point,
+      exerciseId: 'squat',
+      exerciseName: 'Back Squat',
+    }))
+
+    const points = buildProgressChartPoints([bench, squat], 'weight', {
+      exerciseId: 'bench',
+    })
+
+    expect(points.map((point) => point.value)).toEqual([80, 82.5])
+    expect(points.every((point) => point.exerciseName === 'Bench Press')).toBe(true)
+  })
+
+  it('offers only metrics recorded for the selected exercise', () => {
+    const cardio = makeProgress()
+    cardio.dataPoints = cardio.dataPoints.map((point) => ({
+      ...point,
+      weight: null,
+      reps: null,
+      volume: 0,
+      durationSeconds: 1800,
+      distanceKm: 2.5,
+      speedKmh: 5,
+    }))
+
+    expect(getAvailableProgressMetrics(cardio)).toEqual(['duration', 'distance', 'speed'])
   })
 })

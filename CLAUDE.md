@@ -103,7 +103,7 @@ rtk bun run dev | format | lint | test | build | smoke
 
 Pre-handoff after code/config changes (or run the `gymmie-verification` skill):
 
-1. `rtk bun run format` → `rtk git diff --name-only`, then revert churn: `rtk git checkout -- <unrelated-files>`
+1. Snapshot dirty state BEFORE formatting: `rtk git status --short` (files dirty now are pre-existing work — NEVER `git checkout` them, ever). Then `rtk bun run format` → `rtk git diff --name-only`, and revert ONLY files the formatter itself newly dirtied: `rtk git checkout -- <files-clean-before-format-but-churned-after>`. If a file was dirty before format AND churned by it, leave it alone and report it. (Incident 2026-07-06: an agent checked out pre-existing uncommitted edits to `.gitignore`/`CONTEXT.md` as "churn" — unrecoverable.)
 2. `rtk bun run lint`
 3. Focused tests for touched behavior: `bun run test src/features/<feature>/` or `bunx vitest run <file>`
 4. `rm -rf .vercel/output 2>/dev/null; true` — clear stale Vercel build artifacts

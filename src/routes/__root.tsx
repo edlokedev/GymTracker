@@ -33,10 +33,15 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
+        name: 'theme-color',
+        content: '#0f172a',
+      },
+      {
         title: 'Gymmie - Track Your Fitness Journey',
       },
     ],
     links: [
+      { rel: 'manifest', href: '/manifest.json' },
       { rel: 'icon', href: '/gymmie-icon.png', type: 'image/png' },
       { rel: 'shortcut icon', href: '/gymmie-icon.png' },
       {

@@ -31,6 +31,13 @@ export function WorkoutSessionCard({
     })
   }
 
+  const formatTime = (time: string | Date) =>
+    new Date(time).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+
   const sessionLabel = session.name || 'workout'
 
   return (
@@ -44,6 +51,7 @@ export function WorkoutSessionCard({
         </h4>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 sm:mt-0">
           {formatDate(session.date)}
+          {session.start_time && <span>, {formatTime(session.start_time)}</span>}
           {session.end_time && (
             <span className="ml-2 text-green-600 dark:text-green-400">✓ Completed</span>
           )}
@@ -91,16 +99,6 @@ export function WorkoutSessionCard({
           }}
           disabled={isDeleting || isDuplicating}
         />
-        <div className="text-right hidden sm:block ml-2 w-[70px]">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {session.start_time &&
-              new Date(session.start_time).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              })}
-          </p>
-        </div>
       </div>
     </div>
   )

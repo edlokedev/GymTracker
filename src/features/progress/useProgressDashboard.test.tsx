@@ -52,6 +52,40 @@ const progress: ExerciseProgress = {
   },
 }
 
+const newerProgress: ExerciseProgress = {
+  ...progress,
+  exerciseId: 'squat',
+  exerciseName: 'Back Squat',
+  dataPoints: progress.dataPoints.map((point) => ({
+    ...point,
+    id: 'squat-set-1',
+    date: '2026-01-10',
+    exerciseId: 'squat',
+    exerciseName: 'Back Squat',
+    sessionId: 'squat-session-1',
+  })),
+}
+
+const cardioProgress: ExerciseProgress = {
+  ...newerProgress,
+  exerciseId: 'run',
+  exerciseName: 'Treadmill Run',
+  dataPoints: newerProgress.dataPoints.map((point) => ({
+    ...point,
+    id: 'run-set-1',
+    date: '2026-01-15',
+    exerciseId: 'run',
+    exerciseName: 'Treadmill Run',
+    sessionId: 'run-session-1',
+    weight: null,
+    reps: null,
+    volume: 0,
+    durationSeconds: 1800,
+    distanceKm: 3,
+    speedKmh: 6,
+  })),
+}
+
 describe('useProgressDashboard', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -85,7 +119,6 @@ describe('useProgressDashboard', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/progress?startDate=2026-01-01&endDate=2026-02-01&metric=volume',
     )
-    expect(result.current.summary.totalWorkouts).toBe(1)
     expect(result.current.chartPoints).toHaveLength(1)
   })
 
@@ -121,7 +154,115 @@ describe('useProgressDashboard', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/progress?startDate=2026-01-01&endDate=2026-02-01&metric=weight&exercises=bench',
+      '/api/progress?startDate=2026-01-01&endDate=2026-02-01&metric=volume&exercises=bench',
     )
+  })
+
+  it('selects the most recently performed exercise after loading', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        success: true,
+        data: {
+          progress: [progress, newerProgress],
+          totalExercises: 2,
+          dateRange: { start: '2026-01-01', end: '2026-02-01' },
+        },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() =>
+      useProgressDashboard({
+        userId: 'user-1',
+        initialFilters: {
+          dateRange: { start: '2026-01-01', end: '2026-02-01' },
+        },
+      }),
+    )
+
+    await waitFor(() => expect(result.current.state.data).toHaveLength(2))
+
+    expect(result.current.state.selectedExerciseId).toBe('squat')
+    expect(result.current.chartPoints[0]?.exerciseName).toBe('Back Squat')
+
+    act(() => {
+      result.current.actions.setSelectedExerciseId('bench')
+    })
+
+    expect(result.current.state.selectedExerciseId).toBe('bench')
+    expect(result.current.chartPoints[0]?.exerciseName).toBe('Bench Press')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('switches to the first recorded metric when the selected exercise lacks the current one', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          data: {
+            progress: [progress, cardioProgress],
+            totalExercises: 2,
+            dateRange: { start: '2026-01-01', end: '2026-02-01' },
+          },
+        }),
+      ),
+    )
+
+    const { result } = renderHook(() =>
+      useProgressDashboard({
+        userId: 'user-1',
+        initialFilters: {
+          dateRange: { start: '2026-01-01', end: '2026-02-01' },
+          metric: 'volume',
+        },
+      }),
+    )
+
+    await waitFor(() => expect(result.current.state.selectedExerciseId).toBe('run'))
+
+    expect(result.current.state.filters.metric).toBe('duration')
+    expect(result.current.chartPoints[0]?.value).toBe(1800)
+  })
+
+  it('switches exercise tracking types without refetching display-only metrics', async () => {
+    const olderCardio = {
+      ...cardioProgress,
+      dataPoints: cardioProgress.dataPoints.map((point) => ({
+        ...point,
+        date: '2025-12-15',
+      })),
+    }
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        success: true,
+        data: {
+          progress: [progress, olderCardio],
+          totalExercises: 2,
+          dateRange: { start: '2025-12-01', end: '2026-02-01' },
+        },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() =>
+      useProgressDashboard({
+        userId: 'user-1',
+        initialFilters: {
+          dateRange: { start: '2025-12-01', end: '2026-02-01' },
+          metric: 'volume',
+        },
+      }),
+    )
+
+    await waitFor(() => expect(result.current.state.selectedExerciseId).toBe('bench'))
+
+    act(() => {
+      result.current.actions.setSelectedExerciseId('run')
+    })
+
+    expect(result.current.state.filters.metric).toBe('duration')
+    expect(result.current.chartPoints[0]?.exerciseName).toBe('Treadmill Run')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
