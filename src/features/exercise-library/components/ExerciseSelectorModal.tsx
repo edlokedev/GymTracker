@@ -97,9 +97,13 @@ export default function ExerciseSelectorModal({
     favorites: null,
   })
 
-  // Reset to Search on each closed→open transition, never mid-session.
+  // Reset to Search on each closed→open transition, never mid-session, and move
+  // focus into the dialog. Focus lands on the active tab button — never the
+  // search input, whose mobile keyboard would cover the sheet.
   useEffect(() => {
-    if (isOpen) setActiveTab('search')
+    if (!isOpen) return
+    setActiveTab('search')
+    tabRefs.current.search?.focus()
   }, [isOpen])
 
   if (!isOpen) return null

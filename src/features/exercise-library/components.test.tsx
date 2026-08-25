@@ -377,6 +377,14 @@ describe('Exercise Library components', () => {
     await screen.findByRole('option', { name: 'Strength' })
     fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'strength' } })
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Suggested' })).toBeNull())
+
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: '' } })
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Suggested' })).toBeInTheDocument(),
+    )
+
+    fireEvent.change(screen.getByLabelText('Equipment'), { target: { value: 'barbell' } })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Suggested' })).toBeNull())
   })
 
   it('resets to the Search tab when the picker is reopened', async () => {
@@ -509,25 +517,39 @@ describe('Exercise Library components', () => {
     expect(screen.getByRole('tab', { name: /search/i })).toHaveFocus()
   })
 
-  it('debounces the query by 300ms and keeps query + filters across reopens', async () => {
+  it('debounces the query behind a 300ms timer before searching', async () => {
     mockExerciseLibraryFetch()
     const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>
-    const searchCalls = () =>
+    const searchedForBench = () =>
       fetchMock.mock.calls
         .map(([input]: [RequestInfo | URL]) => String(input))
-        .filter((url: string) => url.startsWith('/api/exercises/search'))
+        .some(
+          (url: string) => url.startsWith('/api/exercises/search') && url.includes('query=bench'),
+        )
+    // Fake timers are not usable here — faking the clock (even only
+    // setTimeout) stalls Testing Library's async helpers and the query
+    // client, so the exact delay is pinned on the scheduled timer instead.
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+    fireEvent.change(screen.getByPlaceholderText(/search by name or muscle group/i), {
+      target: { value: 'bench' },
+    })
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 300)
+    expect(searchedForBench()).toBe(false)
+    await waitFor(() => expect(searchedForBench()).toBe(true))
+  })
+
+  it('keeps query + filters across reopens', async () => {
+    mockExerciseLibraryFetch()
 
     renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
 
     const searchInput = screen.getByPlaceholderText(/search by name or muscle group/i)
     fireEvent.change(searchInput, { target: { value: 'bench' } })
-
-    // Debounced: the query is not pushed to the search request immediately.
-    expect(searchCalls().some((url: string) => url.includes('query=bench'))).toBe(false)
-    await waitFor(() =>
-      expect(searchCalls().some((url: string) => url.includes('query=bench'))).toBe(true),
-    )
 
     await screen.findByRole('option', { name: 'Strength' })
     fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'strength' } })
@@ -664,7 +686,26 @@ describe('Exercise Library components', () => {
     }
   })
 
-  it('does not move focus when the picker opens', async () => {
+  it('preserves each tab panel scroll position across tab switches', async () => {
+    mockExerciseLibraryFetch()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    const searchBody = document
+      .getElementById('exercise-picker-panel-search')
+      ?.querySelector('.overflow-y-auto') as HTMLElement
+    searchBody.scrollTop = 120
+
+    fireEvent.click(screen.getByRole('tab', { name: /recent/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /search/i }))
+
+    // Panels stay mounted while hidden, so the scroll offset survives.
+    expect(searchBody.isConnected).toBe(true)
+    expect(searchBody.scrollTop).toBe(120)
+  })
+
+  it('moves focus into the dialog onto the Search tab when the picker opens', async () => {
     mockExerciseLibraryFetch()
 
     renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
@@ -674,7 +715,10 @@ describe('Exercise Library components', () => {
     fireEvent.click(trigger)
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    // Focus enters the aria-modal dialog on the active tab — never the search
+    // input, whose mobile keyboard would cover the sheet.
+    expect(screen.getByRole('tab', { name: /search/i })).toHaveFocus()
+    expect(screen.getByPlaceholderText(/search by name or muscle group/i)).not.toHaveFocus()
   })
 
   it('renders exercise history in recorded set order', async () => {
