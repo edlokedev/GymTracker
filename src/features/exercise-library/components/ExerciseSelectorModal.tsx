@@ -310,10 +310,7 @@ function SearchPanel({
   // Suggested only surfaces on a "blank" search: nonempty suggestions, no
   // query text, no category/equipment filter. Capped at 3, no show-more.
   const showSuggested =
-    suggestedExercises.length > 0 &&
-    query.trim() === '' &&
-    !selectedCategory &&
-    !selectedEquipment
+    suggestedExercises.length > 0 && query.trim() === '' && !selectedCategory && !selectedEquipment
 
   return (
     <PickerTabPanel id="search" active={active}>
@@ -430,6 +427,7 @@ function FavoritesPanel({
   const listRef = useRef<HTMLDivElement>(null)
   const emptyCtaRef = useRef<HTMLButtonElement>(null)
   const pendingFocusIndexRef = useRef<number | null>(null)
+  const favoriteCount = favoriteExercises.length
 
   // Unstarring removes the row; keyboard focus follows to the row that takes
   // its place (or the empty-state Search CTA once the list is empty). The
@@ -442,18 +440,19 @@ function FavoritesPanel({
       pendingFocusIndexRef.current = null
       return
     }
+    // A refetch can re-render the loading state between unstar and settle;
+    // hold the pending index until there is something to focus.
+    if (isLoading) return
 
-    const stars = listRef.current?.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')
-    if (stars && stars.length > 0) {
+    if (favoriteCount > 0) {
+      const stars = listRef.current?.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')
+      if (!stars || stars.length === 0) return
       stars[Math.min(index, stars.length - 1)]?.focus()
-      pendingFocusIndexRef.current = null
-      return
+    } else {
+      emptyCtaRef.current?.focus()
     }
-    if (emptyCtaRef.current) {
-      emptyCtaRef.current.focus()
-      pendingFocusIndexRef.current = null
-    }
-  }, [favoriteExercises, isLoading, active])
+    pendingFocusIndexRef.current = null
+  }, [favoriteCount, isLoading, active])
 
   const handleToggleFavorite = onToggleFavorite
     ? (exercise: ExerciseWithParsedFields, index: number) => {
@@ -702,9 +701,7 @@ function ExerciseResultsList({
   }
 
   if (exercises.length === 0) {
-    return (
-      <PanelEmpty>No exercises found. Try adjusting your search criteria.</PanelEmpty>
-    )
+    return <PanelEmpty>No exercises found. Try adjusting your search criteria.</PanelEmpty>
   }
 
   return (

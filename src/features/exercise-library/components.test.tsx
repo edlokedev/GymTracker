@@ -15,10 +15,17 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
 }))
 
-// ExerciseBrowser now reads the authed user (for the Add-exercise affordance);
-// stub it as signed-out so these catalog-rendering tests stay focused.
+// ExerciseBrowser and the picker read the authed user (for the Add-exercise
+// affordance); default to signed-out so catalog-rendering tests stay focused,
+// and let the Add-exercise test opt into a signed-in user.
+const authUser = vi.hoisted(() => ({ current: null as { id: string } | null }))
+
 vi.mock('@/lib/auth', () => ({
-  useAuth: () => ({ user: null, isAuthenticated: false, isLoading: false }),
+  useAuth: () => ({
+    user: authUser.current,
+    isAuthenticated: authUser.current !== null,
+    isLoading: false,
+  }),
 }))
 
 const makeExercise = (id: string, name: string): ExerciseWithParsedFields => ({
@@ -160,6 +167,7 @@ describe('Exercise Library components', () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     navigateMock.mockReset()
+    authUser.current = null
   })
 
   it('renders browser results and updates route search when a filter is removed', async () => {
@@ -287,7 +295,9 @@ describe('Exercise Library components', () => {
     fireEvent.click(screen.getByRole('tab', { name: /favourites/i }))
 
     const panel = document.getElementById('exercise-picker-panel-favorites') as HTMLElement
-    fireEvent.click(within(panel).getByRole('button', { name: 'Remove Front Squat from favorites' }))
+    fireEvent.click(
+      within(panel).getByRole('button', { name: 'Remove Front Squat from favorites' }),
+    )
     expect(onToggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ id: 'front-squat' }))
     expect(onSelectExercise).not.toHaveBeenCalled()
 
@@ -306,7 +316,11 @@ describe('Exercise Library components', () => {
           { exercise: makeExercise('recent-1', 'recent one'), useCount: 4 },
           { exercise: makeExercise('recent-2', 'recent two'), useCount: 3 },
           { exercise: makeExercise('recent-3', 'recent three'), useCount: 2 },
-          { exercise: makeExercise('recent-4', 'recent four'), useCount: 1, lastUsedAt: '2026-08-20' },
+          {
+            exercise: makeExercise('recent-4', 'recent four'),
+            useCount: 1,
+            lastUsedAt: '2026-08-20',
+          },
         ]}
       />,
     )
@@ -398,7 +412,9 @@ describe('Exercise Library components', () => {
     expect(within(recentPanel).queryByText(/no recent exercises yet/i)).toBeNull()
 
     fireEvent.click(favouritesTab)
-    const favouritesPanel = document.getElementById('exercise-picker-panel-favorites') as HTMLElement
+    const favouritesPanel = document.getElementById(
+      'exercise-picker-panel-favorites',
+    ) as HTMLElement
     expect(within(favouritesPanel).getByText('Loading favourites…')).toBeInTheDocument()
     expect(within(favouritesPanel).queryByText(/no favourites yet/i)).toBeNull()
 
@@ -470,7 +486,9 @@ describe('Exercise Library components', () => {
       />,
     )
 
-    expect(within(panel).getByRole('button', { name: 'Remove Fav Two from favorites' })).toHaveFocus()
+    expect(
+      within(panel).getByRole('button', { name: 'Remove Fav Two from favorites' }),
+    ).toHaveFocus()
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Remove Fav Two from favorites' }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Remove Fav Three from favorites' }))
@@ -489,6 +507,160 @@ describe('Exercise Library components', () => {
     fireEvent.click(cta)
     expect(screen.getByRole('tab', { name: /search/i })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: /search/i })).toHaveFocus()
+  })
+
+  it('debounces the query by 300ms and keeps query + filters across reopens', async () => {
+    const fetchMock = mockExerciseLibraryFetch() && (globalThis.fetch as ReturnType<typeof vi.fn>)
+    const searchCalls = () =>
+      fetchMock.mock.calls
+        .map(([input]: [RequestInfo | URL]) => String(input))
+        .filter((url: string) => url.startsWith('/api/exercises/search'))
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    const searchInput = screen.getByPlaceholderText(/search by name or muscle group/i)
+    fireEvent.change(searchInput, { target: { value: 'bench' } })
+
+    // Debounced: the query is not pushed to the search request immediately.
+    expect(searchCalls().some((url: string) => url.includes('query=bench'))).toBe(false)
+    await waitFor(() =>
+      expect(searchCalls().some((url: string) => url.includes('query=bench'))).toBe(true),
+    )
+
+    await screen.findByRole('option', { name: 'Strength' })
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'strength' } })
+    await waitFor(() => expect(screen.getByLabelText('Category')).toHaveValue('strength'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close exercise selector' }))
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    expect(screen.getByPlaceholderText(/search by name or muscle group/i)).toHaveValue('bench')
+    expect(screen.getByLabelText('Category')).toHaveValue('strength')
+  })
+
+  it('observes the infinite-scroll sentinel only while the Search tab is active', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url === '/api/exercise-categories') {
+          return Response.json({ data: [{ id: 'strength', name: 'Strength', exercise_count: 1 }] })
+        }
+        if (url === '/api/equipment-types') return Response.json({ data: ['barbell'] })
+        if (url === '/api/muscle-groups') return Response.json({ data: ['chest'] })
+        if (url === '/api/exercise-favorites') {
+          return Response.json({ success: true, data: { items: [], exerciseIds: [] } })
+        }
+        if (url.startsWith('/api/exercises/recent')) {
+          return Response.json({ success: true, data: { items: [] } })
+        }
+        if (url.startsWith('/api/exercises/suggested')) {
+          return Response.json({ success: true, data: { items: [] } })
+        }
+        if (url.startsWith('/api/exercises/search')) {
+          return Response.json({
+            success: true,
+            data: {
+              items: [makeExercise('bench-press', 'bench press')],
+              total: 40,
+              page: 1,
+              totalPages: 2,
+              hasMore: true,
+            },
+          })
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      }),
+    )
+
+    const observe = vi.fn()
+    const disconnect = vi.fn()
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = observe
+        unobserve = vi.fn()
+        disconnect = disconnect
+        takeRecords = vi.fn(() => [])
+        root = null
+        rootMargin = ''
+        thresholds = []
+      },
+    )
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    await waitFor(() => expect(observe).toHaveBeenCalled())
+    const observeCallsOnSearch = observe.mock.calls.length
+
+    fireEvent.click(screen.getByRole('tab', { name: /recent/i }))
+    await waitFor(() => expect(disconnect).toHaveBeenCalled())
+    expect(observe.mock.calls.length).toBe(observeCallsOnSearch)
+
+    fireEvent.click(screen.getByRole('tab', { name: /search/i }))
+    await waitFor(() => expect(observe.mock.calls.length).toBeGreaterThan(observeCallsOnSearch))
+  })
+
+  it('opens from requestOpenSignal and reports backdrop dismissal via onPickerClose', async () => {
+    mockExerciseLibraryFetch()
+    const onPickerClose = vi.fn()
+
+    const { rerender } = renderWithQuery(
+      <ExerciseSelector onSelectExercise={vi.fn()} onPickerClose={onPickerClose} />,
+    )
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    rerender(
+      <ExerciseSelector
+        onSelectExercise={vi.fn()}
+        onPickerClose={onPickerClose}
+        requestOpenSignal={1}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+
+    // Backdrop click dismisses; clicks inside the sheet do not.
+    fireEvent.click(dialog)
+    expect(onPickerClose).not.toHaveBeenCalled()
+
+    fireEvent.click(dialog.parentElement as HTMLElement)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(onPickerClose).toHaveBeenCalledOnce()
+  })
+
+  it('offers the +Add custom-exercise affordance to signed-in users only', async () => {
+    authUser.current = { id: 'user-1' }
+    mockExerciseLibraryFetch()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    // The leading "+" glyph is aria-hidden, so the accessible name is just "Add".
+    fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    // CustomExerciseForm is not a role=dialog yet (pre-existing a11y debt), so
+    // pin its heading instead.
+    expect(await screen.findByRole('heading', { name: 'Add custom exercise' })).toBeInTheDocument()
+  })
+
+  it('gives every tab panel a single safe-area padded scroll body', async () => {
+    mockExerciseLibraryFetch()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    for (const id of ['search', 'recent', 'favorites']) {
+      const panel = document.getElementById(`exercise-picker-panel-${id}`) as HTMLElement
+      const scrollBodies = panel.querySelectorAll('.overflow-y-auto')
+      expect(scrollBodies).toHaveLength(1)
+      const scrollBody = scrollBodies[0]
+      expect(scrollBody.className).toContain('overscroll-contain')
+      expect(scrollBody.className).toContain('pb-[max(env(safe-area-inset-bottom),1rem)]')
+    }
   })
 
   it('does not move focus when the picker opens', async () => {
