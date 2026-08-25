@@ -510,7 +510,8 @@ describe('Exercise Library components', () => {
   })
 
   it('debounces the query by 300ms and keeps query + filters across reopens', async () => {
-    const fetchMock = mockExerciseLibraryFetch() && (globalThis.fetch as ReturnType<typeof vi.fn>)
+    mockExerciseLibraryFetch()
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>
     const searchCalls = () =>
       fetchMock.mock.calls
         .map(([input]: [RequestInfo | URL]) => String(input))

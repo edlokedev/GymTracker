@@ -49,6 +49,20 @@ type PickerTabRefs = MutableRefObject<Record<PickerTabId, HTMLButtonElement | nu
 const PANEL_SCROLL_CLASS =
   'min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-[max(env(safe-area-inset-bottom),1rem)] sm:p-6'
 
+const TAB_ACTIVE_CLASS =
+  'flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-600 font-semibold text-white'
+const TAB_INACTIVE_CLASS =
+  'flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+const TAB_BADGE_ACTIVE_CLASS =
+  'inline-flex min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold bg-white/25 text-white'
+const TAB_BADGE_INACTIVE_CLASS =
+  'inline-flex min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+const TAB_PANEL_ACTIVE_CLASS = 'min-h-0 flex-1 flex-col flex'
+const TAB_PANEL_INACTIVE_CLASS = 'min-h-0 flex-1 flex-col hidden'
+const RESULTS_LOADING_CLASS =
+  'space-y-2 transition-opacity duration-150 sm:space-y-3 pointer-events-none opacity-40'
+const RESULTS_READY_CLASS = 'space-y-2 transition-opacity duration-150 sm:space-y-3 opacity-100'
+
 export default function ExerciseSelectorModal({
   isOpen,
   query,
@@ -173,6 +187,12 @@ function PickerTabBar({
   recentBadge?: number
   favoriteBadge?: number
 }) {
+  const badgeByTab: Record<PickerTabId, number | undefined> = {
+    search: undefined,
+    recent: recentBadge,
+    favorites: favoriteBadge,
+  }
+
   // Roving tabindex with automatic activation: arrows/Home/End move focus and
   // select in one step.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -200,8 +220,7 @@ function PickerTabBar({
     >
       {PICKER_TABS.map((tab) => {
         const isActive = tab.id === activeTab
-        const badge =
-          tab.id === 'recent' ? recentBadge : tab.id === 'favorites' ? favoriteBadge : undefined
+        const badge = badgeByTab[tab.id]
 
         return (
           <button
@@ -216,21 +235,11 @@ function PickerTabBar({
             aria-selected={isActive}
             tabIndex={isActive ? 0 : -1}
             onClick={() => onSelectTab(tab.id)}
-            className={`flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              isActive
-                ? 'bg-blue-600 font-semibold text-white'
-                : 'font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-            }`}
+            className={isActive ? TAB_ACTIVE_CLASS : TAB_INACTIVE_CLASS}
           >
             <span className="truncate">{tab.label}</span>
             {badge !== undefined && badge > 0 && (
-              <span
-                className={`inline-flex min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
-                  isActive
-                    ? 'bg-white/25 text-white'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                }`}
-              >
+              <span className={isActive ? TAB_BADGE_ACTIVE_CLASS : TAB_BADGE_INACTIVE_CLASS}>
                 {badge}
               </span>
             )}
@@ -259,7 +268,7 @@ function PickerTabPanel({
       aria-labelledby={`exercise-picker-tab-${id}`}
       hidden={!active}
       inert={!active}
-      className={`min-h-0 flex-1 flex-col ${active ? 'flex' : 'hidden'}`}
+      className={active ? TAB_PANEL_ACTIVE_CLASS : TAB_PANEL_INACTIVE_CLASS}
     >
       {children}
     </div>
@@ -386,13 +395,7 @@ function RecentPanel({
               <ExerciseSelectorListItem
                 key={item.exercise.id}
                 exercise={item.exercise}
-                meta={
-                  item.useCount && item.useCount > 1
-                    ? `Used ${item.useCount} times`
-                    : item.lastUsedAt
-                      ? 'Used recently'
-                      : undefined
-                }
+                meta={getRecentExerciseMeta(item)}
                 isFavorite={favoriteExerciseIds.includes(item.exercise.id)}
                 onSelectExercise={onSelectExercise}
                 onToggleFavorite={onToggleFavorite}
@@ -405,6 +408,12 @@ function RecentPanel({
       </ScrollArea>
     </PickerTabPanel>
   )
+}
+
+function getRecentExerciseMeta(item: RecentExerciseQuickPick) {
+  if (item.useCount && item.useCount > 1) return `Used ${item.useCount} times`
+  if (item.lastUsedAt) return 'Used recently'
+  return undefined
 }
 
 function FavoritesPanel({
@@ -705,15 +714,9 @@ function ExerciseResultsList({
   }
 
   return (
-    <div
-      className={`space-y-2 transition-opacity duration-150 sm:space-y-3 ${isLoading ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
-    >
+    <div className={isLoading ? RESULTS_LOADING_CLASS : RESULTS_READY_CLASS}>
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        {isLoading
-          ? 'Searching…'
-          : total > exercises.length
-            ? `Showing ${exercises.length} of ${total}`
-            : `${total} exercise${total !== 1 ? 's' : ''}`}
+        {getExerciseResultsLabel(isLoading, exercises.length, total)}
       </p>
       {exercises.map((exercise) => (
         <ExerciseSelectorListItem
@@ -732,6 +735,12 @@ function ExerciseResultsList({
       )}
     </div>
   )
+}
+
+function getExerciseResultsLabel(isLoading: boolean, visibleCount: number, total: number) {
+  if (isLoading) return 'Searching…'
+  if (total > visibleCount) return `Showing ${visibleCount} of ${total}`
+  return `${total} exercise${total !== 1 ? 's' : ''}`
 }
 
 function ExerciseSelectorListItem({
