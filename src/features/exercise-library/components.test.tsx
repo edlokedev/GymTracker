@@ -94,6 +94,66 @@ function mockExerciseLibraryFetch() {
   return exercise
 }
 
+// Same catalog mock, but recents + favourites stay in flight until the test
+// resolves them — lets the picker's loading→settled sequencing be asserted.
+function mockExerciseLibraryFetchPendingQuickPicks() {
+  const exercise = makeExercise('bench-press', 'bench press')
+  let resolveRecent: (response: Response) => void = () => {}
+  let resolveFavorites: (response: Response) => void = () => {}
+  const recentResponse = new Promise<Response>((resolve) => {
+    resolveRecent = resolve
+  })
+  const favoritesResponse = new Promise<Response>((resolve) => {
+    resolveFavorites = resolve
+  })
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url === '/api/exercise-categories') {
+        return Response.json({ data: [{ id: 'strength', name: 'Strength', exercise_count: 1 }] })
+      }
+      if (url === '/api/equipment-types') {
+        return Response.json({ data: ['barbell'] })
+      }
+      if (url === '/api/muscle-groups') {
+        return Response.json({ data: ['chest'] })
+      }
+      if (url === '/api/exercise-favorites') {
+        return await favoritesResponse
+      }
+      if (url.startsWith('/api/exercises/recent')) {
+        return await recentResponse
+      }
+      if (url.startsWith('/api/exercises/suggested')) {
+        return Response.json({ success: true, data: { items: [] } })
+      }
+      if (url.startsWith('/api/exercises/search')) {
+        return Response.json({
+          success: true,
+          data: { items: [exercise], total: 1, page: 1, totalPages: 1, hasMore: false },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    }),
+  )
+
+  return {
+    resolveRecent: (items: unknown[]) =>
+      resolveRecent(Response.json({ success: true, data: { items } })),
+    resolveFavorites: (items: ExerciseWithParsedFields[]) =>
+      resolveFavorites(
+        Response.json({
+          success: true,
+          data: { items, exerciseIds: items.map((item) => item.id) },
+        }),
+      ),
+  }
+}
+
 describe('Exercise Library components', () => {
   afterEach(() => {
     cleanup()
@@ -299,6 +359,8 @@ describe('Exercise Library components', () => {
     fireEvent.change(searchInput, { target: { value: '' } })
     expect(screen.getByRole('region', { name: 'Suggested' })).toBeInTheDocument()
 
+    // Category options arrive async; wait for them before selecting one.
+    await screen.findByRole('option', { name: 'Strength' })
     fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'strength' } })
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Suggested' })).toBeNull())
   })
@@ -317,6 +379,116 @@ describe('Exercise Library components', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
     expect(screen.getByRole('tab', { name: /search/i })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows labelled loading states and hides tab badges until quick picks settle', async () => {
+    const { resolveRecent, resolveFavorites } = mockExerciseLibraryFetchPendingQuickPicks()
+
+    renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+
+    const recentTab = screen.getByRole('tab', { name: /recent/i })
+    const favouritesTab = screen.getByRole('tab', { name: /favourites/i })
+    expect(recentTab).toHaveTextContent(/^Recent$/)
+    expect(favouritesTab).toHaveTextContent(/^Favourites$/)
+
+    fireEvent.click(recentTab)
+    const recentPanel = document.getElementById('exercise-picker-panel-recent') as HTMLElement
+    expect(within(recentPanel).getByText('Loading recent exercises…')).toBeInTheDocument()
+    expect(within(recentPanel).queryByText(/no recent exercises yet/i)).toBeNull()
+
+    fireEvent.click(favouritesTab)
+    const favouritesPanel = document.getElementById('exercise-picker-panel-favorites') as HTMLElement
+    expect(within(favouritesPanel).getByText('Loading favourites…')).toBeInTheDocument()
+    expect(within(favouritesPanel).queryByText(/no favourites yet/i)).toBeNull()
+
+    resolveRecent([
+      { exercise: makeExercise('recent-1', 'recent one'), useCount: 2, lastUsedAt: '2026-08-20' },
+    ])
+    resolveFavorites([makeExercise('fav-1', 'fav one'), makeExercise('fav-2', 'fav two')])
+
+    await waitFor(() => expect(within(favouritesPanel).getByText('Fav One')).toBeInTheDocument())
+    expect(within(favouritesPanel).queryByText('Loading favourites…')).toBeNull()
+    expect(favouritesTab).toHaveTextContent(/^Favourites2$/)
+    await waitFor(() => expect(recentTab).toHaveTextContent(/^Recent1$/))
+  })
+
+  it('settles immediately when quick-pick lists come from props', async () => {
+    mockExerciseLibraryFetchPendingQuickPicks()
+
+    renderWithQuery(
+      <ExerciseSelector
+        onSelectExercise={vi.fn()}
+        recentlyUsedExercises={[{ exercise: makeExercise('recent-1', 'recent one'), useCount: 2 }]}
+        favoriteExercises={[makeExercise('fav-1', 'fav one')]}
+        favoriteExerciseIds={['fav-1']}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /recent/i }))
+
+    const recentPanel = document.getElementById('exercise-picker-panel-recent') as HTMLElement
+    expect(within(recentPanel).queryByText('Loading recent exercises…')).toBeNull()
+    expect(within(recentPanel).getByText('Recent One')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /recent/i })).toHaveTextContent(/^Recent1$/)
+    expect(screen.getByRole('tab', { name: /favourites/i })).toHaveTextContent(/^Favourites1$/)
+  })
+
+  it('moves focus to the next row when a favourite is unstarred, then to the Search CTA', async () => {
+    mockExerciseLibraryFetch()
+    const onToggleFavorite = vi.fn()
+    const favourites = [
+      makeExercise('fav-1', 'fav one'),
+      makeExercise('fav-2', 'fav two'),
+      makeExercise('fav-3', 'fav three'),
+    ]
+
+    const { rerender } = renderWithQuery(
+      <ExerciseSelector
+        onSelectExercise={vi.fn()}
+        onToggleFavorite={onToggleFavorite}
+        favoriteExercises={favourites}
+        favoriteExerciseIds={favourites.map((exercise) => exercise.id)}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /select an exercise/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /favourites/i }))
+
+    const panel = document.getElementById('exercise-picker-panel-favorites') as HTMLElement
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove Fav One from favorites' }))
+    expect(onToggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ id: 'fav-1' }))
+
+    const afterFirst = favourites.slice(1)
+    rerender(
+      <ExerciseSelector
+        onSelectExercise={vi.fn()}
+        onToggleFavorite={onToggleFavorite}
+        favoriteExercises={afterFirst}
+        favoriteExerciseIds={afterFirst.map((exercise) => exercise.id)}
+      />,
+    )
+
+    expect(within(panel).getByRole('button', { name: 'Remove Fav Two from favorites' })).toHaveFocus()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove Fav Two from favorites' }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove Fav Three from favorites' }))
+    rerender(
+      <ExerciseSelector
+        onSelectExercise={vi.fn()}
+        onToggleFavorite={onToggleFavorite}
+        favoriteExercises={[]}
+        favoriteExerciseIds={[]}
+      />,
+    )
+
+    const cta = await within(panel).findByRole('button', { name: 'Browse exercises' })
+    await waitFor(() => expect(cta).toHaveFocus())
+
+    fireEvent.click(cta)
+    expect(screen.getByRole('tab', { name: /search/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /search/i })).toHaveFocus()
   })
 
   it('does not move focus when the picker opens', async () => {

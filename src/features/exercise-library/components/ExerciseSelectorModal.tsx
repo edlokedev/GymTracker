@@ -432,19 +432,28 @@ function FavoritesPanel({
   const pendingFocusIndexRef = useRef<number | null>(null)
 
   // Unstarring removes the row; keyboard focus follows to the row that takes
-  // its place (or the empty-state Search CTA once the list is empty).
+  // its place (or the empty-state Search CTA once the list is empty). The
+  // pending index survives until a focus target actually exists, so a refetch
+  // that briefly re-renders the loading state doesn't drop focus.
   useEffect(() => {
-    if (pendingFocusIndexRef.current === null) return
     const index = pendingFocusIndexRef.current
-    pendingFocusIndexRef.current = null
+    if (index === null) return
+    if (!active) {
+      pendingFocusIndexRef.current = null
+      return
+    }
 
     const stars = listRef.current?.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')
     if (stars && stars.length > 0) {
       stars[Math.min(index, stars.length - 1)]?.focus()
-    } else {
-      emptyCtaRef.current?.focus()
+      pendingFocusIndexRef.current = null
+      return
     }
-  }, [favoriteExercises])
+    if (emptyCtaRef.current) {
+      emptyCtaRef.current.focus()
+      pendingFocusIndexRef.current = null
+    }
+  }, [favoriteExercises, isLoading, active])
 
   const handleToggleFavorite = onToggleFavorite
     ? (exercise: ExerciseWithParsedFields, index: number) => {

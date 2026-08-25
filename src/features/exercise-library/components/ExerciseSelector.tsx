@@ -94,6 +94,10 @@ export default function ExerciseSelector({
     recentlyUsedExercises.length > 0 ? recentlyUsedExercises : library.quickPickLists.recent
   const effectiveSuggestedExercises =
     suggestedExercises.length > 0 ? suggestedExercises : library.quickPickLists.suggested
+  // Props-supplied lists are already settled by the caller; only the hook-driven
+  // lists can still be in flight.
+  const isLoadingRecent = recentlyUsedExercises.length > 0 ? false : library.isLoadingQuickPicks
+  const isLoadingFavorites = favoriteExercises.length > 0 ? false : library.isLoadingFavorites
   const effectiveToggleFavorite =
     onToggleFavorite ??
     ((exercise: ExerciseWithParsedFields) => library.actions.toggleFavorite(exercise.id))
@@ -175,6 +179,8 @@ export default function ExerciseSelector({
         favoriteExerciseIds={effectiveFavoriteExerciseIds}
         recentlyUsedExercises={effectiveRecentlyUsedExercises}
         suggestedExercises={effectiveSuggestedExercises}
+        isLoadingRecent={isLoadingRecent}
+        isLoadingFavorites={isLoadingFavorites}
         onClose={closePicker}
         onQueryChange={handleQueryChange}
         onCategoryChange={(categoryId) => {

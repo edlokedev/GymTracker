@@ -93,6 +93,7 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
     favoriteExerciseIds: favorites.favoriteExerciseIds,
     favoriteExerciseIdSet: favorites.favoriteExerciseIdSet,
     togglingFavoriteId: favorites.togglingFavoriteId,
+    isLoadingFavorites: favorites.isLoadingFavorites,
     // Quick picks
     recentExercises: quickPicks.recentExercises,
     suggestedExercises: quickPicks.suggestedExercises,
