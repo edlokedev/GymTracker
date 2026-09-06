@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ProgressFilters, ProgressState } from '@/lib/types/progress'
-import { fetchProgressData } from './client'
+import { useQuery } from '@tanstack/react-query'
+import { useCallback, useMemo, useState } from 'react'
+import type { ExerciseProgress, ProgressFilters, ProgressState } from '@/lib/types/progress'
+import { fetchProgressData, progressDataOptions } from './client'
 import {
   applyProgressDatePreset,
   buildProgressChartPoints,
@@ -15,150 +16,82 @@ interface UseProgressDashboardOptions {
   initialFilters?: Partial<ProgressFilters>
 }
 
+const EMPTY_PROGRESS: ExerciseProgress[] = []
+
 export function useProgressDashboard({ userId, initialFilters }: UseProgressDashboardOptions) {
-  const [state, setState] = useState<ProgressState>(() => {
-    const initialState = createProgressState()
-
-    return {
-      ...initialState,
-      filters: {
-        ...initialState.filters,
-        ...initialFilters,
-        dateRange: initialFilters?.dateRange || initialState.filters.dateRange,
-        exerciseIds: initialFilters?.exerciseIds || initialState.filters.exerciseIds,
-      },
-    }
-  })
+  const [filters, setFiltersState] = useState<ProgressFilters>(() => ({
+    ...createProgressState().filters,
+    ...initialFilters,
+  }))
+  const [preferredExerciseId, setPreferredExerciseId] = useState<string | null>(null)
+  // Metrics are display-only: the response already contains every metric.
   const dataFilters = useMemo<ProgressFilters>(
-    () => ({
-      exerciseIds: state.filters.exerciseIds,
-      dateRange: state.filters.dateRange,
-      metric: 'volume',
-    }),
-    [state.filters.exerciseIds, state.filters.dateRange],
+    () => ({ exerciseIds: filters.exerciseIds, dateRange: filters.dateRange, metric: 'volume' }),
+    [filters.exerciseIds, filters.dateRange],
   )
+  const options = progressDataOptions(dataFilters)
+  const query = useQuery({
+    queryKey: [...options.queryKey, userId],
+    queryFn: () => fetchProgressData(dataFilters),
+    enabled: Boolean(userId),
+  })
+  const data = userId ? (query.data?.progress ?? EMPTY_PROGRESS) : EMPTY_PROGRESS
+  const selectedExerciseId = data.some((exercise) => exercise.exerciseId === preferredExerciseId)
+    ? preferredExerciseId
+    : findMostRecentExerciseId(data)
+  const selectedExercise = data.find((exercise) => exercise.exerciseId === selectedExerciseId)
+  const availableMetrics = selectedExercise ? getAvailableProgressMetrics(selectedExercise) : []
+  const metric = availableMetrics.includes(filters.metric)
+    ? filters.metric
+    : (availableMetrics[0] ?? filters.metric)
+  const state: ProgressState = {
+    filters: metric === filters.metric ? filters : { ...filters, metric },
+    data,
+    selectedExerciseId,
+    isLoading: Boolean(userId) && query.isFetching,
+    error: userId && query.error ? query.error.message : null,
+  }
 
-  const loadProgressData = useCallback(async () => {
-    if (!userId) return
-
-    setState((prev) => ({ ...prev, isLoading: true, error: null }))
-
-    try {
-      const data = await fetchProgressData(dataFilters)
-      setState((prev) => {
-        const selectedExerciseId = data.progress.some(
-          (exercise) => exercise.exerciseId === prev.selectedExerciseId,
-        )
-          ? prev.selectedExerciseId
-          : findMostRecentExerciseId(data.progress)
-        const selectedExercise = data.progress.find(
-          (exercise) => exercise.exerciseId === selectedExerciseId,
-        )
-        const availableMetrics = selectedExercise
-          ? getAvailableProgressMetrics(selectedExercise)
-          : []
-        const metric = availableMetrics.includes(prev.filters.metric)
-          ? prev.filters.metric
-          : (availableMetrics[0] ?? prev.filters.metric)
-
-        return {
-          ...prev,
-          data: data.progress,
-          selectedExerciseId,
-          filters: metric === prev.filters.metric ? prev.filters : { ...prev.filters, metric },
-          isLoading: false,
-          error: null,
-        }
-      })
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch progress data',
-      }))
-    }
-  }, [dataFilters, userId])
-
-  useEffect(() => {
-    void loadProgressData()
-  }, [loadProgressData])
-
-  const setFilters = useCallback((filters: Partial<ProgressFilters>) => {
-    setState((prev) => ({
+  const setFilters = useCallback((next: Partial<ProgressFilters>) => {
+    setFiltersState((prev) => ({
       ...prev,
-      filters: {
-        ...prev.filters,
-        ...filters,
-        dateRange: filters.dateRange || prev.filters.dateRange,
-        exerciseIds: filters.exerciseIds || prev.filters.exerciseIds,
-      },
+      ...next,
+      dateRange: next.dateRange || prev.dateRange,
+      exerciseIds: next.exerciseIds || prev.exerciseIds,
     }))
   }, [])
+  const { refetch } = query
+  const refresh = useCallback(async () => {
+    if (userId) await refetch()
+  }, [refetch, userId])
 
   const actions = {
-    setMetric: useCallback((metric: ProgressFilters['metric']) => {
-      setState((prev) => ({
-        ...prev,
-        filters: { ...prev.filters, metric },
-      }))
+    setMetric: useCallback((nextMetric: ProgressFilters['metric']) => {
+      setFiltersState((prev) => ({ ...prev, metric: nextMetric }))
     }, []),
-
     setDatePreset: useCallback((presetValue: ProgressDatePresetValue) => {
-      setState((prev) => ({
-        ...prev,
-        filters: applyProgressDatePreset(prev.filters, presetValue),
-      }))
+      setFiltersState((prev) => applyProgressDatePreset(prev, presetValue))
     }, []),
-
     setDateRange: useCallback((dateRange: ProgressFilters['dateRange']) => {
-      setState((prev) => ({
-        ...prev,
-        filters: { ...prev.filters, dateRange },
-      }))
+      setFiltersState((prev) => ({ ...prev, dateRange }))
     }, []),
-
     setExerciseIds: useCallback((exerciseIds: string[]) => {
-      setState((prev) => ({
-        ...prev,
-        filters: { ...prev.filters, exerciseIds },
-      }))
+      setFiltersState((prev) => ({ ...prev, exerciseIds }))
     }, []),
-
-    setSelectedExerciseId: useCallback((selectedExerciseId: string) => {
-      setState((prev) => {
-        const selectedExercise = prev.data.find(
-          (exercise) => exercise.exerciseId === selectedExerciseId,
-        )
-        const availableMetrics = selectedExercise
-          ? getAvailableProgressMetrics(selectedExercise)
-          : []
-        const metric = availableMetrics.includes(prev.filters.metric)
-          ? prev.filters.metric
-          : (availableMetrics[0] ?? prev.filters.metric)
-
-        return {
-          ...prev,
-          selectedExerciseId,
-          filters: metric === prev.filters.metric ? prev.filters : { ...prev.filters, metric },
-        }
-      })
-    }, []),
-
+    setSelectedExerciseId: useCallback(
+      (exerciseId: string) => {
+        setPreferredExerciseId(exerciseId)
+        setFiltersState((prev) => ({ ...prev, metric }))
+      },
+      [metric],
+    ),
     setFilters,
-    refresh: loadProgressData,
+    refresh,
   }
-
   const chartPoints = useMemo(
-    () =>
-      buildProgressChartPoints(state.data, state.filters.metric, {
-        exerciseId: state.selectedExerciseId,
-      }),
-    [state.data, state.filters.metric, state.selectedExerciseId],
+    () => buildProgressChartPoints(data, metric, { exerciseId: selectedExerciseId }),
+    [data, metric, selectedExerciseId],
   )
 
-  return {
-    state,
-    chartPoints,
-    actions,
-  }
+  return { state, chartPoints, actions }
 }

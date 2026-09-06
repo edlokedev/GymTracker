@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ExerciseProgress } from '@/lib/types/progress'
+import { createQueryWrapper } from '../../../test/queryWrapper'
 import { useProgressDashboard } from './useProgressDashboard'
 
 const progress: ExerciseProgress = {
@@ -87,6 +88,44 @@ const cardioProgress: ExerciseProgress = {
 }
 
 describe('useProgressDashboard', () => {
+  it('does not fetch or refresh while signed out', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { result } = renderHook(() => useProgressDashboard({ userId: undefined }), {
+      wrapper: createQueryWrapper().wrapper,
+    })
+    await act(async () => {
+      await result.current.actions.refresh()
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result.current.state.isLoading).toBe(false)
+    expect(result.current.state.data).toEqual([])
+  })
+
+  it('ignores a slow stale response after exercise filters change', async () => {
+    let resolveSlow!: (response: Response) => void
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (!String(input).includes('exercises=squat')) {
+        return new Promise<Response>((resolve) => {
+          resolveSlow = resolve
+        })
+      }
+      return Promise.resolve(Response.json({ success: true, data: { progress: [newerProgress] } }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { result } = renderHook(() => useProgressDashboard({ userId: 'user-1' }), {
+      wrapper: createQueryWrapper().wrapper,
+    })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    act(() => result.current.actions.setExerciseIds(['squat']))
+    await waitFor(() => expect(result.current.state.data[0]?.exerciseId).toBe('squat'))
+    await act(async () => {
+      resolveSlow(Response.json({ success: true, data: { progress: [progress] } }))
+    })
+    expect(result.current.state.data[0]?.exerciseId).toBe('squat')
+    expect(result.current.state.selectedExerciseId).toBe('squat')
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
   })
@@ -104,14 +143,16 @@ describe('useProgressDashboard', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useProgressDashboard({
-        userId: 'user-1',
-        initialFilters: {
-          dateRange: { start: '2026-01-01', end: '2026-02-01' },
-          metric: 'volume',
-        },
-      }),
+    const { result } = renderHook(
+      () =>
+        useProgressDashboard({
+          userId: 'user-1',
+          initialFilters: {
+            dateRange: { start: '2026-01-01', end: '2026-02-01' },
+            metric: 'volume',
+          },
+        }),
+      { wrapper: createQueryWrapper().wrapper },
     )
 
     await waitFor(() => expect(result.current.state.data).toHaveLength(1))
@@ -135,14 +176,16 @@ describe('useProgressDashboard', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useProgressDashboard({
-        userId: 'user-1',
-        initialFilters: {
-          dateRange: { start: '2026-01-01', end: '2026-02-01' },
-          metric: 'volume',
-        },
-      }),
+    const { result } = renderHook(
+      () =>
+        useProgressDashboard({
+          userId: 'user-1',
+          initialFilters: {
+            dateRange: { start: '2026-01-01', end: '2026-02-01' },
+            metric: 'volume',
+          },
+        }),
+      { wrapper: createQueryWrapper().wrapper },
     )
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
@@ -171,13 +214,15 @@ describe('useProgressDashboard', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useProgressDashboard({
-        userId: 'user-1',
-        initialFilters: {
-          dateRange: { start: '2026-01-01', end: '2026-02-01' },
-        },
-      }),
+    const { result } = renderHook(
+      () =>
+        useProgressDashboard({
+          userId: 'user-1',
+          initialFilters: {
+            dateRange: { start: '2026-01-01', end: '2026-02-01' },
+          },
+        }),
+      { wrapper: createQueryWrapper().wrapper },
     )
 
     await waitFor(() => expect(result.current.state.data).toHaveLength(2))
@@ -209,14 +254,16 @@ describe('useProgressDashboard', () => {
       ),
     )
 
-    const { result } = renderHook(() =>
-      useProgressDashboard({
-        userId: 'user-1',
-        initialFilters: {
-          dateRange: { start: '2026-01-01', end: '2026-02-01' },
-          metric: 'volume',
-        },
-      }),
+    const { result } = renderHook(
+      () =>
+        useProgressDashboard({
+          userId: 'user-1',
+          initialFilters: {
+            dateRange: { start: '2026-01-01', end: '2026-02-01' },
+            metric: 'volume',
+          },
+        }),
+      { wrapper: createQueryWrapper().wrapper },
     )
 
     await waitFor(() => expect(result.current.state.selectedExerciseId).toBe('run'))
@@ -245,14 +292,16 @@ describe('useProgressDashboard', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() =>
-      useProgressDashboard({
-        userId: 'user-1',
-        initialFilters: {
-          dateRange: { start: '2025-12-01', end: '2026-02-01' },
-          metric: 'volume',
-        },
-      }),
+    const { result } = renderHook(
+      () =>
+        useProgressDashboard({
+          userId: 'user-1',
+          initialFilters: {
+            dateRange: { start: '2025-12-01', end: '2026-02-01' },
+            metric: 'volume',
+          },
+        }),
+      { wrapper: createQueryWrapper().wrapper },
     )
 
     await waitFor(() => expect(result.current.state.selectedExerciseId).toBe('bench'))
