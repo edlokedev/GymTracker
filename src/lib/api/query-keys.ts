@@ -28,9 +28,10 @@ export interface ExerciseSearchFilters {
 
 /** Params accepted by the progress analytics endpoint. */
 export interface ProgressParams {
-  exerciseId?: string
-  from?: string
-  to?: string
+  startDate?: string
+  endDate?: string
+  metric?: string
+  exerciseIds?: readonly string[]
 }
 
 export const queryKeys = {
