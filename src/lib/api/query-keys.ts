@@ -62,6 +62,8 @@ export const queryKeys = {
     favourites: () => ['exercises', 'favourites'] as const,
     recent: () => ['exercises', 'recent'] as const,
     suggestions: () => ['exercises', 'suggestions'] as const,
+    /** Ids of the caller's own custom exercises (edit/archive affordances). */
+    ownedCustomIds: () => ['exercises', 'owned-custom-ids'] as const,
   },
 
   workoutTemplates: {

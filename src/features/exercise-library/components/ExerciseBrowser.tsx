@@ -1,9 +1,11 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { queryKeys } from '@/lib/api/query-keys'
 import { useAuth } from '@/lib/auth'
 import type { ExerciseWithParsedFields } from '@/lib/types/database'
 import { toTitleCase } from '@/lib/utils/text'
-import { archiveCustomExercise, fetchMyCustomExerciseIds } from '../client'
+import { archiveCustomExercise, myCustomExerciseIdsOptions } from '../client'
 import { type ExerciseLibrarySearch, routeSearchToNavigateSearch } from '../model'
 import { useExerciseLibrary } from '../useExerciseLibrary'
 import CustomExerciseForm from './CustomExerciseForm'
@@ -24,39 +26,38 @@ interface ExerciseBrowserProps {
 
 export type { ExerciseLibrarySearch }
 
+const EMPTY_ID_SET: ReadonlySet<string> = new Set()
+const toIdSet = (ids: string[]): ReadonlySet<string> => new Set(ids)
+
 export default function ExerciseBrowser({
   initialFilters,
   onSelectExercise,
 }: ExerciseBrowserProps) {
   const navigate = useNavigate({ from: '/exercises' })
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [selectedExercise, setSelectedExercise] = useState<ExerciseWithParsedFields | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editingExercise, setEditingExercise] = useState<ExerciseWithParsedFields | null>(null)
-  const [ownedCustomIds, setOwnedCustomIds] = useState<Set<string>>(new Set())
 
-  // Key this callback on the stable user id (a primitive), not the user object.
-  // useAuth() now memoizes `user`, but depending on `userId` keeps this robust
-  // even if that memoization ever regresses: an unstable dependency here would
-  // re-create the callback every render and re-fire the effect below, which is
-  // exactly what caused the infinite refetch loop against /api/exercises/custom.
+  // Owned-custom-ids live in the Query cache, gated on sign-in. This retired
+  // the useEffect-fetch-into-useState that shared its shape with the
+  // /api/exercises/custom infinite-refetch incident: Query dedupes by key, so
+  // an unstable dependency can no longer re-fire the request per render.
   const userId = user?.id
-  const refreshOwnedCustomIds = useCallback(async () => {
-    if (!userId) {
-      setOwnedCustomIds(new Set())
-      return
-    }
-    try {
-      setOwnedCustomIds(new Set(await fetchMyCustomExerciseIds()))
-    } catch (error) {
-      console.error('Failed to load custom exercises:', error)
-    }
-  }, [userId])
+  const { data: fetchedOwnedCustomIds } = useQuery({
+    ...myCustomExerciseIdsOptions(),
+    enabled: Boolean(userId),
+    select: toIdSet,
+  })
+  // Signed out: ignore any cached ids from a previous session.
+  const ownedCustomIds = (userId && fetchedOwnedCustomIds) || EMPTY_ID_SET
 
-  useEffect(() => {
-    void refreshOwnedCustomIds()
-  }, [refreshOwnedCustomIds])
+  const invalidateOwnedCustomIds = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.exercises.ownedCustomIds() }),
+    [queryClient],
+  )
 
   const handleRouteSearchChange = useCallback(
     (routeSearch: ExerciseLibrarySearch) => {
@@ -151,16 +152,16 @@ export default function ExerciseBrowser({
   }, [])
 
   const handleSaved = useCallback(async () => {
-    await Promise.all([library.actions.refresh(), refreshOwnedCustomIds()])
-  }, [library.actions, refreshOwnedCustomIds])
+    await Promise.all([library.actions.refresh(), invalidateOwnedCustomIds()])
+  }, [library.actions, invalidateOwnedCustomIds])
 
   const handleArchive = useCallback(
     async (exercise: ExerciseWithParsedFields) => {
       await archiveCustomExercise(exercise.id)
       setSelectedExercise(null)
-      await Promise.all([library.actions.refresh(), refreshOwnedCustomIds()])
+      await Promise.all([library.actions.refresh(), invalidateOwnedCustomIds()])
     },
-    [library.actions, refreshOwnedCustomIds],
+    [library.actions, invalidateOwnedCustomIds],
   )
 
   const filterControls = (

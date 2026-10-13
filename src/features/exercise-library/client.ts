@@ -277,6 +277,20 @@ export async function fetchMyCustomExerciseIds(): Promise<string[]> {
   return data.exerciseIds
 }
 
+/**
+ * The caller's own custom exercise ids, as a Query (issue #0017). Replaces the
+ * useEffect-fetch-into-useState in ExerciseBrowser — the factory key means the
+ * custom-exercise mutations can invalidate it instead of the component
+ * hand-refreshing, and Query's dedupe closes the re-render refetch-loop class
+ * (the /api/exercises/custom incident).
+ */
+export function myCustomExerciseIdsOptions() {
+  return queryOptions({
+    queryKey: queryKeys.exercises.ownedCustomIds(),
+    queryFn: fetchMyCustomExerciseIds,
+  })
+}
+
 export async function createCustomExercise(
   payload: CustomExercisePayload,
 ): Promise<ExerciseWithParsedFields> {
