@@ -77,19 +77,26 @@ export default function WorkoutSessionManager({
     void loadLocationNames()
   }, [loadLocationNames])
 
+  // `action` resolves true on success (dialog closes) or false on failure
+  // (dialog stays open and shows commandError, so the error is never hidden
+  // behind the backdrop).
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
     title: string
     description: string
-    confirmLabel?: string
-    onConfirm: () => void
+    confirmLabel: string
+    pendingLabel: string
+    variant?: 'danger' | 'primary'
+    action: () => Promise<boolean>
   }>({
     isOpen: false,
     title: '',
     description: '',
     confirmLabel: 'Confirm',
-    onConfirm: () => {},
+    pendingLabel: 'Working…',
+    action: async () => false,
   })
+  const [confirmStatus, setConfirmStatus] = useState<'idle' | 'pending' | 'error'>('idle')
   // "Change exercise": which group is being changed, and a signal to open the
   // single shared picker instance programmatically.
   const [changingExerciseId, setChangingExerciseId] = useState<string | null>(null)
@@ -165,22 +172,37 @@ export default function WorkoutSessionManager({
     })
   }
 
+  const openConfirm = (modal: Omit<typeof confirmModal, 'isOpen'>) => {
+    setConfirmStatus('idle')
+    setConfirmModal({ ...modal, isOpen: true })
+  }
+
+  const closeConfirm = () => {
+    setConfirmStatus('idle')
+    setConfirmModal((prev) => ({ ...prev, isOpen: false }))
+  }
+
+  const runConfirmAction = async () => {
+    setConfirmStatus('pending')
+    const didSucceed = await confirmModal.action()
+    if (didSucceed) {
+      closeConfirm()
+    } else {
+      setConfirmStatus('error')
+    }
+  }
+
   const promptDeleteSession = () => {
     if (!session) return
 
     const workoutLabel = session.name?.trim() || 'this workout'
 
-    setConfirmModal({
-      isOpen: true,
+    openConfirm({
       title: 'Delete Workout',
       description: `Are you sure you want to delete "${workoutLabel}"? This will permanently remove the workout and all of its sets.`,
       confirmLabel: 'Delete Workout',
-      onConfirm: async () => {
-        const didDelete = await actions.deleteSession()
-        if (didDelete) {
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }))
-        }
-      },
+      pendingLabel: 'Deleting…',
+      action: () => actions.deleteSession(),
     })
   }
 
@@ -190,12 +212,12 @@ export default function WorkoutSessionManager({
       ? formatExerciseName(exerciseToRemove.exercise.name)
       : 'this exercise'
 
-    setConfirmModal({
-      isOpen: true,
+    openConfirm({
       title: 'Remove Exercise',
       description: `Are you sure you want to remove "${exerciseName}" and all its sets from your workout?`,
       confirmLabel: 'Remove',
-      onConfirm: async () => {
+      pendingLabel: 'Removing…',
+      action: async () => {
         const remainingExercises = exercises.filter((e) => e.exercise.id !== exerciseId)
         const didRemove = await actions.removeExercise(exerciseId)
         if (didRemove) {
@@ -214,8 +236,8 @@ export default function WorkoutSessionManager({
             actions.selectActiveExercise(nextActiveExerciseId)
             focusExercise(nextActiveExerciseId)
           }
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }))
         }
+        return didRemove
       },
     })
   }
@@ -252,17 +274,16 @@ export default function WorkoutSessionManager({
         ? ` Heads up: these are tracked differently (${fromType} → ${toType}), so the logged data may not match the new exercise.`
         : '')
 
-    setConfirmModal({
-      isOpen: true,
+    openConfirm({
       title: 'Change Exercise',
       description,
       confirmLabel: 'Change Exercise',
-      onConfirm: async () => {
+      pendingLabel: 'Changing…',
+      variant: 'primary',
+      action: async () => {
         const didChange = await actions.changeExercise(fromExerciseId, toExercise)
         setChangingExerciseId(null)
-        if (didChange) {
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }))
-        }
+        return didChange
       },
     })
   }
@@ -799,14 +820,20 @@ export default function WorkoutSessionManager({
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}
         description={confirmModal.description}
-        confirmLabel={confirmModal.confirmLabel}
+        confirmLabel={
+          confirmStatus === 'pending' ? confirmModal.pendingLabel : confirmModal.confirmLabel
+        }
         cancelLabel="Cancel"
-        onConfirm={confirmModal.onConfirm}
+        variant={confirmModal.variant}
+        isConfirming={confirmStatus === 'pending'}
+        onConfirm={runConfirmAction}
         onCancel={() => {
           setChangingExerciseId(null)
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }))
+          closeConfirm()
         }}
-      />
+      >
+        {confirmStatus === 'error' && <InlineError message={commandError} />}
+      </ConfirmDialog>
 
       {isSessionStarted && !session?.end_time && (
         <MobileWorkoutActionBar

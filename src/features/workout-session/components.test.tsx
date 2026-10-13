@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -17,20 +17,24 @@ function renderManager(ui: ReactElement) {
   return render(ui, { wrapper })
 }
 
-const selectorExercise = vi.hoisted<() => ExerciseWithParsedFields>(() => () => ({
-  id: 'bench-press',
-  name: 'Bench Press',
-  category_id: 'strength',
-  category_name: 'Strength',
-  equipment: 'barbell',
-  primary_muscles: ['chest'],
-  secondary_muscles: [],
-  instructions: [],
-  gif_path: null,
-  preview_image_path: null,
-  created_at: new Date('2026-05-01T10:00:00.000Z'),
-  updated_at: new Date('2026-05-01T10:00:00.000Z'),
-}))
+const selectorExercise = vi.hoisted(() =>
+  vi.fn(
+    (): ExerciseWithParsedFields => ({
+      id: 'bench-press',
+      name: 'Bench Press',
+      category_id: 'strength',
+      category_name: 'Strength',
+      equipment: 'barbell',
+      primary_muscles: ['chest'],
+      secondary_muscles: [],
+      instructions: [],
+      gif_path: null,
+      preview_image_path: null,
+      created_at: new Date('2026-05-01T10:00:00.000Z'),
+      updated_at: new Date('2026-05-01T10:00:00.000Z'),
+    }),
+  ),
+)
 
 vi.mock('@/features/exercise-library/components/ExerciseSelector', () => ({
   default: ({
@@ -656,5 +660,126 @@ describe('WorkoutSessionManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Workout' }))
 
     await waitFor(() => expect(onSessionDelete).toHaveBeenCalledWith('session-1'))
+  })
+
+  it('shows a busy confirm button while an exercise change is in flight', async () => {
+    const deadlift: ExerciseWithParsedFields = {
+      ...selectorExercise(),
+      id: 'deadlift',
+      name: 'Deadlift',
+      primary_muscles: ['back'],
+    }
+    selectorExercise.mockReturnValueOnce(deadlift)
+    let resolvePatch: (response: Response) => void = () => {}
+    let changed = false
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url.includes('includeDetails=true')) {
+        const details = makeWorkoutDetails()
+        if (!changed) return Response.json({ success: true, data: details })
+        const [bench] = details.exercises
+        return Response.json({
+          success: true,
+          data: { ...details, exercises: [{ exercise: deadlift, sets: bench?.sets ?? [] }] },
+        })
+      }
+
+      if (url.includes('fromExerciseId=bench-press') && init?.method === 'PATCH') {
+        return new Promise<Response>((resolve) => {
+          resolvePatch = (response) => {
+            changed = true
+            resolve(response)
+          }
+        })
+      }
+
+      if (url.includes('/api/workout-sets') || url.includes('/api/exercises')) {
+        return Response.json({ success: true, data: [] })
+      }
+
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Change Bench Press' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select mocked exercise' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Change Exercise' }))
+
+    const busyButton = await within(dialog).findByRole('button', { name: 'Changing…' })
+    expect(busyButton).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+
+    resolvePatch(Response.json({ success: true, data: { repointed: 1, setIds: ['set-1'] } }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('shows exercise change failures inside the still-open confirm dialog', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('includeDetails=true')) {
+          return Response.json({
+            success: true,
+            data: makeWorkoutDetails({ includeSecondExercise: true }),
+          })
+        }
+        throw new Error(`Unexpected fetch ${url}`)
+      }),
+    )
+
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Squat' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Change Squat' }))
+    // The mocked picker returns Bench Press, which is already in this workout.
+    fireEvent.click(screen.getByRole('button', { name: 'Select mocked exercise' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Change Exercise' }))
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('alert')).toHaveTextContent(
+        'That exercise is already in your workout.',
+      ),
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('shows exercise removal failures inside the still-open confirm dialog', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('includeDetails=true')) {
+          return Response.json({ success: true, data: makeWorkoutDetails() })
+        }
+        if (url.includes('workoutId=session-1') && init?.method === 'DELETE') {
+          return Response.json({ success: false, error: 'Server unavailable' }, { status: 500 })
+        }
+        throw new Error(`Unexpected fetch ${url}`)
+      }),
+    )
+
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Bench Press' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }))
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Server unavailable'),
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })
