@@ -162,7 +162,10 @@ export const workoutSetQueries = {
       .select(HISTORY_COLUMNS)
       .eq('exercise_id', exerciseId)
       .eq('workout_sessions.user_id', userId)
-      .order('date', { ascending: false, foreignTable: 'workout_sessions' })
+      // Parent-row ordering by the to-one embed (PostgREST >= 11). Do NOT use
+      // { foreignTable }: that only sorts the embedded rows, so the limit kept
+      // set #1 of many sessions instead of every set of the newest sessions.
+      .order('workout_sessions(date)', { ascending: false })
       .order('set_number', { ascending: true })
       .order('created_at', { ascending: true })
       .limit(boundedLimit)

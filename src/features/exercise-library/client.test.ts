@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  exerciseHistoryOptions,
   fetchRecentExercises,
   fetchSuggestedExercises,
   filtersToApiSearchParams,
@@ -90,5 +91,15 @@ describe('exercise library client', () => {
       '/api/exercises/recent?limit=6',
       '/api/exercises/suggested?exerciseId=bench-press&muscle=chest&limit=4',
     ])
+  })
+})
+
+describe('exerciseHistoryOptions', () => {
+  it('keys the cache by limit so a 15-set panel and a 50-set modal do not share data', () => {
+    const panel = exerciseHistoryOptions('ex-1', 15).queryKey
+    const modal = exerciseHistoryOptions('ex-1', 50).queryKey
+
+    expect(panel).not.toEqual(modal)
+    expect(panel.slice(0, 3)).toEqual(['workout-sets', 'history', 'ex-1'])
   })
 })
