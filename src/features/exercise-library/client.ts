@@ -254,7 +254,7 @@ export function suggestedExercisesOptions(options: {
 
 export function exerciseHistoryOptions(exerciseId: string, limit = 50) {
   return queryOptions({
-    queryKey: queryKeys.workoutSets.history(exerciseId),
+    queryKey: [...queryKeys.workoutSets.history(exerciseId), limit] as const,
     queryFn: () => fetchExerciseHistory(exerciseId, limit),
     enabled: Boolean(exerciseId),
   })
