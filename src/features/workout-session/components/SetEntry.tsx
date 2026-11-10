@@ -88,9 +88,14 @@ export default function SetEntry({
   )
   const saveFeedbackTimeoutRef = useRef<number | null>(null)
   const submitSignalRef = useRef(submitSignal)
+  // True once the user has typed into a new entry. The last-performance prefill
+  // arrives asynchronously and must not overwrite those values (issue #0027).
+  const hasUserInputRef = useRef(false)
 
-  const set = (field: keyof SetEntryFormValues, value: string) =>
+  const set = (field: keyof SetEntryFormValues, value: string) => {
+    hasUserInputRef.current = true
     setValues((prev) => ({ ...prev, [field]: value }))
+  }
 
   useEffect(() => {
     if (existingSet) {
@@ -103,7 +108,7 @@ export default function SetEntry({
   }, [existingSet])
 
   useEffect(() => {
-    if (!existingSet) {
+    if (!existingSet && !hasUserInputRef.current) {
       setValues(initialValues(undefined, previousSet))
       setValidationMessage(null)
       setShowDetails(Boolean(previousSet?.rest_time))
@@ -157,6 +162,7 @@ export default function SetEntry({
       flashSavedState()
 
       if (!existingSet) {
+        hasUserInputRef.current = false
         setValues(valuesFromSet(savedSet, { carryNotes: false }))
         setIsSaved(false)
         setIsEditing(true)
@@ -185,6 +191,7 @@ export default function SetEntry({
       setValidationMessage(null)
       setIsEditing(false)
     } else {
+      hasUserInputRef.current = false
       setValues(emptyValues())
       setValidationMessage(null)
     }

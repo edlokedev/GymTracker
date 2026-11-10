@@ -212,6 +212,41 @@ describe('WorkoutSessionManager', () => {
     expect(screen.getByText('8')).toBeInTheDocument()
   })
 
+  it('keeps the workout details fields disabled until the session has loaded', async () => {
+    let releaseDetail: (() => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('includeDetails=true')) {
+          await new Promise<void>((resolve) => {
+            releaseDetail = resolve
+          })
+          return Response.json({ success: true, data: makeWorkoutDetails() })
+        }
+        return Response.json({ success: true, data: [] })
+      }),
+    )
+
+    renderManager(<WorkoutSessionManager existingSession={makeSession({ name: undefined })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Workout details/ }))
+    const detailFields = () => [
+      screen.getByPlaceholderText('e.g., Push Day, Legs, etc.'),
+      screen.getByPlaceholderText('How are you feeling? Any goals for this workout?'),
+      screen.getByLabelText('Location'),
+      screen.getByDisplayValue('2026-05-01'),
+    ]
+
+    await waitFor(() => expect(releaseDetail).toBeDefined())
+    for (const field of detailFields()) expect(field).toBeDisabled()
+
+    releaseDetail?.()
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('e.g., Push Day, Legs, etc.')).toHaveValue('Push Day'),
+    )
+    for (const field of detailFields()) expect(field).toBeEnabled()
+  })
+
   it('keeps completed workout template save feedback visible after success', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)

@@ -292,7 +292,7 @@ describe('useWorkoutSession', () => {
       onSessionSave,
     })
 
-    await waitFor(() => expect(result.current.loading).toBe(false))
+    await waitFor(() => expect(result.current.isSessionReady).toBe(true))
 
     await act(async () => {
       result.current.setSessionName('Pull Day')
@@ -638,7 +638,7 @@ describe('useWorkoutSession', () => {
 
     const { result } = renderWorkoutSession({ existingSession: makeSession() })
 
-    await waitFor(() => expect(result.current.loading).toBe(false))
+    await waitFor(() => expect(result.current.isSessionReady).toBe(true))
 
     let savePromise: Promise<void>
     act(() => {
@@ -656,5 +656,208 @@ describe('useWorkoutSession', () => {
 
     // Settled → lingering 'saved'.
     expect(result.current.saveStatus).toBe('saved')
+  })
+
+  // Issue #0025: /workout?sessionId=… mounts the hook with a scaffold (today's
+  // date, no name) before the real session has been fetched.
+  describe('opening a past workout from a scaffold', () => {
+    const scaffold: WorkoutSession = {
+      id: 'session-1',
+      user_id: 'user-1',
+      date: '2026-11-10',
+      start_time: '2026-11-10T09:00:00.000Z',
+      created_at: new Date('2026-11-10T09:00:00.000Z'),
+      updated_at: new Date('2026-11-10T09:00:00.000Z'),
+    }
+    const patchCalls = (fetchMock: ReturnType<typeof vi.fn>) =>
+      fetchMock.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'PATCH')
+
+    it('does not save scaffold values over the session before it has loaded', async () => {
+      let releaseDetail: (() => void) | undefined
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('includeDetails=true')) {
+          await new Promise<void>((resolve) => {
+            releaseDetail = resolve
+          })
+          return Response.json({ success: true, data: makeWorkoutDetails() })
+        }
+        if (url.includes('action=history')) return Response.json({ success: true, data: [] })
+        if (init?.method === 'PATCH') return Response.json({ success: true, data: makeSession() })
+        throw new Error(`Unexpected fetch ${url}`)
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { result } = renderWorkoutSession({ existingSession: scaffold })
+      await waitFor(() => expect(releaseDetail).toBeDefined())
+      expect(result.current.isSessionReady).toBe(false)
+
+      await act(async () => {
+        await result.current.actions.saveSession()
+      })
+      expect(patchCalls(fetchMock)).toHaveLength(0)
+
+      await act(async () => releaseDetail?.())
+      await waitFor(() => expect(result.current.isSessionReady).toBe(true))
+      expect(result.current.sessionDate).toBe('2026-05-01')
+
+      await act(async () => {
+        await result.current.actions.saveSession()
+      })
+      const [, init] = patchCalls(fetchMock)[0]
+      expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({
+        name: 'Push Day',
+        notes: 'Good day',
+        date: '2026-05-01',
+      })
+    })
+
+    it('still loads the session details when an exercise was added first', async () => {
+      let releaseDetail: (() => void) | undefined
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input)
+          if (url.includes('includeDetails=true')) {
+            await new Promise<void>((resolve) => {
+              releaseDetail = resolve
+            })
+            return Response.json({ success: true, data: makeWorkoutDetails() })
+          }
+          return Response.json({ success: true, data: [] })
+        }),
+      )
+
+      const { result } = renderWorkoutSession({ existingSession: scaffold })
+      await waitFor(() => expect(releaseDetail).toBeDefined())
+      act(() => result.current.actions.addExercise(makeExercise('squat')))
+
+      await act(async () => releaseDetail?.())
+      await waitFor(() => expect(result.current.isSessionReady).toBe(true))
+
+      expect(result.current.sessionName).toBe('Push Day')
+      expect(result.current.sessionDate).toBe('2026-05-01')
+      // The in-flight exercise edit still wins over the late seed.
+      expect(result.current.exercises.map((item) => item.exercise.id)).toEqual(['squat'])
+    })
+
+    it('reports a failed load instead of showing an empty workout', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          Response.json({ success: false, error: 'Workout unavailable' }, { status: 500 }),
+        ),
+      )
+
+      const { result } = renderWorkoutSession({ existingSession: scaffold })
+
+      await waitFor(() => expect(result.current.commandError).toBe('Workout unavailable'))
+      expect(result.current.isSessionReady).toBe(false)
+    })
+  })
+
+  // Issue #0026: a template session holds planned exercises that have no sets
+  // yet, which the server's session detail does not know about.
+  describe('changing an exercise in a template session', () => {
+    const startTemplateSession = async (fetchMock: ReturnType<typeof vi.fn>) => {
+      vi.stubGlobal('fetch', fetchMock)
+      const rendered = renderWorkoutSession({ initialTemplateId: 'template-1' })
+      await waitFor(() => expect(rendered.result.current.session?.id).toBe('template-session'))
+      return rendered
+    }
+    const templateFetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('action=startFromTemplate') && init?.method === 'POST') {
+        return Response.json({
+          success: true,
+          data: {
+            session: makeSession({ id: 'template-session', name: 'Push Plan' }),
+            template: makeWorkoutTemplate(),
+          },
+        })
+      }
+      if (url.includes('action=history')) return Response.json({ success: true, data: [] })
+      return null
+    }
+
+    it('keeps the not-yet-started exercises after changing a logged one', async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const shared = templateFetch(input, init)
+        if (shared) return shared
+        if (url.startsWith('/api/workout-sets') && init?.method === 'POST') {
+          return Response.json({ success: true, data: makeSet('set-1', 1) })
+        }
+        if (url.includes('fromExerciseId=bench-press') && init?.method === 'PATCH') {
+          return Response.json({ success: true, data: { repointed: 1, setIds: ['set-1'] } })
+        }
+        // Server detail only knows exercises that already have sets.
+        if (url.includes('includeDetails=true')) {
+          return Response.json({
+            success: true,
+            data: {
+              ...makeSession({ id: 'template-session' }),
+              exercises: [
+                {
+                  exercise: makeExercise('deadlift'),
+                  sets: [{ ...makeSet('set-1', 1), exercise_id: 'deadlift' }],
+                },
+              ],
+            },
+          })
+        }
+        throw new Error(`Unexpected fetch ${url}`)
+      })
+      const { result } = await startTemplateSession(fetchMock)
+
+      await act(async () => {
+        await result.current.actions.saveSet('bench-press', {
+          workout_id: 'template-session',
+          exercise_id: 'bench-press',
+          set_order: 1,
+          reps: 8,
+          weight: 100,
+        })
+      })
+      let changed = false
+      await act(async () => {
+        changed = await result.current.actions.changeExercise(
+          'bench-press',
+          makeExercise('deadlift'),
+        )
+      })
+
+      expect(changed).toBe(true)
+      expect(result.current.exercises.map((item) => item.exercise.id)).toEqual([
+        'deadlift',
+        'squat',
+      ])
+      expect(result.current.exercises[0].sets).toEqual([
+        expect.objectContaining({ id: 'set-1', exercise_id: 'deadlift' }),
+      ])
+      expect(result.current.activeExerciseId).toBe('deadlift')
+    })
+
+    it('swaps an exercise with no sets locally without calling the server', async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const shared = templateFetch(input, init)
+        if (shared) return shared
+        throw new Error(`Unexpected fetch ${String(input)}`)
+      })
+      const { result } = await startTemplateSession(fetchMock)
+
+      let changed = false
+      await act(async () => {
+        changed = await result.current.actions.changeExercise('squat', makeExercise('deadlift'))
+      })
+
+      expect(changed).toBe(true)
+      expect(result.current.commandError).toBeNull()
+      expect(result.current.exercises.map((item) => item.exercise.id)).toEqual([
+        'bench-press',
+        'deadlift',
+      ])
+    })
   })
 })

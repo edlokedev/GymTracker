@@ -171,4 +171,48 @@ describe('SetEntry', () => {
 
     expect(screen.getByRole('button', { name: 'Save Set' }).parentElement).toHaveClass('hidden')
   })
+
+  // Issue #0027: the last-performance prefill arrives asynchronously, after the
+  // entry is already on screen.
+  describe('late last-performance prefill', () => {
+    const lastPerformance = {
+      id: 'history-1',
+      workout_id: '',
+      exercise_id: 'bench-press',
+      set_number: 1,
+      reps: 8,
+      weight: 100,
+      created_at: new Date('2026-05-01T10:00:00.000Z'),
+      updated_at: new Date('2026-05-01T10:00:00.000Z'),
+    }
+    const renderEntry = (previousSet?: typeof lastPerformance) => (
+      <SetEntry
+        exerciseId="bench-press"
+        workoutId="session-1"
+        setNumber={1}
+        trackingType="strength"
+        previousSet={previousSet}
+        onSave={vi.fn()}
+      />
+    )
+
+    it('fills an untouched entry when the prefill arrives', () => {
+      const { rerender } = render(renderEntry())
+
+      rerender(renderEntry(lastPerformance))
+
+      expect(screen.getByLabelText('Reps *')).toHaveValue(8)
+      expect(screen.getByLabelText('Weight (kg)')).toHaveValue(100)
+    })
+
+    it('keeps values the user already typed when the prefill arrives', () => {
+      const { rerender } = render(renderEntry())
+      fireEvent.change(screen.getByLabelText('Reps *'), { target: { value: '5' } })
+
+      rerender(renderEntry(lastPerformance))
+
+      expect(screen.getByLabelText('Reps *')).toHaveValue(5)
+      expect(screen.getByLabelText('Weight (kg)')).toHaveValue(null)
+    })
+  })
 })

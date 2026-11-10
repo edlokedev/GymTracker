@@ -50,6 +50,7 @@ export default function WorkoutSessionManager({
     activeExerciseId,
     activeExercise,
     isSessionStarted,
+    isSessionReady,
     loading,
     saveStatus,
     commandStatus,
@@ -428,6 +429,7 @@ export default function WorkoutSessionManager({
                   value={sessionName}
                   onChange={(e) => setSessionName(e.target.value)}
                   onBlur={actions.saveSession}
+                  disabled={!isSessionReady}
                   placeholder="e.g., Push Day, Legs, etc."
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:disabled:bg-gray-600"
                 />
@@ -441,6 +443,7 @@ export default function WorkoutSessionManager({
                   value={sessionNotes}
                   onChange={(e) => setSessionNotes(e.target.value)}
                   onBlur={actions.saveSession}
+                  disabled={!isSessionReady}
                   placeholder="How are you feeling? Any goals for this workout?"
                   rows={2}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:disabled:bg-gray-600"
@@ -461,6 +464,7 @@ export default function WorkoutSessionManager({
                   value={sessionLocation}
                   onChange={(e) => setSessionLocation(e.target.value)}
                   onBlur={actions.saveSession}
+                  disabled={!isSessionReady}
                   placeholder="e.g., Planet Fitness, Home Gym"
                   maxLength={100}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:disabled:bg-gray-600"
@@ -481,6 +485,7 @@ export default function WorkoutSessionManager({
                   value={sessionDate}
                   onChange={(e) => setSessionDate(e.target.value)}
                   onBlur={actions.saveSession}
+                  disabled={!isSessionReady}
                   onClick={(e) => {
                     try {
                       if ('showPicker' in HTMLInputElement.prototype) {

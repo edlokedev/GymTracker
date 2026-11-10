@@ -85,6 +85,11 @@ export function useWorkoutSession({
   const [sessionStartTime, setSessionStartTime] = useState(
     existingSession?.start_time || nowISOString(),
   )
+  // Id of the session whose name/notes/location/date fields hold real values:
+  // one created here, or one whose detail has been fetched. A session opened by
+  // id starts as a scaffold (today's date, no name) and must not be saved until
+  // then, or the scaffold overwrites the stored workout (issue #0025).
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null)
   const [commandStatus, setCommandStatus] = useState<WorkoutCommandStatus>('idle')
   const [commandError, setCommandError] = useState<string | null>(null)
   const [lastPerformanceByExerciseId, setLastPerformanceByExerciseId] = useState<
@@ -141,6 +146,7 @@ export function useWorkoutSession({
 
   const resetSession = useCallback(() => {
     setSession(null)
+    setLoadedSessionId(null)
     setExercises([])
     setSessionName('')
     setSessionNotes('')
@@ -239,9 +245,10 @@ export function useWorkoutSession({
   // background refetch) don't stomp in-progress edits.
   const seededSessionIdRef = useRef<string | null>(null)
   // Set once the user edits the in-flight exercise list (add/remove/save/change),
-  // so a late-arriving bootstrap seed never stomps their work. Reset on session
-  // switch. This is the local-editing-wins half of "Query owns server sync, local
-  // state owns in-flight editing".
+  // so a late-arriving bootstrap seed never stomps their exercises. Reset on
+  // session switch. This is the local-editing-wins half of "Query owns server
+  // sync, local state owns in-flight editing". It does not hold back the
+  // metadata fields, which cannot be edited meaningfully before they load.
   const userEditedExercisesRef = useRef(false)
   // The detail query is keyed by the requested session id, so its data is the
   // response for *this* session even if the payload's own id differs (e.g. a
@@ -253,15 +260,21 @@ export function useWorkoutSession({
     if (!existingSessionId) return
     if (!loadedDetail) return
     if (seededSessionIdRef.current === existingSessionId) return
-    if (userEditedExercisesRef.current) return
     seededSessionIdRef.current = existingSessionId
 
-    setSession(loadedDetail)
-    setSessionName(loadedDetail.name || '')
-    setSessionNotes(loadedDetail.notes || '')
-    setSessionLocation(loadedDetail.location_name || '')
-    setSessionDate(loadedDetail.date)
-    setSessionStartTime(loadedDetail.start_time)
+    // A session created in this hook already holds its real metadata; only a
+    // session opened by id needs it seeded from the detail.
+    if (loadedSessionId !== existingSessionId) {
+      setSession(loadedDetail)
+      setSessionName(loadedDetail.name || '')
+      setSessionNotes(loadedDetail.notes || '')
+      setSessionLocation(loadedDetail.location_name || '')
+      setSessionDate(loadedDetail.date)
+      setSessionStartTime(loadedDetail.start_time)
+      setLoadedSessionId(existingSessionId)
+    }
+
+    if (userEditedExercisesRef.current) return
     const loadedExercises = mapWorkoutDetailsToExercises(loadedDetail)
     setExercises(loadedExercises)
     setActiveExerciseId((currentActiveExerciseId) =>
@@ -276,35 +289,15 @@ export function useWorkoutSession({
         .filter((exercise) => exercise.sets.length === 0)
         .map((exercise) => exercise.exercise.id),
     )
-  }, [existingSessionId, loadedDetail, loadLastPerformanceDefaultsForExercises])
+  }, [existingSessionId, loadedDetail, loadedSessionId, loadLastPerformanceDefaultsForExercises])
 
-  // Imperative reload used after "change exercise" repoints sets server-side.
-  const reloadSessionData = useCallback(
-    async (sessionId: string) => {
-      const workout = await queryClient.fetchQuery({
-        ...workoutSessionDetailOptions(sessionId),
-        // Force a fresh read; the repoint just mutated the server rows.
-        staleTime: 0,
-      })
-      setSession(workout)
-      setSessionName(workout.name || '')
-      setSessionNotes(workout.notes || '')
-      setSessionLocation(workout.location_name || '')
-      setSessionDate(workout.date)
-      setSessionStartTime(workout.start_time)
-      const loadedExercises = mapWorkoutDetailsToExercises(workout)
-      setExercises(loadedExercises)
-      setActiveExerciseId((currentActiveExerciseId) =>
-        getActiveExerciseId(loadedExercises, currentActiveExerciseId),
-      )
-      void loadLastPerformanceDefaultsForExercises(
-        loadedExercises
-          .filter((exercise) => exercise.sets.length === 0)
-          .map((exercise) => exercise.exercise.id),
-      )
-    },
-    [loadLastPerformanceDefaultsForExercises, queryClient],
-  )
+  // A session opened by id that fails to load must say so: without this the
+  // editor shows an empty workout that can never be saved (issue #0025).
+  const detailError = detailQuery.error
+  useEffect(() => {
+    if (!detailError || loadedSessionId === existingSessionId) return
+    failCommand(detailError, 'Failed to load workout')
+  }, [detailError, existingSessionId, failCommand, loadedSessionId])
 
   // On a session switch: with no existing session, reset; with one, eagerly seed
   // `session` from the prop (its id is the requested id) so consumers see the new
@@ -354,6 +347,7 @@ export function useWorkoutSession({
     mutationFn: (data: WorkoutSessionWriteInput) => createWorkoutSession(data),
     onSuccess: (newSession) => {
       setSession(newSession)
+      setLoadedSessionId(newSession.id)
       setSessionDate(newSession.date)
       setSessionStartTime(newSession.start_time)
       onSessionSave?.(newSession)
@@ -401,6 +395,7 @@ export function useWorkoutSession({
     onSuccess: (result) => {
       const plannedExercises = mapWorkoutTemplateToExercises(result.template)
       setSession(result.session)
+      setLoadedSessionId(result.session.id)
       setSessionName(result.session.name || '')
       setSessionNotes(result.session.notes || '')
       setSessionLocation(result.session.location_name || '')
@@ -449,8 +444,10 @@ export function useWorkoutSession({
     },
   })
 
+  const isSessionReady = !session || loadedSessionId === session.id
+
   const saveSession = useCallback(async () => {
-    if (!session) return
+    if (!session || !isSessionReady) return
 
     if (!sessionDate || Number.isNaN(Date.parse(sessionDate))) {
       setCommandStatus('error')
@@ -483,6 +480,7 @@ export function useWorkoutSession({
     beginCommand,
     failCommand,
     finishCommand,
+    isSessionReady,
     session,
     sessionDate,
     sessionLocation,
@@ -617,9 +615,13 @@ export function useWorkoutSession({
   )
 
   // "Change exercise": repoint a logged group to a different exercise, keeping
-  // its sets. Persisted workouts go through the atomic RPC then reload; an
-  // unsaved workout swaps locally. Fast-fails on a client-visible duplicate
-  // (the server still blocks authoritatively with a 409).
+  // its sets. Sets that exist on the server go through the atomic RPC, which
+  // only rewrites their exercise_id; the same swap is then applied locally. The
+  // session is not reloaded, because the server only knows exercises that have
+  // sets and a reload would drop the planned ones (issue #0026). An exercise
+  // with no sets has nothing to repoint, so it swaps locally only. Fast-fails on
+  // a client-visible duplicate (the server still blocks authoritatively with a
+  // 409).
   const changeExerciseMutation = useMutation({
     mutationFn: ({
       sessionId,
@@ -646,16 +648,18 @@ export function useWorkoutSession({
 
       try {
         beginCommand()
-        if (session?.id) {
+        const hasLoggedSets = exercises.some(
+          (item) => item.exercise.id === fromExerciseId && item.sets.length > 0,
+        )
+        if (session?.id && hasLoggedSets) {
           await changeExerciseMutation.mutateAsync({
             sessionId: session.id,
             fromExerciseId,
             toExerciseId: toExercise.id,
           })
-          await reloadSessionData(session.id)
-        } else {
-          setExercises((current) => replaceExerciseInWorkout(current, fromExerciseId, toExercise))
         }
+        userEditedExercisesRef.current = true
+        setExercises((current) => replaceExerciseInWorkout(current, fromExerciseId, toExercise))
         setActiveExerciseId((currentId) =>
           currentId === fromExerciseId ? toExercise.id : currentId,
         )
@@ -675,7 +679,6 @@ export function useWorkoutSession({
       failCommand,
       finishCommand,
       loadLastPerformanceDefaults,
-      reloadSessionData,
       session?.id,
     ],
   )
@@ -823,6 +826,7 @@ export function useWorkoutSession({
     activeExercise,
     sessionStartTime,
     isSessionStarted: Boolean(session),
+    isSessionReady,
     loading,
     saveStatus,
     commandStatus,
