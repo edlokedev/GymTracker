@@ -22,7 +22,10 @@ export type SupabaseServerContext = {
   responseHeaders: Headers
 }
 
-function parseCookieHeader(header: string | null): Record<string, string> {
+// Exported for tests. A cookie value that is not valid percent-encoding is kept
+// raw instead of throwing: auth runs outside the route try/catch, so a throw
+// here would 500 every route (non-envelope) until the cookie is cleared.
+export function parseCookieHeader(header: string | null): Record<string, string> {
   if (!header) return {}
   const out: Record<string, string> = {}
   for (const part of header.split(';')) {
@@ -30,7 +33,12 @@ function parseCookieHeader(header: string | null): Record<string, string> {
     if (!rawName) continue
     const name = rawName.trim()
     if (!name) continue
-    out[name] = decodeURIComponent(rest.join('=').trim())
+    const rawValue = rest.join('=').trim()
+    try {
+      out[name] = decodeURIComponent(rawValue)
+    } catch {
+      out[name] = rawValue
+    }
   }
   return out
 }

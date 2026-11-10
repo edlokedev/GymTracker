@@ -2,6 +2,7 @@ import { createServerFileRoute } from '@tanstack/react-start/server'
 import dayjs from 'dayjs'
 import { type PrivateHandlerContext, privateMethod } from '../lib/api/define-private-route'
 import { badRequest } from '../lib/api/errors'
+import { parseIntParam } from '../lib/api/params'
 import { getProgressData } from '../lib/supabase/queries/progress'
 import type { ProgressMetric } from '../lib/types/progress'
 
@@ -27,7 +28,12 @@ export const getProgress = async ({ user, supabase, url }: PrivateHandlerContext
     searchParams.get('startDate') || dayjs().subtract(90, 'day').format('YYYY-MM-DD')
   const endDate = searchParams.get('endDate') || dayjs().format('YYYY-MM-DD')
   const metric = parseMetric(searchParams.get('metric'))
-  const limit = parseInt(searchParams.get('limit') || '1000', 10)
+  const limit = parseIntParam(searchParams.get('limit'), {
+    name: 'limit',
+    defaultValue: 1000,
+    min: 1,
+    max: 1000,
+  })
 
   if (dayjs(startDate).isAfter(dayjs(endDate))) {
     badRequest('Start date cannot be after end date')

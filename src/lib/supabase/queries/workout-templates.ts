@@ -1,5 +1,5 @@
 import { getNextWorkoutRecommendation } from '@/features/workout-templates/model'
-import { assertPostgresOk } from '../../api/errors'
+import { assertPostgresOk, BadRequestError } from '../../api/errors'
 import type {
   ExerciseWithParsedFields,
   NextWorkoutResponse,
@@ -217,6 +217,9 @@ export const workoutTemplateQueries = {
     userId: string,
     input: CreateWorkoutTemplateInput,
   ): Promise<WorkoutTemplateWithExercises | null> {
+    if (input.exercises !== undefined && !Array.isArray(input.exercises)) {
+      throw new BadRequestError('exercises must be an array')
+    }
     let exercises = input.exercises ?? []
     let sourceSession: WorkoutSession | null = null
 
@@ -257,7 +260,22 @@ export const workoutTemplateQueries = {
             notes: exercise.notes ?? null,
           })),
         )
-      assertPostgresOk(insertExercisesError)
+      if (insertExercisesError) {
+        // Compensate: don't leave an empty template behind. A failed cleanup is
+        // logged with the template id (so it can be reaped); the original
+        // insert error is what the caller sees.
+        const { error: cleanupError } = await queryClient(supabase)
+          .from('workout_templates')
+          .delete()
+          .eq('id', template.id)
+        if (cleanupError) {
+          console.error(
+            `workoutTemplateQueries.create: failed to delete orphan template ${template.id}:`,
+            cleanupError,
+          )
+        }
+        assertPostgresOk(insertExercisesError)
+      }
     }
 
     return workoutTemplateQueries.getById(supabase, template.id)

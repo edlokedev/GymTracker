@@ -3,6 +3,7 @@ import {
   assertPostgresOk,
   BadRequestError,
   badRequest,
+  ConflictError,
   classifyPostgresError,
   ForbiddenError,
   forbidden,
@@ -21,23 +22,40 @@ describe('classifyPostgresError', () => {
   it('maps PGRST116 to NotFoundError', () => {
     const e = classifyPostgresError({ code: 'PGRST116', message: 'No rows' })
     expect(e).toBeInstanceOf(NotFoundError)
-    expect(e?.message).toBe('No rows')
+    expect(e?.message).toBe('Not found')
   })
 
   it('maps 23503 to NotFoundError (collapses ownership info-leak)', () => {
-    const e = classifyPostgresError({ code: '23503', message: 'fk violation' })
+    const e = classifyPostgresError({ code: '23503', message: 'fk violation "workouts_user_fk"' })
     expect(e).toBeInstanceOf(NotFoundError)
+    expect(e?.message).toBe('Not found')
   })
 
   it('maps 42501 to NotFoundError (collapsed: ownership-only RLS predicate)', () => {
-    const e = classifyPostgresError({ code: '42501', message: 'denied' })
+    const e = classifyPostgresError({ code: '42501', message: 'denied for table workouts' })
     expect(e).toBeInstanceOf(NotFoundError)
+    expect(e?.message).toBe('Not found')
   })
 
   it('maps missing migration tables to an actionable bad request', () => {
     const e = classifyPostgresError({ code: '42P01', message: 'relation does not exist' })
     expect(e).toBeInstanceOf(BadRequestError)
     expect(e?.message).toBe('Workout template database tables are missing. Run migrations.')
+  })
+
+  it.each(['22P02', '23514', '23502'])('maps %s to a generic BadRequestError', (code) => {
+    const e = classifyPostgresError({
+      code,
+      message: 'invalid input syntax for type uuid: "secret"',
+    })
+    expect(e).toBeInstanceOf(BadRequestError)
+    expect(e?.message).toBe('Invalid request')
+  })
+
+  it('maps 23505 to a generic ConflictError', () => {
+    const e = classifyPostgresError({ code: '23505', message: 'duplicate key "uq_secret_idx"' })
+    expect(e).toBeInstanceOf(ConflictError)
+    expect(e?.message).toBe('Conflict')
   })
 
   it('returns null for unknown codes', () => {

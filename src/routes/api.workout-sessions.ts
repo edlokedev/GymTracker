@@ -1,6 +1,7 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
 import { type PrivateHandlerContext, privateMethod } from '../lib/api/define-private-route'
 import { badRequest, notFound } from '../lib/api/errors'
+import { parseIntParam } from '../lib/api/params'
 import { workoutSessionQueries } from '../lib/supabase/queries/workout-sessions'
 import { workoutTemplateQueries } from '../lib/supabase/queries/workout-templates'
 import type { WorkoutSessionInput } from '../lib/types/database'
@@ -37,8 +38,18 @@ export const getWorkoutSessions = async ({ supabase, url }: PrivateHandlerContex
     return data
   }
 
-  const limit = parseInt(url.searchParams.get('limit') || '20', 10)
-  const offset = parseInt(url.searchParams.get('offset') || '0', 10)
+  const limit = parseIntParam(url.searchParams.get('limit'), {
+    name: 'limit',
+    defaultValue: 20,
+    min: 1,
+    max: 100,
+  })
+  const offset = parseIntParam(url.searchParams.get('offset'), {
+    name: 'offset',
+    defaultValue: 0,
+    min: 0,
+    max: 100000,
+  })
   const locationName = url.searchParams.get('location_name') ?? undefined
   return workoutSessionQueries.list(supabase, limit, offset, locationName)
 }
@@ -88,6 +99,7 @@ export const createWorkoutSession = async ({ user, supabase, request }: PrivateH
   void _ignored
   assertValidDate(input.date)
   if (input.location_name !== undefined && input.location_name !== null) {
+    if (typeof input.location_name !== 'string') badRequest('location_name must be a string')
     const trimmed = input.location_name.trim()
     if (trimmed.length > 100) badRequest('location_name must be 100 characters or fewer')
     input.location_name = trimmed === '' ? undefined : trimmed
@@ -112,6 +124,7 @@ export const patchWorkoutSession = async ({ supabase, request, url }: PrivateHan
   assertValidDate(updates.date)
 
   if (updates.location_name !== undefined && updates.location_name !== null) {
+    if (typeof updates.location_name !== 'string') badRequest('location_name must be a string')
     const trimmed = updates.location_name.trim()
     if (trimmed.length > 100) badRequest('location_name must be 100 characters or fewer')
     updates.location_name = trimmed === '' ? null : trimmed

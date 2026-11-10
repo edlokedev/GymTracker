@@ -1,5 +1,6 @@
 import { createServerFileRoute } from '@tanstack/react-start/server'
 import { type PublicHandlerContext, publicMethod } from '../lib/api/define-public-route'
+import { parseIntParam } from '../lib/api/params'
 import { exerciseCatalogQueries } from '../lib/supabase/queries/exercise-catalog'
 
 // Public catalog route. The handler returns `{ items, total, page, totalPages,
@@ -12,8 +13,18 @@ export const searchExercises = async ({ supabase, url }: PublicHandlerContext) =
   const equipment = url.searchParams.get('equipment') || undefined
   const muscle_group = url.searchParams.get('muscle_group') || undefined
   const level = url.searchParams.get('level') || undefined
-  const limit = parseInt(url.searchParams.get('limit') || '20', 10)
-  const offset = parseInt(url.searchParams.get('offset') || '0', 10)
+  const limit = parseIntParam(url.searchParams.get('limit'), {
+    name: 'limit',
+    defaultValue: 20,
+    min: 1,
+    max: 100,
+  })
+  const offset = parseIntParam(url.searchParams.get('offset'), {
+    name: 'offset',
+    defaultValue: 0,
+    min: 0,
+    max: 100000,
+  })
 
   const result = await exerciseCatalogQueries.search(supabase, {
     query,

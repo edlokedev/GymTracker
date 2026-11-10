@@ -135,6 +135,19 @@ export function mapExerciseRow(row: RawExerciseRow): CatalogExercise {
 export const EXERCISE_SELECT =
   'id, name, category_id, tracking_type, force, level, mechanic, equipment, primary_muscles, secondary_muscles, instructions, gif_path, preview_image_path, created_by, created_at, updated_at, exercise_categories!inner(name)'
 
+// PostgREST `or()` filter for an exact muscle match in primary OR secondary.
+// `muscle_group` is public input: values containing PostgREST reserved
+// characters (comma, parens, double quote, backslash) are double-quoted with
+// quote/backslash escaped so they stay one value and cannot inject extra
+// conditions. Ordinary values keep the unquoted form.
+function muscleGroupFilter(muscleGroup: string): string {
+  const needle = JSON.stringify([muscleGroup])
+  const value = /[,()"\\]/.test(muscleGroup)
+    ? `"${needle.replace(/[\\"]/g, (ch) => `\\${ch}`)}"`
+    : needle
+  return `primary_muscles.cs.${value},secondary_muscles.cs.${value}`
+}
+
 export const exerciseCatalogQueries = {
   async listCategories(supabase: SB): Promise<CatalogCategoryWithCount[]> {
     const { data: categories, error } = await supabase
@@ -246,8 +259,7 @@ export const exerciseCatalogQueries = {
       // Exact-match muscle_group: row's primary OR secondary jsonb array
       // contains the muscle string.
       if (params.muscle_group) {
-        const needle = JSON.stringify([params.muscle_group])
-        q = q.or(`primary_muscles.cs.${needle},secondary_muscles.cs.${needle}`)
+        q = q.or(muscleGroupFilter(params.muscle_group))
       }
 
       return q.order('name', { ascending: true })
@@ -287,8 +299,7 @@ export const exerciseCatalogQueries = {
       if (params.level) q = q.eq('level', params.level)
       if (params.force) q = q.eq('force', params.force)
       if (params.muscle_group) {
-        const needle = JSON.stringify([params.muscle_group])
-        q = q.or(`primary_muscles.cs.${needle},secondary_muscles.cs.${needle}`)
+        q = q.or(muscleGroupFilter(params.muscle_group))
       }
       return q.order('name', { ascending: true })
     }

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { BadRequestError } from '../../api/errors'
 import type { AppSupabaseClient } from '../query-client'
 import { workoutTemplateQueries } from './workout-templates'
 
@@ -8,6 +9,8 @@ type TableState = {
   data?: unknown[]
   singleData?: unknown
   error?: { code?: string; message?: string } | null
+  // When set, a builder whose last op is `delete` resolves with this error.
+  deleteError?: { code?: string; message?: string } | null
   ops: QueryOp[]
 }
 
@@ -55,6 +58,12 @@ class FakeBuilder {
 
   // biome-ignore lint/suspicious/noThenProperty: Supabase builders are awaited directly.
   then(resolve: (value: unknown) => void) {
+    const isDelete =
+      this.state.ops.at(-1)?.name === 'delete' || this.state.ops.some((o) => o.name === 'delete')
+    if (isDelete && this.state.deleteError !== undefined) {
+      resolve({ data: [], error: this.state.deleteError })
+      return
+    }
     resolve({ data: this.state.data ?? [], error: this.state.error ?? null })
   }
 
@@ -187,6 +196,59 @@ describe('workoutTemplateQueries', () => {
           },
         ],
       ],
+    })
+  })
+
+  describe('create() failure handling', () => {
+    const exerciseInput = { exercises: [{ exerciseId: 'bench', targetSets: 3 }] }
+    const insertFailure = { code: 'XX000', message: 'child insert exploded' }
+
+    function arrange(overrides: { deleteError?: TableState['deleteError'] } = {}) {
+      return makeClient({
+        workout_templates: {
+          singleData: templateRow,
+          data: [templateRow],
+          deleteError: overrides.deleteError,
+        },
+        workout_template_exercises: { error: insertFailure },
+        exercises: { data: [] },
+      })
+    }
+
+    it('deletes the just-created template and rethrows the original error when the child insert fails', async () => {
+      const { client, states } = arrange()
+
+      await expect(
+        workoutTemplateQueries.create(client, 'user-1', exerciseInput),
+      ).rejects.toMatchObject({ message: 'child insert exploded' })
+
+      const ops = states.workout_templates.ops
+      expect(ops).toContainEqual({ name: 'delete', args: [] })
+      expect(ops).toContainEqual({ name: 'eq', args: ['id', 'template-1'] })
+    })
+
+    it('still throws the original error and logs when the compensating delete also fails', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const { client } = arrange({ deleteError: { code: 'XX001', message: 'delete exploded' } })
+
+      await expect(
+        workoutTemplateQueries.create(client, 'user-1', exerciseInput),
+      ).rejects.toMatchObject({ message: 'child insert exploded' })
+
+      expect(consoleError).toHaveBeenCalled()
+      consoleError.mockRestore()
+    })
+
+    it('rejects a non-array exercises payload with BadRequestError before inserting anything', async () => {
+      const { client, states } = arrange()
+
+      await expect(
+        workoutTemplateQueries.create(client, 'user-1', {
+          exercises: 'bench' as unknown as [],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestError)
+
+      expect(states.workout_templates.ops.some((o) => o.name === 'insert')).toBe(false)
     })
   })
 })

@@ -2,13 +2,15 @@ import { createServerFileRoute } from '@tanstack/react-start/server'
 import { type PrivateHandlerContext, privateMethod } from '../lib/api/define-private-route'
 import { badRequest } from '../lib/api/errors'
 import { getCalendarAggregate, resolveCalendarRange } from '../lib/supabase/queries/calendar'
-import { isValidCalendarDate } from '../lib/utils/calendar'
+import { dayjs, isValidCalendarDate } from '../lib/utils/calendar'
 
 // Aggregate route: returns the authenticated user's workout-calendar rollup
 // for a date range, plus summary stats and the resolved date window. Identity
 // comes from the Supabase session — `userId` is never accepted from the
 // request. The handler's plain object becomes the envelope's `data` field, so
 // clients read `result.data.workouts / .summary / .dateRange`.
+
+const MAX_CALENDAR_WINDOW_DAYS = 400
 
 export const getCalendarData = async ({ user, supabase, url }: PrivateHandlerContext) => {
   const startDateParam = url.searchParams.get('start')
@@ -26,6 +28,14 @@ export const getCalendarData = async ({ user, supabase, url }: PrivateHandlerCon
     ['today', todayParam],
   ] as const) {
     if (value && !isValidCalendarDate(value)) badRequest(`${name} must be a valid YYYY-MM-DD date`)
+  }
+
+  if (startDateParam && endDateParam) {
+    if (startDateParam > endDateParam) badRequest('start must not be after end')
+    const spanDays = dayjs(endDateParam).diff(dayjs(startDateParam), 'day')
+    if (spanDays > MAX_CALENDAR_WINDOW_DAYS) {
+      badRequest(`date window must be ${MAX_CALENDAR_WINDOW_DAYS} days or fewer`)
+    }
   }
 
   const dateRange = resolveCalendarRange(startDateParam, endDateParam, todayParam)

@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { assertPostgresOk } from '../../api/errors'
+import { assertPostgresOk, BadRequestError } from '../../api/errors'
 import type {
   ExerciseProgress,
   ProgressDataPoint,
@@ -33,58 +33,83 @@ type SetJoinRow = {
 
 export type ProgressQueryInput = ProgressRequest & {
   userId: string
+  // Hard cap on total rows fetched across pages (tests override).
+  maxRows?: number
 }
+
+const PROGRESS_MAX_PAGE_SIZE = 1000
+const PROGRESS_MAX_ROWS = 20000
 
 export async function getProgressData(
   supabase: AppSupabaseClient,
   input: ProgressQueryInput,
 ): Promise<ExerciseProgress[]> {
-  const { userId, exerciseIds, startDate, endDate, metric = 'volume', limit = 1000 } = input
+  const {
+    userId,
+    exerciseIds,
+    startDate,
+    endDate,
+    metric = 'volume',
+    limit = PROGRESS_MAX_PAGE_SIZE,
+    maxRows = PROGRESS_MAX_ROWS,
+  } = input
 
-  // One round-trip: join sets -> exercises (for name) and sets -> sessions
-  // (for date + user_id filter). PostgREST embeds resolve via FK references.
-  let query = queryClient(supabase)
-    .from<SetJoinRow>('workout_sets')
-    .select(
-      `
-        id,
-        workout_id,
-        exercise_id,
-        set_number,
-        weight,
-        reps,
-        duration_seconds,
-        distance_km,
-        speed_kmh,
-        incline,
-        created_at,
-        exercises!inner ( name ),
-        workout_sessions!inner ( date, user_id )
-      `,
-    )
-    .eq('workout_sessions.user_id', userId)
-    .gte('workout_sessions.date', startDate)
-    .lte('workout_sessions.date', endDate)
+  // Page size is capped by PostgREST's max-rows (1000 by default).
+  const pageSize = Math.min(Math.max(Math.floor(limit) || 1, 1), PROGRESS_MAX_PAGE_SIZE)
 
-  if (exerciseIds && exerciseIds.length > 0) {
-    query = query.in('exercise_id', exerciseIds)
+  const rows: SetJoinRow[] = []
+  for (let from = 0; ; from += pageSize) {
+    // One round-trip per page: join sets -> exercises (for name) and
+    // sets -> sessions (for date + user_id filter). PostgREST embeds resolve
+    // via FK references.
+    let query = queryClient(supabase)
+      .from<SetJoinRow>('workout_sets')
+      .select(
+        `
+          id,
+          workout_id,
+          exercise_id,
+          set_number,
+          weight,
+          reps,
+          duration_seconds,
+          distance_km,
+          speed_kmh,
+          incline,
+          created_at,
+          exercises!inner ( name ),
+          workout_sessions!inner ( date, user_id )
+        `,
+      )
+      .eq('workout_sessions.user_id', userId)
+      .gte('workout_sessions.date', startDate)
+      .lte('workout_sessions.date', endDate)
+
+    if (exerciseIds && exerciseIds.length > 0) {
+      query = query.in('exercise_id', exerciseIds)
+    }
+
+    // Order PARENT rows (to-one embed, PostgREST >= 11).
+    // `{ foreignTable }` would only sort the embedded rows, leaving the real order as
+    // exercise_id, set_number - so a limit would silently drop late exercises.
+    // `id` is a unique tie-breaker so range paging is stable.
+    query = query
+      .order('workout_sessions(date)', { ascending: true })
+      .order('exercise_id', { ascending: true })
+      .order('set_number', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+
+    const { data, error } = await query
+    assertPostgresOk(error)
+
+    const page = (data ?? []) as SetJoinRow[]
+    rows.push(...page)
+    if (page.length < pageSize) break
+    if (rows.length >= maxRows) {
+      throw new BadRequestError('Too much data for this date range. Narrow the range or exercises.')
+    }
   }
-
-  // Mirror SQLite ordering: by session date asc, then exercise, then set #.
-  // PostgREST supports ordering on embedded resources via foreignTable.
-  query = query
-    .order('date', {
-      ascending: true,
-      foreignTable: 'workout_sessions',
-    })
-    .order('exercise_id', { ascending: true })
-    .order('set_number', { ascending: true })
-    .limit(limit)
-
-  const { data, error } = await query
-  assertPostgresOk(error)
-
-  const rows: SetJoinRow[] = (data ?? []) as SetJoinRow[]
 
   // Group by exercise.
   const exerciseData = new Map<string, ProgressDataPoint[]>()
@@ -143,7 +168,9 @@ function calculatePersonalRecords(dataPoints: ProgressDataPoint[]) {
   let maxDistance: ProgressDataPoint | null = null
   let maxSpeed: ProgressDataPoint | null = null
 
-  const sortedPoints = [...dataPoints].sort((a, b) => (dayjs(a.date).isBefore(b.date) ? -1 : 1))
+  const sortedPoints = [...dataPoints].sort(
+    (a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf(),
+  )
 
   const markedDataPoints = sortedPoints.map((point) => {
     const updatedPoint = { ...point }
@@ -155,10 +182,9 @@ function calculatePersonalRecords(dataPoints: ProgressDataPoint[]) {
 
     if (
       point.reps &&
-      point.weight &&
       (!maxReps ||
         point.reps > (maxReps.reps || 0) ||
-        (point.reps === maxReps.reps && point.weight > (maxReps.weight || 0)))
+        (point.reps === maxReps.reps && (point.weight ?? 0) > (maxReps.weight ?? 0)))
     ) {
       maxReps = point
       updatedPoint.isPersonalRecord = true

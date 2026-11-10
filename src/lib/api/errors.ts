@@ -20,6 +20,9 @@
 //                Local/dev database is behind migrations. Do not collapse this
 //                to a generic 500 because the UI can tell the operator exactly
 //                what to fix.
+//   - 22P02 / 23514 / 23502 (invalid text rep, check,   -> BadRequestError -> 400
+//                not-null violation); generic message, no raw Postgres text
+//   - 23505    (unique_violation)                       -> ConflictError -> 409
 //   - anything else                                     -> 500 with server log
 
 export class NotFoundError extends Error {
@@ -82,9 +85,13 @@ type PostgresLikeError = { code?: string | null; message?: string | null } | nul
 export function classifyPostgresError(error: PostgresLikeError): Error | null {
   if (!error || typeof error !== 'object') return null
   const code = error.code ?? undefined
-  if (code === 'PGRST116') return new NotFoundError(error.message ?? 'Not found')
-  if (code === '23503') return new NotFoundError(error.message ?? 'Not found')
-  if (code === '42501') return new NotFoundError(error.message ?? 'Not found')
+  if (code === 'PGRST116') return new NotFoundError('Not found')
+  if (code === '23503') return new NotFoundError('Not found')
+  if (code === '42501') return new NotFoundError('Not found')
+  if (code === '22P02' || code === '23514' || code === '23502') {
+    return new BadRequestError('Invalid request')
+  }
+  if (code === '23505') return new ConflictError('Conflict')
   if (code === '42P01') {
     return new BadRequestError('Workout template database tables are missing. Run migrations.')
   }

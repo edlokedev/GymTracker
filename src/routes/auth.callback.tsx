@@ -10,25 +10,32 @@ import { getSupabaseServerClient } from '../lib/supabase/server'
 // Supabase server client, then 302 the browser to the original destination.
 //
 // `?next=` lets the caller pick a post-login landing path; we default to `/`.
-// The destination is restricted to same-origin paths (starts with `/` and not
-// `//`) so this route can't be abused as an open redirect.
+// The destination is restricted to same-origin paths (resolved against the request origin) so this route can't be abused as an open redirect.
 //
 // This route deliberately stays outside definePrivateRoute / definePublicRoute
 // because it returns 302 redirects, not JSON. Cookie merging is the only thing
 // it shares with the JSON routes, so it imports `mergeSetCookies` from the
 // shared module rather than reimplementing it inline.
 
-function sanitizeNext(raw: string | null): string {
+function sanitizeNext(raw: string | null, requestOrigin: string): string {
   if (!raw) return '/'
-  if (!raw.startsWith('/')) return '/'
-  if (raw.startsWith('//')) return '/'
-  return raw
+  // Resolve with the WHATWG parser so tab/newline stripping and backslash
+  // normalisation are applied exactly as a browser would, then require the
+  // result to stay on our origin.
+  let resolved: URL
+  try {
+    resolved = new URL(raw, requestOrigin)
+  } catch {
+    return '/'
+  }
+  if (resolved.origin !== requestOrigin) return '/'
+  return resolved.pathname + resolved.search + resolved.hash
 }
 
 export async function getAuthCallback({ request }: { request: Request }) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  const next = sanitizeNext(url.searchParams.get('next'))
+  const next = sanitizeNext(url.searchParams.get('next'), url.origin)
 
   const { supabase, responseHeaders } = getSupabaseServerClient(request)
 

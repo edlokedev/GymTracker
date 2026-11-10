@@ -79,6 +79,38 @@ describe('GET /auth/callback', () => {
     },
   )
 
+  it.each(['/\t/evil.example', '/\\evil.example', '/\\/evil.example'])(
+    'rejects tab/backslash origin-escaping next redirects: %j',
+    async (next) => {
+      arrangeSupabase()
+
+      const res = await runCallback(
+        `http://test/auth/callback?code=oauth-code&next=${encodeURIComponent(next)}`,
+      )
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/')
+    },
+  )
+
+  it('rejects a raw (single-encoded) tab next redirect', async () => {
+    arrangeSupabase()
+
+    const res = await runCallback('http://test/auth/callback?code=oauth-code&next=/%09/evil.example')
+
+    expect(res.headers.get('location')).toBe('/')
+  })
+
+  it('keeps path, query string and hash of a normal same-origin next', async () => {
+    arrangeSupabase()
+
+    const res = await runCallback(
+      `http://test/auth/callback?code=oauth-code&next=${encodeURIComponent('/history?range=7d&tab=a#top')}`,
+    )
+
+    expect(res.headers.get('location')).toBe('/history?range=7d&tab=a#top')
+  })
+
   it('redirects with an encoded auth_error when code exchange fails', async () => {
     const error = new Error('OAuth failed: bad token')
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
