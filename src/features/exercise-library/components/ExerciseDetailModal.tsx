@@ -49,6 +49,7 @@ export default function ExerciseDetailModal({
   const { user } = useAuth()
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -352,18 +353,30 @@ export default function ExerciseDetailModal({
         confirmLabel="Archive"
         variant="danger"
         isConfirming={isArchiving}
-        onCancel={() => setConfirmArchive(false)}
+        onCancel={() => {
+          setConfirmArchive(false)
+          setArchiveError(null)
+        }}
         onConfirm={async () => {
           if (!onArchiveExercise) return
           setIsArchiving(true)
+          setArchiveError(null)
           try {
             await onArchiveExercise(exercise)
             setConfirmArchive(false)
+          } catch {
+            setArchiveError('Couldn’t archive this exercise. Try again.')
           } finally {
             setIsArchiving(false)
           }
         }}
-      />
+      >
+        {archiveError && (
+          <p role="alert" className="text-red-700 text-sm dark:text-red-400">
+            {archiveError}
+          </p>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

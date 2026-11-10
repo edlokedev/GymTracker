@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   exerciseHistoryOptions,
+  exerciseSearchOptions,
   fetchRecentExercises,
   fetchSuggestedExercises,
   filtersToApiSearchParams,
@@ -101,5 +102,26 @@ describe('exerciseHistoryOptions', () => {
 
     expect(panel).not.toEqual(modal)
     expect(panel.slice(0, 3)).toEqual(['workout-sets', 'history', 'ex-1'])
+  })
+
+  it('passes the query abort signal to the search request', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json({
+        success: true,
+        data: { items: [], total: 0, page: 1, totalPages: 1, hasMore: false },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+
+    const options = exerciseSearchOptions({
+      categoryIds: [],
+      equipment: [],
+      muscleGroups: [],
+      query: 'bench',
+    })
+    await options.queryFn?.({ pageParam: 0, signal: controller.signal } as never)
+
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
   })
 })

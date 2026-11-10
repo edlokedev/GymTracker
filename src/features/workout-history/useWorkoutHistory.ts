@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 import { queryKeys } from '@/lib/api/query-keys'
 import type { WorkoutSession } from '@/lib/types/database'
@@ -6,16 +6,10 @@ import { parseCalendarDate } from '@/lib/utils/calendar'
 import {
   deleteWorkoutHistorySession,
   duplicateWorkoutHistorySession,
-  loadWorkoutHistoryPage,
   workoutDetailOptions,
   workoutHistoryListOptions,
 } from './client'
-import {
-  getDeleteCandidateLabel,
-  getLastWorkoutDate,
-  removeSessionById,
-  type WorkoutHistoryMode,
-} from './model'
+import { getDeleteCandidateLabel, getLastWorkoutDate, type WorkoutHistoryMode } from './model'
 
 interface UseWorkoutHistoryOptions {
   userId?: string
@@ -34,62 +28,44 @@ export function useWorkoutHistory({
   const enabled = Boolean(userId)
 
   const [locationFilter, setLocationFilter] = useState<string | undefined>(undefined)
-  // Pages 2+ from "load more" are appended here; the query owns page 1. A filter
-  // change or refresh resets this back to the query-only page-1 view.
-  const [appendedPages, setAppendedPages] = useState<WorkoutSession[]>([])
-  const [page, setPage] = useState(1)
-  const [hasMoreAppended, setHasMoreAppended] = useState<boolean | null>(null)
-
-  // Sessions list — a thin useQuery. TanStack Query's last-request-wins retires
-  // the old loadSessions stale-response race (it had no request token).
-  const listQuery = useQuery({
+  // One infinite query per filter owns every loaded page, so a refetch after a
+  // mutation re-reads all pages together (no overlap with a separately-held
+  // page 1) and a slow "load more" for an old filter lands in the old entry.
+  const listQuery = useInfiniteQuery({
     ...workoutHistoryListOptions({ limit, locationName: locationFilter }),
     enabled,
   })
 
-  const firstPage = listQuery.data?.data ?? []
-  const sessions = useMemo(
-    () => (mode === 'history' ? [...firstPage, ...appendedPages] : firstPage),
-    [firstPage, appendedPages, mode],
-  )
+  const loadedPages = listQuery.data?.pages
+  const sessions = useMemo(() => {
+    const pages = mode === 'history' ? (loadedPages ?? []) : (loadedPages?.slice(0, 1) ?? [])
+    // Defensive: a row can shift across offset boundaries if the list changes
+    // between page fetches; never render (or key) the same session twice.
+    const seen = new Set<string>()
+    return pages
+      .flatMap((page) => page.data)
+      .filter((session) => !seen.has(session.id) && seen.add(session.id))
+  }, [loadedPages, mode])
 
-  const hasMore = mode === 'history' ? (hasMoreAppended ?? listQuery.data?.hasMore ?? false) : false
+  const hasMore = mode === 'history' ? listQuery.hasNextPage : false
 
   const isLoading = listQuery.isPending && enabled
   const error = listQuery.error ? 'Failed to load workout history' : null
 
+  const { fetchNextPage, isFetching, refetch } = listQuery
   const loadMore = useCallback(async () => {
-    if (mode !== 'history' || !hasMore || listQuery.isFetching) return
-    const nextPage = page + 1
-    const offset = (nextPage - 1) * limit
-    try {
-      const result = await loadWorkoutHistoryPage({ limit, offset, locationName: locationFilter })
-      setAppendedPages((current) => [...current, ...result.data])
-      setHasMoreAppended(result.hasMore)
-      setPage(nextPage)
-    } catch (loadError) {
-      console.error('Error loading more workout history:', loadError)
-    }
-  }, [hasMore, limit, listQuery.isFetching, locationFilter, mode, page])
-
-  const resetPagination = useCallback(() => {
-    setAppendedPages([])
-    setHasMoreAppended(null)
-    setPage(1)
-  }, [])
+    if (mode !== 'history' || !hasMore || isFetching) return
+    const result = await fetchNextPage()
+    if (result.isError) console.error('Error loading more workout history:', result.error)
+  }, [fetchNextPage, hasMore, isFetching, mode])
 
   const refresh = useCallback(async () => {
-    resetPagination()
-    await listQuery.refetch()
-  }, [listQuery, resetPagination])
+    await refetch()
+  }, [refetch])
 
-  const filterByLocation = useCallback(
-    (name: string | undefined) => {
-      resetPagination()
-      setLocationFilter(name)
-    },
-    [resetPagination],
-  )
+  const filterByLocation = useCallback((name: string | undefined) => {
+    setLocationFilter(name)
+  }, [])
 
   // Invalidate every server view a session mutation can touch: the sessions
   // list, the calendar summary, and exercise recents (duplicate/delete both add
@@ -165,7 +141,6 @@ export function useWorkoutHistory({
 
   const removeDeletedSession = useCallback(
     (sessionId: string) => {
-      setAppendedPages((current) => removeSessionById(current, sessionId))
       if (selectedSession?.id === sessionId) {
         clearSelectedWorkout()
       }
@@ -216,24 +191,22 @@ export function useWorkoutHistory({
 
   const updateSessionLocation = useCallback(
     (workoutId: string, locationName: string | null) => {
-      // Patch the page-1 query cache (its rows are the query's, not local state)
-      // and any appended pages so the list reflects the edit immediately.
+      // Patch every loaded page in the query cache so the list reflects the
+      // edit immediately.
       queryClient.setQueryData(
         workoutHistoryListOptions({ limit, locationName: locationFilter }).queryKey,
         (current) =>
           current
             ? {
                 ...current,
-                data: current.data.map((s) =>
-                  s.id === workoutId ? { ...s, location_name: locationName ?? undefined } : s,
-                ),
+                pages: current.pages.map((page) => ({
+                  ...page,
+                  data: page.data.map((s) =>
+                    s.id === workoutId ? { ...s, location_name: locationName ?? undefined } : s,
+                  ),
+                })),
               }
             : current,
-      )
-      setAppendedPages((current) =>
-        current.map((s) =>
-          s.id === workoutId ? { ...s, location_name: locationName ?? undefined } : s,
-        ),
       )
       setSelectedSession((prev) => {
         if (!prev || prev.id !== workoutId) return prev

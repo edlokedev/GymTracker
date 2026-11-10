@@ -480,8 +480,11 @@ function formatMetricValue(value: number, metric: ProgressMetric): string {
 }
 
 function formatDuration(totalSeconds: number): string {
-  const minutes = Math.round(totalSeconds / 60)
-  if (minutes < 60) return `${minutes}m`
+  const seconds = Math.round(totalSeconds)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes < 60) return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
   const hours = Math.floor(minutes / 60)
   const remainingMinutes = minutes % 60
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`

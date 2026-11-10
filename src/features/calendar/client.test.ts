@@ -53,6 +53,15 @@ describe('calendar client queryOptions', () => {
     )
   })
 
+  it('calendarDataOptions keys two anchors in the same month by their different windows', () => {
+    expect(calendarDataOptions(new Date(2026, 2, 31)).queryKey).not.toEqual(
+      calendarDataOptions(new Date(2026, 2, 3)).queryKey,
+    )
+    expect(calendarDataOptions(new Date(2026, 2, 3)).queryKey).toEqual(
+      calendarDataOptions(new Date(2026, 2, 3, 18, 30)).queryKey,
+    )
+  })
+
   it('workoutDayOptions requests local date-only param and no userId', async () => {
     const details: WorkoutSessionWithSets[] = []
     const fetchMock = vi.fn(async () => Response.json({ success: true, data: details }))

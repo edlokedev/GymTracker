@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 import type { ExerciseProgress, ProgressFilters, ProgressState } from '@/lib/types/progress'
 import { fetchProgressData, progressDataOptions } from './client'
@@ -34,6 +34,9 @@ export function useProgressDashboard({ userId, initialFilters }: UseProgressDash
     queryKey: [...options.queryKey, userId],
     queryFn: () => fetchProgressData(dataFilters),
     enabled: Boolean(userId),
+    // Keep the last data on screen while a changed filter refetches, so the
+    // controls (open <details>, focus) are not unmounted for the skeleton.
+    placeholderData: keepPreviousData,
   })
   const data = userId ? (query.data?.progress ?? EMPTY_PROGRESS) : EMPTY_PROGRESS
   const selectedExerciseId = data.some((exercise) => exercise.exerciseId === preferredExerciseId)
@@ -48,7 +51,7 @@ export function useProgressDashboard({ userId, initialFilters }: UseProgressDash
     filters: metric === filters.metric ? filters : { ...filters, metric },
     data,
     selectedExerciseId,
-    isLoading: Boolean(userId) && query.isFetching,
+    isLoading: Boolean(userId) && query.isPending,
     error: userId && query.error ? query.error.message : null,
   }
 

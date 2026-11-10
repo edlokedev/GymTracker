@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import dayjs from 'dayjs'
 import { useCallback, useMemo, useState } from 'react'
 import type { CalendarState, WorkoutSessionWithSets } from '@/lib/types/calendar'
 import { getRolling30DayRange } from '@/lib/utils/calendar'
@@ -91,9 +92,10 @@ export const useCalendarData = (userId: string) => {
       // derived query key changes, so Query fetches the new window (issue #0003
       // calendar-site fix).
       setCurrentDate((prev) => {
-        const next = new Date(prev)
-        next.setMonth(next.getMonth() + (direction === 'next' ? 1 : -1))
-        return next
+        // dayjs clamps to month end (Mar 31 -1mo = Feb 28) where setMonth overflows.
+        return dayjs(prev)
+          .add(direction === 'next' ? 1 : -1, 'month')
+          .toDate()
       })
     }, []),
 

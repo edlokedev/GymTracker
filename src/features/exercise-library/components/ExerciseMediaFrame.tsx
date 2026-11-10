@@ -17,14 +17,14 @@ export default function ExerciseMediaFrame({
   imageClassName,
   iconClassName,
 }: ExerciseMediaFrameProps) {
-  const { gifUrl, previewImageUrl, placeholderUrl } = getExerciseMediaUrls(exercise)
-  const [mediaSrc, setMediaSrc] = useState<string>(gifUrl || previewImageUrl || placeholderUrl)
+  const { gifUrl, previewImageUrl } = getExerciseMediaUrls(exercise)
+  const [mediaSrc, setMediaSrc] = useState<string | null>(gifUrl || previewImageUrl)
   const [isFallbackMedia, setIsFallbackMedia] = useState(Boolean(!gifUrl && previewImageUrl))
 
   useEffect(() => {
-    setMediaSrc(gifUrl || previewImageUrl || placeholderUrl)
+    setMediaSrc(gifUrl || previewImageUrl)
     setIsFallbackMedia(Boolean(!gifUrl && previewImageUrl))
-  }, [gifUrl, previewImageUrl, placeholderUrl])
+  }, [gifUrl, previewImageUrl])
 
   const handleMediaError = () => {
     if (!isFallbackMedia && previewImageUrl) {
@@ -33,22 +33,23 @@ export default function ExerciseMediaFrame({
       return
     }
 
-    if (mediaSrc !== placeholderUrl) {
-      setMediaSrc(placeholderUrl)
-      setIsFallbackMedia(true)
-    }
+    // No usable media: drop the <img> so the fallback icon behind it shows.
+    setMediaSrc(null)
+    setIsFallbackMedia(true)
   }
 
   return (
     <div className={frameClassName}>
-      <img
-        src={mediaSrc}
-        alt={alt}
-        className={imageClassName}
-        loading="lazy"
-        decoding="async"
-        onError={handleMediaError}
-      />
+      {mediaSrc && (
+        <img
+          src={mediaSrc}
+          alt={alt}
+          className={imageClassName}
+          loading="lazy"
+          decoding="async"
+          onError={handleMediaError}
+        />
+      )}
       <div className={iconClassName}>
         <svg className="h-12 w-12 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

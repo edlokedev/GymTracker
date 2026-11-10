@@ -5,8 +5,6 @@ import type { ExerciseWithParsedFields } from './types/database'
 // with absolute jsDelivr URLs which pass through untouched.
 const EXERCISE_MEDIA_BASE_PATH = '/images/exercises'
 
-export const EXERCISE_PLACEHOLDER_IMAGE = '/images/placeholder-exercise.png'
-
 function isAbsoluteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value) || value.startsWith('//')
 }
@@ -23,6 +21,5 @@ export function getExerciseMediaUrls(
   return {
     gifUrl: resolveMediaUrl(exercise.gif_path),
     previewImageUrl: resolveMediaUrl(exercise.preview_image_path),
-    placeholderUrl: EXERCISE_PLACEHOLDER_IMAGE,
   }
 }

@@ -37,8 +37,8 @@ export interface ProgressParams {
 export const queryKeys = {
   calendar: {
     all: ['calendar'] as const,
-    /** Rolling-window calendar summary for a given month/anchor date. */
-    data: (month: string) => ['calendar', 'data', { month }] as const,
+    /** Rolling-window calendar summary, keyed by the exact YYYY-MM-DD window requested. */
+    data: (start: string, end: string) => ['calendar', 'data', { start, end }] as const,
     /** Day drill-down (WorkoutDetailModal). */
     day: (date: string) => ['calendar', 'day', date] as const,
   },

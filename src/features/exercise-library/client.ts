@@ -68,9 +68,10 @@ export async function fetchExerciseFacetCatalog(): Promise<ExerciseFacetCatalog>
 export async function searchExerciseLibrary(
   filters: ExerciseLibraryFilters,
   options: { limit: number; offset: number },
+  signal?: AbortSignal,
 ): Promise<ExerciseSearchResult> {
   const params = filtersToApiSearchParams(filters, options)
-  const response = await fetch(`/api/exercises/search?${params.toString()}`)
+  const response = await fetch(`/api/exercises/search?${params.toString()}`, { signal })
   // The envelope's `data` field carries the search payload directly. The
   // server is now the single source of truth for `hasMore`, so no client-side
   // fallback is needed.
@@ -211,8 +212,8 @@ export function exerciseSearchOptions(
   return infiniteQueryOptions({
     queryKey: queryKeys.exercises.search(searchFilterKey(filters)),
     initialPageParam: 0,
-    queryFn: ({ pageParam }) =>
-      searchExerciseLibrary(filters, { limit: pageSize, offset: pageParam }),
+    queryFn: ({ pageParam, signal }) =>
+      searchExerciseLibrary(filters, { limit: pageSize, offset: pageParam }, signal),
     getNextPageParam: (lastPage, allPages) =>
       lastPage.hasMore ? allPages.reduce((sum, page) => sum + page.items.length, 0) : undefined,
   })

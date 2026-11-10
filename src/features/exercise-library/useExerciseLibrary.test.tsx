@@ -20,16 +20,106 @@ const makeExercise = (id: string, name: string): ExerciseWithParsedFields => ({
 })
 
 // renderHook helper that provides a fresh QueryClient (ADR-0007, Phase 3). The
+// Signed in by default (private favourites/recents queries are gated on a user).
 // hook is now a façade over four query-backed hooks, so every test wraps it.
 function renderLibrary(options: Parameters<typeof useExerciseLibrary>[0]) {
   const { wrapper, queryClient } = createQueryWrapper()
-  const rendered = renderHook(() => useExerciseLibrary(options), { wrapper })
+  const rendered = renderHook(() => useExerciseLibrary({ userId: 'user-1', ...options }), {
+    wrapper,
+  })
   return { ...rendered, queryClient }
 }
 
 describe('useExerciseLibrary', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('does not call private favourites/recents routes for signed-out visitors', async () => {
+    const urls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        urls.push(url)
+        if (url.startsWith('/api/exercises/search')) {
+          return Response.json({
+            success: true,
+            data: { items: [], total: 0, page: 1, totalPages: 1, hasMore: false },
+          })
+        }
+        if (url.startsWith('/api/exercise-favorites') || url.startsWith('/api/exercises/recent')) {
+          return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        return Response.json({ data: [] })
+      }),
+    )
+
+    const signedOut = renderLibrary({ initialSearch: { query: '' }, userId: undefined })
+    await waitFor(() => expect(urls.some((u) => u.startsWith('/api/exercises/search'))).toBe(true))
+    await waitFor(() => expect(signedOut.result.current.isLoading).toBe(false))
+    expect(urls.some((u) => u.startsWith('/api/exercise-favorites'))).toBe(false)
+    expect(urls.some((u) => u.startsWith('/api/exercises/recent'))).toBe(false)
+    expect(signedOut.result.current.isLoadingFavorites).toBe(false)
+    expect(signedOut.result.current.isLoadingQuickPicks).toBe(false)
+
+    renderLibrary({ initialSearch: { query: '' } })
+    await waitFor(() =>
+      expect(urls.some((u) => u.startsWith('/api/exercise-favorites'))).toBe(true),
+    )
+    expect(urls.some((u) => u.startsWith('/api/exercises/recent'))).toBe(true)
+  })
+
+  it('keeps loadMore referentially stable across unrelated re-renders', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.startsWith('/api/exercises/search')) {
+          return Response.json({
+            success: true,
+            data: { items: [], total: 0, page: 1, totalPages: 1, hasMore: false },
+          })
+        }
+        if (url.startsWith('/api/exercise-favorites') || url.startsWith('/api/exercises/recent')) {
+          return Response.json({ success: true, data: { items: [], exerciseIds: [] } })
+        }
+        return Response.json({ data: [] })
+      }),
+    )
+    const { result, rerender } = renderLibrary({ initialSearch: { query: '' } })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    await waitFor(() => expect(result.current.isLoadingFavorites).toBe(false))
+    const first = result.current.actions.loadMore
+    rerender()
+    rerender()
+    expect(result.current.actions.loadMore).toBe(first)
+  })
+
+  it('loadSuggestedExercises resolves (no unhandled rejection) when suggestions fail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.startsWith('/api/exercises/suggestions') || url.includes('suggest')) {
+          return Response.json({ success: false, error: 'nope' }, { status: 500 })
+        }
+        if (url.startsWith('/api/exercises/search')) {
+          return Response.json({
+            success: true,
+            data: { items: [], total: 0, page: 1, totalPages: 1, hasMore: false },
+          })
+        }
+        if (url.startsWith('/api/exercise-favorites') || url.startsWith('/api/exercises/recent')) {
+          return Response.json({ success: true, data: { items: [], exerciseIds: [] } })
+        }
+        return Response.json({ data: [] })
+      }),
+    )
+    const { result } = renderLibrary({ initialSearch: { query: '' } })
+    await expect(
+      result.current.actions.loadSuggestedExercises({ exerciseId: 'squat', limit: 6 }),
+    ).resolves.toBeUndefined()
   })
 
   it('loads facets and searches from initial filters', async () => {

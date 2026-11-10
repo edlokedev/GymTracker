@@ -1,5 +1,6 @@
 // React import omitted (automatic runtime)
-import { parseCalendarDate } from '@/lib/utils/calendar'
+import dayjs from 'dayjs'
+import { getLocalCalendarDate, parseCalendarDate } from '@/lib/utils/calendar'
 
 interface WorkoutSummaryStatsProps {
   stats: {
@@ -34,10 +35,11 @@ export function WorkoutSummaryStats({ stats, isLoading }: WorkoutSummaryStatsPro
     if (!date) return 'Never'
 
     const workoutDate = parseCalendarDate(date)
-    const now = new Date()
-    const diffTime = Math.abs(now.getTime() - workoutDate.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    // Whole calendar days (both sides at local midnight), so a workout today is
+    // 0 days ago rather than rounding up to "Yesterday".
+    const diffDays = Math.abs(dayjs(getLocalCalendarDate()).diff(dayjs(date), 'day'))
 
+    if (diffDays === 0) return 'Today'
     if (diffDays === 1) return 'Yesterday'
     if (diffDays < 7) return `${diffDays} days ago`
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`

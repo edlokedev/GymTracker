@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import type { ActiveExerciseFilterChip } from '../model'
 import ExerciseFacetFilter, { type ExerciseFacetOption } from './ExerciseFacetFilter'
@@ -23,6 +23,8 @@ interface ExerciseBrowserFiltersProps {
   onRemoveFilter: (chip: ActiveExerciseFilterChip) => void
   onResetFilters: () => void
 }
+
+const QUERY_DEBOUNCE_MS = 300
 
 export function ExerciseBrowserFilters(props: ExerciseBrowserFiltersProps) {
   return (
@@ -173,6 +175,35 @@ function ExerciseSearchField({
   query: string
   onQueryChange: (query: string) => void
 }) {
+  // Keystrokes update local state at once; the (URL-navigating, fetching)
+  // onQueryChange fires after a pause, like the picker's ExerciseSelector.
+  const [draft, setDraft] = useState(query)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const lastCommittedRef = useRef(query)
+
+  // A query that differs from what we last committed came from outside (back/
+  // forward, reset filters): adopt it and drop any pending debounced commit.
+  useEffect(() => {
+    if (query === lastCommittedRef.current) return
+    clearTimeout(debounceRef.current)
+    lastCommittedRef.current = query
+    setDraft(query)
+  }, [query])
+
+  // Clear the pending timer on unmount so a late commit never fires.
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current)
+  }, [])
+
+  const handleChange = (value: string) => {
+    setDraft(value)
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      lastCommittedRef.current = value
+      onQueryChange(value)
+    }, QUERY_DEBOUNCE_MS)
+  }
+
   return (
     <div className="space-y-2">
       <label
@@ -200,8 +231,8 @@ function ExerciseSearchField({
         <input
           id="exercise-search"
           type="text"
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
+          value={draft}
+          onChange={(event) => handleChange(event.target.value)}
           placeholder="Search by name or muscle..."
           className="w-full rounded-md border border-gray-300 bg-white py-2.5 pr-3 pl-9 text-sm text-gray-900 placeholder-gray-500 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950/50 dark:text-white dark:placeholder-slate-500"
         />

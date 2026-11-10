@@ -60,6 +60,7 @@ export default function ExerciseSelector({
   const library = useExerciseLibrary({
     initialSearch: emptyExerciseLibrarySearch,
     enabled: shouldLoad,
+    userId: user?.id,
   })
 
   // P1: begin loading the catalog only once the user signals intent to open the

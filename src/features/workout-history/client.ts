@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 import { buildSearchParams, readApiData, readApiSuccess } from '@/lib/api'
 import { queryKeys } from '@/lib/api/query-keys'
 import type { WorkoutSessionWithSets } from '@/lib/types/calendar'
@@ -24,16 +24,12 @@ async function fetchWorkoutHistoryPage({
 }
 
 /**
- * Query options for the FIRST page of the workout-sessions list (ADR-0007,
- * Phase 2). Keyed by `{ limit, locationName }` via `queryKeys.workoutSessions.list`
- * — the offset is intentionally excluded so a filter change produces a distinct
- * cache entry and TanStack Query guarantees last-request-wins, retiring the
- * hand-rolled stale-response race in the old `loadSessions` (audit finding: the
- * only race guard `prefillRequestRef` lived in one place; history had none).
- *
- * Subsequent pages ("load more") are fetched imperatively via
- * `fetchWorkoutHistoryPage` and appended in the hook — they extend, not replace,
- * the rendered list, so they are not a race site.
+ * Infinite-query options for the workout-sessions list (ADR-0007, Phase 2).
+ * Keyed by `{ limit, locationName }` via `queryKeys.workoutSessions.list` — the
+ * offset is intentionally excluded (it is the page param), so a filter change
+ * produces a distinct cache entry. Every loaded page lives in that one entry:
+ * a stale "load more" for an old filter lands in the old entry, and an
+ * invalidation refetches all loaded pages together, so pages never overlap.
  */
 export function workoutHistoryListOptions({
   limit,
@@ -42,13 +38,14 @@ export function workoutHistoryListOptions({
   limit: number
   locationName?: string
 }) {
-  return queryOptions({
+  return infiniteQueryOptions({
     queryKey: queryKeys.workoutSessions.list({ limit, locationName }),
-    queryFn: () => fetchWorkoutHistoryPage({ limit, offset: 0, locationName }),
+    queryFn: ({ pageParam }) => fetchWorkoutHistoryPage({ limit, offset: pageParam, locationName }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.reduce((count, page) => count + page.data.length, 0) : undefined,
   })
 }
-
-export { fetchWorkoutHistoryPage as loadWorkoutHistoryPage }
 
 /**
  * Query options for a single session's detail (ADR-0007, Phase 2), keyed

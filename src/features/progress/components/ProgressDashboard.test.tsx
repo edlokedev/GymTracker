@@ -147,4 +147,61 @@ describe('ProgressDashboard', () => {
     fireEvent.change(exerciseSelect, { target: { value: 'bench' } })
     expect(setSelectedExerciseId).toHaveBeenCalledWith('bench')
   })
+
+  it('shows short durations with seconds so a 20s plank is not 0m', () => {
+    const plank: ExerciseProgress = {
+      ...bench,
+      exerciseId: 'plank',
+      exerciseName: 'plank',
+      dataPoints: bench.dataPoints.map((point, index) => ({
+        ...point,
+        exerciseId: 'plank',
+        exerciseName: 'plank',
+        weight: null,
+        reps: null,
+        volume: 0,
+        durationSeconds: index === 0 ? 20 : 80,
+      })),
+    }
+    vi.mocked(useProgressDashboard).mockReturnValue({
+      state: {
+        filters: {
+          exerciseIds: [],
+          dateRange: { start: '2026-06-01', end: '2026-07-08' },
+          metric: 'duration',
+        },
+        data: [plank],
+        selectedExerciseId: 'plank',
+        isLoading: false,
+        error: null,
+      },
+      chartPoints: plank.dataPoints.map((point) => ({
+        date: point.date,
+        value: point.durationSeconds ?? 0,
+        exerciseName: point.exerciseName,
+        isPersonalRecord: point.isPersonalRecord,
+        volume: point.volume,
+        weight: point.weight,
+        reps: point.reps,
+        durationSeconds: point.durationSeconds,
+        distanceKm: point.distanceKm,
+        speedKmh: point.speedKmh,
+      })),
+      actions: {
+        setMetric: vi.fn(),
+        setDatePreset: vi.fn(),
+        setDateRange: vi.fn(),
+        setExerciseIds: vi.fn(),
+        setSelectedExerciseId: vi.fn(),
+        setFilters: vi.fn(),
+        refresh: vi.fn(),
+      },
+    })
+
+    render(<ProgressDashboard />)
+
+    // Latest and best are both the 80s set; the 20s set must not read "0m".
+    expect(screen.getAllByText('1m 20s').length).toBeGreaterThan(0)
+    expect(screen.queryByText('1m')).not.toBeInTheDocument()
+  })
 })

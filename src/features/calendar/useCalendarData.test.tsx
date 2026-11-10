@@ -240,4 +240,32 @@ describe('useCalendarData', () => {
     expect(result.current.state.summaryStats.totalWorkouts).toBe(marker(finalMonth))
     expect(result.current.state.workoutData[0]?.date.slice(0, 7)).toBe(finalMonth)
   })
+
+  it('navigateMonth clamps month-end anchors instead of overflowing', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 2, 31, 12))
+    const ends: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input), 'http://localhost')
+        ends.push(url.searchParams.get('end') ?? '')
+        return Response.json(calendarEnvelope({ workoutDate: '2026-03-10', totalWorkouts: 1 }))
+      }),
+    )
+
+    try {
+      const { wrapper } = createQueryWrapper()
+      const { result } = renderHook(() => useCalendarData('user-1'), { wrapper })
+      await waitFor(() => expect(ends).toEqual(['2026-03-31']))
+
+      act(() => {
+        result.current.actions.navigateMonth('prev')
+      })
+      await waitFor(() => expect(ends).toContain('2026-02-28'))
+      expect(ends).not.toContain('2026-03-03')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

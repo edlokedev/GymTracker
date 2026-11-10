@@ -126,6 +126,35 @@ describe('useProgressDashboard', () => {
     expect(result.current.state.selectedExerciseId).toBe('squat')
   })
 
+  it('keeps showing data (not the skeleton) while a changed filter refetches', async () => {
+    let resolveSecond!: (response: Response) => void
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ success: true, data: { progress: [progress] } }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveSecond = resolve
+          }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    const { result } = renderHook(() => useProgressDashboard({ userId: 'user-1' }), {
+      wrapper: createQueryWrapper().wrapper,
+    })
+    await waitFor(() => expect(result.current.state.data).toHaveLength(1))
+    expect(result.current.state.isLoading).toBe(false)
+
+    act(() => result.current.actions.setDateRange({ start: '2026-01-01', end: '2026-01-31' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+
+    expect(result.current.state.isLoading).toBe(false)
+    expect(result.current.state.data).toHaveLength(1)
+    await act(async () => {
+      resolveSecond(Response.json({ success: true, data: { progress: [newerProgress] } }))
+    })
+    await waitFor(() => expect(result.current.state.data[0]?.exerciseId).toBe('squat'))
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
   })

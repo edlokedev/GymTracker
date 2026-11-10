@@ -34,7 +34,13 @@ export function useExerciseQuickPicks(enabled: boolean) {
       setSuggestionParams(options)
       // Return the settled data so callers that await it (parity with the old
       // imperative loader) see the fetched list.
-      await queryClient.ensureQueryData(suggestedExercisesOptions(options))
+      // A failed load is not thrown at callers (they fire-and-forget it): the
+      // error stays on the suggestions query and the list simply stays empty.
+      try {
+        await queryClient.ensureQueryData(suggestedExercisesOptions(options))
+      } catch {
+        // surfaced via suggestedQuery.error
+      }
     },
     [queryClient],
   )

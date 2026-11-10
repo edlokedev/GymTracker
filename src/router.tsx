@@ -12,10 +12,15 @@ function parseSearch(search: string): Record<string, unknown> {
   for (const [key, rawValue] of searchParams.entries()) {
     let value: unknown = rawValue
 
-    try {
-      value = JSON.parse(rawValue)
-    } catch {
-      value = rawValue
+    // Only structured values are JSON-decoded. Scalars stay strings: decoding
+    // them turned user text like `100`, `true` or `null` into a number/boolean/
+    // null that route validators then discarded.
+    if (rawValue.startsWith('{') || rawValue.startsWith('[')) {
+      try {
+        value = JSON.parse(rawValue)
+      } catch {
+        value = rawValue
+      }
     }
 
     const existingValue = parsed[key]

@@ -45,7 +45,7 @@ describe('workout-history client queryOptions', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const options = workoutHistoryListOptions({ limit: 20, locationName: 'Home Gym' })
-    await options.queryFn?.({} as never)
+    await options.queryFn?.({ pageParam: 0 } as never)
 
     const url = lastFetchUrl(fetchMock)
     expect(url.pathname).toBe('/api/workout-sessions')

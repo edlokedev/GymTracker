@@ -65,7 +65,12 @@ describe('useWorkoutHistory', () => {
       await result.current.actions.loadMore()
     })
 
-    expect(result.current.sessions.map((session) => session.id)).toEqual(['session-1', 'session-2'])
+    await waitFor(() =>
+      expect(result.current.sessions.map((session) => session.id)).toEqual([
+        'session-1',
+        'session-2',
+      ]),
+    )
     expect(result.current.hasMore).toBe(false)
   })
 
@@ -290,5 +295,98 @@ describe('useWorkoutHistory', () => {
     // The stale responses must NOT clobber the final filter's rendered list.
     await waitFor(() => expect(result.current.sessions.map((s) => s.name)).toEqual(['Gym B']))
     expect(result.current.locationFilter).toBe('Gym B')
+  })
+
+  it('delete after load-more never duplicates rows (refetched page 1 vs loaded pages)', async () => {
+    let rows = ['a', 'b', 'c'].map((id) => makeSession({ id, name: id }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input), 'http://localhost')
+        if (init?.method === 'DELETE') {
+          rows = rows.filter((r) => r.id !== url.searchParams.get('id'))
+          return Response.json({ success: true, data: {} })
+        }
+        const limit = Number(url.searchParams.get('limit'))
+        const offset = Number(url.searchParams.get('offset') ?? 0)
+        return Response.json({
+          success: true,
+          data: {
+            data: rows.slice(offset, offset + limit),
+            total: rows.length,
+            page: 1,
+            limit,
+            hasMore: offset + limit < rows.length,
+          },
+        })
+      }),
+    )
+
+    const { wrapper } = createQueryWrapper()
+    const { result } = renderHook(
+      () => useWorkoutHistory({ userId: 'user-1', mode: 'history', limit: 2 }),
+      { wrapper },
+    )
+    await waitFor(() => expect(result.current.sessions.map((s) => s.id)).toEqual(['a', 'b']))
+    await act(async () => {
+      await result.current.actions.loadMore()
+    })
+    await waitFor(() => expect(result.current.sessions.map((s) => s.id)).toEqual(['a', 'b', 'c']))
+
+    await act(async () => {
+      await result.current.actions.deleteSession('a')
+    })
+    await waitFor(() => expect(result.current.sessions.map((s) => s.id)).toEqual(['b', 'c']))
+    expect(result.current.hasMore).toBe(false)
+  })
+
+  it('a slow load-more from a previous filter never lands in the new filter list', async () => {
+    let releaseOldPage2: (r: Response) => void = () => {}
+    const page = (ids: string[], hasMore: boolean) =>
+      Response.json({
+        success: true,
+        data: {
+          data: ids.map((id) => makeSession({ id, name: id })),
+          total: 9,
+          page: 1,
+          limit: 1,
+          hasMore,
+        },
+      })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = new URL(String(input), 'http://localhost')
+        const loc = url.searchParams.get('location_name')
+        const offset = url.searchParams.get('offset')
+        if (loc === 'Gym A') return Promise.resolve(page(['gym-a-1'], false))
+        if (offset === '0') return Promise.resolve(page(['all-1'], true))
+        return new Promise<Response>((resolve) => {
+          releaseOldPage2 = resolve
+        })
+      }),
+    )
+
+    const { wrapper } = createQueryWrapper()
+    const { result } = renderHook(
+      () => useWorkoutHistory({ userId: 'user-1', mode: 'history', limit: 1 }),
+      { wrapper },
+    )
+    await waitFor(() => expect(result.current.sessions.map((s) => s.id)).toEqual(['all-1']))
+
+    let pending: Promise<void> = Promise.resolve()
+    act(() => {
+      pending = result.current.actions.loadMore()
+    })
+    act(() => {
+      result.current.actions.filterByLocation('Gym A')
+    })
+    await waitFor(() => expect(result.current.sessions.map((s) => s.id)).toEqual(['gym-a-1']))
+
+    await act(async () => {
+      releaseOldPage2(page(['all-2'], false))
+      await pending
+    })
+    expect(result.current.sessions.map((s) => s.id)).toEqual(['gym-a-1'])
   })
 })

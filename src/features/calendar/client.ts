@@ -21,16 +21,17 @@ function calendarDataSearchParams(dateRange: { start: Date; end: Date }): URLSea
 
 /**
  * Query options for the rolling-30-day calendar window anchored on `anchorDate`.
- * The month key is derived from the anchor so navigating months produces a
- * distinct cache entry — TanStack Query then guarantees last-request-wins,
+ * The key is the exact start/end day strings the request sends, so any two
+ * different windows get distinct cache entries — TanStack Query then guarantees last-request-wins,
  * retiring the hand-rolled stale-response race in the old useCalendarData.
  */
 export function calendarDataOptions(anchorDate: Date) {
   const dateRange = getRolling30DayRange(anchorDate)
-  const month = getLocalCalendarDate(anchorDate).slice(0, 7) // YYYY-MM
+  const start = getLocalCalendarDate(dateRange.start)
+  const end = getLocalCalendarDate(dateRange.end)
 
   return queryOptions({
-    queryKey: queryKeys.calendar.data(month),
+    queryKey: queryKeys.calendar.data(start, end),
     queryFn: async () => {
       const params = calendarDataSearchParams(dateRange)
       const response = await fetch(`/api/calendar-data?${params.toString()}`)

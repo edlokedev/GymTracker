@@ -15,6 +15,10 @@ interface UseExerciseLibraryOptions {
   // exercise picker defer the whole catalog load until the user signals intent
   // (P1). Defaults to true so the dedicated /exercises browser loads eagerly.
   enabled?: boolean
+  // Signed-in user id. Favourites, recents and suggestions are private routes,
+  // so those queries stay off for signed-out visitors (the public catalog,
+  // facets and search are unaffected).
+  userId?: string
 }
 
 /**
@@ -46,8 +50,9 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
   // served entirely from the favourites cache (ADR-0005), so we never pay a
   // catalog search for it.
   const search = useExerciseSearch(filters.filters, enabled && !favouritesActive, pageSize)
-  const favorites = useFavoriteExercises(enabled)
-  const quickPicks = useExerciseQuickPicks(enabled)
+  const privateEnabled = enabled && Boolean(options.userId)
+  const favorites = useFavoriteExercises(privateEnabled)
+  const quickPicks = useExerciseQuickPicks(privateEnabled)
 
   const { categoryLabelById, activeFilterChips } = filters.buildChips(search.categories)
 
@@ -58,10 +63,11 @@ export function useExerciseLibrary(options: UseExerciseLibraryOptions = {}) {
   const total = favouritesActive ? favorites.favoriteExercises.length : search.total
   const hasMore = favouritesActive ? false : search.hasMore
 
+  const { isLoadingMore, hasMore: searchHasMore, fetchNextPage } = search
   const loadMore = useCallback(async () => {
-    if (favouritesActive || search.isLoadingMore || !search.hasMore) return
-    await search.fetchNextPage()
-  }, [favouritesActive, search])
+    if (favouritesActive || isLoadingMore || !searchHasMore) return
+    await fetchNextPage()
+  }, [favouritesActive, isLoadingMore, searchHasMore, fetchNextPage])
 
   const quickPickLists = useMemo(
     () =>

@@ -404,6 +404,7 @@ describe('Exercise Library components', () => {
   })
 
   it('shows labelled loading states and hides tab badges until quick picks settle', async () => {
+    authUser.current = { id: 'user-1' }
     const { resolveRecent, resolveFavorites } = mockExerciseLibraryFetchPendingQuickPicks()
 
     renderWithQuery(<ExerciseSelector onSelectExercise={vi.fn()} />)
@@ -522,7 +523,7 @@ describe('Exercise Library components', () => {
     const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>
     const searchedForBench = () =>
       fetchMock.mock.calls
-        .map(([input]: [RequestInfo | URL]) => String(input))
+        .map((call) => String(call[0]))
         .some(
           (url: string) => url.startsWith('/api/exercises/search') && url.includes('query=bench'),
         )

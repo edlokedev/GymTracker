@@ -72,6 +72,7 @@ export default function ExerciseBrowser({
   const library = useExerciseLibrary({
     routeSearch: initialFilters,
     onRouteSearchChange: handleRouteSearchChange,
+    userId,
   })
 
   const categoryOptions: ExerciseFacetOption[] = useMemo(
