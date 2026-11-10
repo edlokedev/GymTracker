@@ -817,4 +817,74 @@ describe('WorkoutSessionManager', () => {
     )
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
+
+  // P3: a closed <details> must not mount its history, or an 8-exercise
+  // workout fires 8 history requests on mount.
+  it('mounts exercise history only once its disclosure has been opened', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ success: true, data: makeWorkoutDetails() })),
+    )
+
+    const { container } = renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+
+    expect(screen.queryByText('Mock exercise history')).not.toBeInTheDocument()
+
+    const details = container.querySelector('details') as HTMLDetailsElement
+    details.open = true
+
+    await waitFor(() => expect(screen.getByText('Mock exercise history')).toBeInTheDocument())
+  })
+
+  // I4: the sticky bar's Save Set must show the saving state and stop taking
+  // taps while the set request is in flight.
+  it('disables the sticky Save Set button while a set is saving', async () => {
+    let releaseSave: (() => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('includeDetails=true')) {
+          return Response.json({ success: true, data: makeWorkoutDetails() })
+        }
+        if (url === '/api/workout-sets' && init?.method === 'POST') {
+          await new Promise<void>((resolve) => {
+            releaseSave = resolve
+          })
+          return Response.json({
+            success: true,
+            data: {
+              id: 'set-2',
+              workout_id: 'session-1',
+              exercise_id: 'bench-press',
+              set_number: 2,
+              reps: 8,
+              weight: 100,
+              created_at: '2026-05-01T10:00:00.000Z',
+              updated_at: '2026-05-01T10:00:00.000Z',
+            },
+          })
+        }
+        return Response.json({ success: true, data: [] })
+      }),
+    )
+
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Bench Press' })).toBeInTheDocument(),
+    )
+
+    const stickyButton = screen.getAllByRole('button', { name: 'Save Set' }).at(-1) as HTMLElement
+    expect(stickyButton).toBeEnabled()
+    fireEvent.click(stickyButton)
+
+    await waitFor(() => expect(stickyButton).toBeDisabled())
+    expect(stickyButton).toHaveTextContent('Saving...')
+
+    releaseSave?.()
+    await waitFor(() => expect(stickyButton).toBeEnabled())
+  })
 })

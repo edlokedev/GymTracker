@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import LoginPage from '@/features/auth/components/LoginPage'
 import WorkoutSessionManager from '@/features/workout-session/components/WorkoutSessionManager'
@@ -30,7 +30,17 @@ export const Route = createFileRoute('/workout')({
 export function WorkoutPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const { sessionId, templateId } = Route.useSearch()
+  const navigate = useNavigate()
   const [currentSession, setCurrentSession] = useState<WorkoutSession | null>(null)
+
+  // Leaving ?sessionId=... (e.g. editing a workout, then opening plain /workout)
+  // must drop the old session, or new sets would keep logging into it. The
+  // manager is deliberately not re-keyed on the id: that would remount it when a
+  // started session writes its id to the URL and lose a template's planned
+  // exercises.
+  useEffect(() => {
+    if (!sessionId) setCurrentSession(null)
+  }, [sessionId])
 
   // When the page is opened with ?sessionId=... we seed `currentSession`
   // with just enough scaffolding for the editor to hydrate. The full
@@ -72,6 +82,11 @@ export function WorkoutPage() {
   }
 
   const handleSessionSave = (session: WorkoutSession) => {
+    // Put the active session in the URL (replacing ?templateId=...) so a reload
+    // reopens it instead of starting a second session and orphaning this one.
+    if (session.id !== sessionId) {
+      void navigate({ to: '/workout', search: { sessionId: session.id }, replace: true })
+    }
     if (isStartingTemplate) return
     setCurrentSession(session)
   }

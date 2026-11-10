@@ -51,6 +51,7 @@ export default function WorkoutSessionManager({
     activeExercise,
     isSessionStarted,
     isSessionReady,
+    isSavingSet,
     loading,
     saveStatus,
     commandStatus,
@@ -109,6 +110,9 @@ export default function WorkoutSessionManager({
   const [templateSaveError, setTemplateSaveError] = useState<string | null>(null)
   const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(() => new Set())
   const [submitSignal, setSubmitSignal] = useState(0)
+  // Exercises whose history disclosure has been opened; history is mounted lazily
+  // so a long workout does not fire one history request per exercise on load.
+  const [historyOpenedIds, setHistoryOpenedIds] = useState<Set<string>>(() => new Set())
   const exerciseRefs = useRef<Record<string, HTMLDivElement | null>>({})
   // Tracks the session id we've already seeded completion state for, so editing a
   // completed workout pre-marks its done exercises exactly once — and never
@@ -705,7 +709,15 @@ export default function WorkoutSessionManager({
                       Done Exercise
                     </button>
 
-                    <details className="mt-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40">
+                    <details
+                      onToggle={(event) => {
+                        if (!event.currentTarget.open) return
+                        setHistoryOpenedIds((current) =>
+                          current.has(exerciseId) ? current : new Set(current).add(exerciseId),
+                        )
+                      }}
+                      className="mt-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40"
+                    >
                       <summary className="motion-press flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 font-semibold text-gray-700 text-sm dark:text-gray-200">
                         <span>Past performance and logged sets</span>
                         <span className="inline-flex items-center gap-2 text-gray-500 text-xs dark:text-gray-400">
@@ -731,7 +743,9 @@ export default function WorkoutSessionManager({
                             Past Performance
                           </h4>
                           <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                            <ExerciseHistory exerciseId={exerciseId} limit={15} />
+                            {historyOpenedIds.has(exerciseId) && (
+                              <ExerciseHistory exerciseId={exerciseId} limit={15} />
+                            )}
                           </div>
                         </div>
 
@@ -852,6 +866,7 @@ export default function WorkoutSessionManager({
           }
           canCompleteWorkout={totalSets > 0}
           loading={loading}
+          isSavingSet={isSavingSet}
           onDoneExercise={() => {
             if (activeExerciseId) {
               completeExercise(activeExerciseId)
@@ -947,6 +962,7 @@ function MobileWorkoutActionBar({
   activeExerciseHasSets,
   canCompleteWorkout,
   loading,
+  isSavingSet,
   onDoneExercise,
   onPrimaryAction,
   onCompleteWorkout,
@@ -959,6 +975,7 @@ function MobileWorkoutActionBar({
   activeExerciseHasSets: boolean
   canCompleteWorkout: boolean
   loading: boolean
+  isSavingSet: boolean
   onDoneExercise: () => void
   onPrimaryAction: () => void
   onCompleteWorkout: () => void
@@ -1005,10 +1022,10 @@ function MobileWorkoutActionBar({
         <button
           type="button"
           onClick={onPrimaryAction}
-          disabled={loading}
+          disabled={loading || isSavingSet}
           className="motion-press min-h-12 w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {primaryLabel}
+          {isSavingSet && primaryLabel === 'Save Set' ? 'Saving...' : primaryLabel}
         </button>
       </div>
     </div>
@@ -1038,7 +1055,8 @@ function LastSetSummary({
     if (set.reps) stats.push(`${set.reps} reps`)
     if (set.weight !== undefined) stats.push(`${set.weight} kg`)
   } else if (trackingType === 'cardio') {
-    if (set.duration_seconds) stats.push(`${set.duration_seconds / 60} min`)
+    if (set.duration_seconds)
+      stats.push(`${Math.round((set.duration_seconds / 60) * 100) / 100} min`)
     if (set.distance_km !== undefined) stats.push(`${set.distance_km} km`)
     if (set.incline !== undefined) stats.push(`incline ${set.incline}`)
     if (set.speed_kmh !== undefined) stats.push(`${set.speed_kmh} km/h`)

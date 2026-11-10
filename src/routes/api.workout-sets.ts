@@ -38,7 +38,7 @@ export const getWorkoutSets = async ({ user, supabase, url }: PrivateHandlerCont
 
 export const createWorkoutSet = async ({ supabase, request }: PrivateHandlerContext) => {
   const data = (await request.json()) as WorkoutSetInput
-  if (!data.workout_id || !data.exercise_id || !data.set_order) {
+  if (!data.workout_id || !data.exercise_id || data.set_order == null) {
     badRequest('Missing required fields: workout_id, exercise_id, and set_order are required')
   }
   return workoutSetQueries.create(supabase, data)

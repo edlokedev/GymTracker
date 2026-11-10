@@ -225,14 +225,15 @@ export interface WorkoutSetInput {
   workout_id: string
   exercise_id: string
   set_order: number // maps to set_number in database
-  reps?: number
-  weight?: number // weight in kg
-  rest_time?: number
-  notes?: string
-  duration_seconds?: number
-  distance_km?: number
-  incline?: number
-  speed_kmh?: number
+  // null = clear the stored value (update only); undefined = leave untouched
+  reps?: number | null
+  weight?: number | null // weight in kg
+  rest_time?: number | null
+  notes?: string | null
+  duration_seconds?: number | null
+  distance_km?: number | null
+  incline?: number | null
+  speed_kmh?: number | null
 }
 
 export interface CreateWorkoutInput {

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { queryKeys } from '@/lib/api/query-keys'
 import type {
   ExerciseWithParsedFields,
   WorkoutSession,
@@ -294,8 +295,8 @@ describe('useWorkoutSession', () => {
 
     await waitFor(() => expect(result.current.isSessionReady).toBe(true))
 
+    act(() => result.current.setSessionName('Pull Day'))
     await act(async () => {
-      result.current.setSessionName('Pull Day')
       await result.current.actions.saveSession()
     })
 
@@ -641,8 +642,8 @@ describe('useWorkoutSession', () => {
     await waitFor(() => expect(result.current.isSessionReady).toBe(true))
 
     let savePromise: Promise<void>
+    act(() => result.current.setSessionName('Pull Day'))
     act(() => {
-      result.current.setSessionName('Pull Day')
       savePromise = result.current.actions.saveSession()
     })
 
@@ -701,6 +702,8 @@ describe('useWorkoutSession', () => {
       await waitFor(() => expect(result.current.isSessionReady).toBe(true))
       expect(result.current.sessionDate).toBe('2026-05-01')
 
+      // An unchanged form is not saved, so edit a field to trigger the PATCH.
+      act(() => result.current.setSessionLocation('Home Gym'))
       await act(async () => {
         await result.current.actions.saveSession()
       })
@@ -858,6 +861,193 @@ describe('useWorkoutSession', () => {
         'bench-press',
         'deadlift',
       ])
+    })
+  })
+
+  // I2: /workout writes the new session id into the URL, which re-renders the
+  // hook with an existingSession scaffold. The server detail only knows
+  // exercises that have sets, so it must not wipe the template's planned ones.
+  it("keeps a template's planned exercises when the session id is adopted from the URL", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('action=startFromTemplate') && init?.method === 'POST') {
+        return Response.json({
+          success: true,
+          data: {
+            session: makeSession({ id: 'template-session', name: 'Push Plan' }),
+            template: makeWorkoutTemplate(),
+          },
+        })
+      }
+      if (url.includes('action=history')) return Response.json({ success: true, data: [] })
+      if (url.includes('includeDetails=true')) {
+        return Response.json({
+          success: true,
+          data: { ...makeSession({ id: 'template-session', name: 'Push Plan' }), exercises: [] },
+        })
+      }
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = createQueryWrapper()
+    const { result, rerender } = renderHook(
+      (props: Parameters<typeof useWorkoutSession>[0]) => useWorkoutSession(props),
+      {
+        wrapper,
+        initialProps: { initialTemplateId: 'template-1' } as Parameters<
+          typeof useWorkoutSession
+        >[0],
+      },
+    )
+    await waitFor(() => expect(result.current.session?.id).toBe('template-session'))
+    expect(result.current.exercises.map((item) => item.exercise.id)).toEqual([
+      'bench-press',
+      'squat',
+    ])
+
+    // The route now has ?sessionId=... and passes a scaffold.
+    rerender({
+      existingSession: {
+        id: 'template-session',
+        user_id: 'user-1',
+        date: '2026-05-01',
+        start_time: '2026-05-01T10:00:00.000Z',
+        created_at: new Date('2026-05-01T10:00:00.000Z'),
+        updated_at: new Date('2026-05-01T10:00:00.000Z'),
+      },
+    })
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes('includeDetails=true')),
+      ).toBe(true),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+
+    expect(result.current.exercises.map((item) => item.exercise.id)).toEqual([
+      'bench-press',
+      'squat',
+    ])
+    expect(result.current.sessionName).toBe('Push Plan')
+  })
+
+  // P2: every set write invalidates the session views, but the active session's
+  // own detail query is seeded once and its refetch is discarded: a wasted GET.
+  it('does not refetch the active session detail after saving a set', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('includeDetails=true')) {
+        return Response.json({ success: true, data: { ...makeSession(), exercises: [] } })
+      }
+      if (url === '/api/workout-sets' && init?.method === 'POST') {
+        return Response.json({ success: true, data: makeSet('set-1', 1) })
+      }
+      if (url.includes('action=history')) return Response.json({ success: true, data: [] })
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper, queryClient } = createQueryWrapper()
+    const { result } = renderHook(() => useWorkoutSession({ existingSession: makeSession() }), {
+      wrapper,
+    })
+    await waitFor(() => expect(result.current.isSessionReady).toBe(true))
+    const listKey = queryKeys.workoutSessions.list()
+    queryClient.setQueryData(listKey, [])
+    const detailGets = () =>
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('includeDetails=true')).length
+    expect(detailGets()).toBe(1)
+
+    await act(async () => {
+      await result.current.actions.saveSet('bench-press', {
+        workout_id: 'session-1',
+        exercise_id: 'bench-press',
+        set_order: 1,
+        reps: 8,
+      })
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+
+    expect(detailGets()).toBe(1)
+    // Other views still go stale: the list, and the detail entry for later visits.
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true)
+    expect(
+      queryClient.getQueryState(queryKeys.workoutSessions.detail('session-1'))?.isInvalidated,
+    ).toBe(true)
+  })
+
+  // P9: blur on a details field must not PATCH when nothing changed.
+  it('skips the session save when the details are unchanged', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('includeDetails=true')) {
+        return Response.json({ success: true, data: { ...makeSession(), exercises: [] } })
+      }
+      if (init?.method === 'PATCH') {
+        return Response.json({ success: true, data: makeSession({ name: 'Pull Day' }) })
+      }
+      throw new Error(`Unexpected fetch ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { result } = renderWorkoutSession({ existingSession: makeSession() })
+    await waitFor(() => expect(result.current.isSessionReady).toBe(true))
+    const patches = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
+
+    await act(async () => {
+      await result.current.actions.saveSession()
+    })
+    expect(patches()).toHaveLength(0)
+
+    act(() => result.current.setSessionName('Pull Day'))
+    await act(async () => {
+      await result.current.actions.saveSession()
+    })
+    expect(patches()).toHaveLength(1)
+  })
+
+  // I5: the duration stat must tick while the workout is live.
+  describe('live duration', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const stubDetail = () =>
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          Response.json({ success: true, data: { ...makeSession(), exercises: [] } }),
+        ),
+      )
+
+    it('advances while the session is active', () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+      vi.setSystemTime(new Date('2026-05-01T10:05:00.000Z'))
+      stubDetail()
+
+      const { result } = renderWorkoutSession({ existingSession: makeSession() })
+      expect(result.current.sessionDuration).toBe('5m')
+
+      act(() => {
+        vi.advanceTimersByTime(10 * 60 * 1000)
+      })
+      expect(result.current.sessionDuration).toBe('15m')
+    })
+
+    it('does not tick for a completed session', () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+      vi.setSystemTime(new Date('2026-05-01T12:00:00.000Z'))
+      stubDetail()
+
+      const { result } = renderWorkoutSession({
+        existingSession: makeSession({ end_time: '2026-05-01T10:45:00.000Z' }),
+      })
+      expect(result.current.sessionDuration).toBe('45m')
+      act(() => {
+        vi.advanceTimersByTime(10 * 60 * 1000)
+      })
+      expect(result.current.sessionDuration).toBe('45m')
     })
   })
 })

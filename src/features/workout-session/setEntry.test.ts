@@ -206,6 +206,113 @@ describe('set entry model', () => {
     })
   })
 
+  describe('clearing fields on update', () => {
+    const base = { exerciseId: 'bench-press', workoutId: 'session-1', setNumber: 2 }
+
+    it('sends null for cleared optional strength fields when updating', () => {
+      expect(
+        buildWorkoutSetInput({
+          ...base,
+          trackingType: 'strength',
+          forUpdate: true,
+          values: { ...strengthValues, weight: '', restTime: '', notes: '  ' },
+        }),
+      ).toEqual({
+        ok: true,
+        data: {
+          workout_id: 'session-1',
+          exercise_id: 'bench-press',
+          set_order: 2,
+          reps: 8,
+          weight: null,
+          rest_time: null,
+          notes: null,
+        },
+      })
+    })
+
+    it('sends null for cleared optional cardio fields when updating', () => {
+      expect(
+        buildWorkoutSetInput({
+          ...base,
+          trackingType: 'cardio',
+          forUpdate: true,
+          values: {
+            ...strengthValues,
+            reps: '',
+            weight: '',
+            durationMin: '30',
+            distanceKm: '',
+            incline: '',
+            speedKmh: '',
+            restTime: '',
+            notes: '',
+          },
+        }),
+      ).toEqual({
+        ok: true,
+        data: {
+          workout_id: 'session-1',
+          exercise_id: 'bench-press',
+          set_order: 2,
+          duration_seconds: 1800,
+          distance_km: null,
+          incline: null,
+          speed_kmh: null,
+          rest_time: null,
+          notes: null,
+        },
+      })
+    })
+
+    it('keeps undefined (not null) for cleared fields when creating', () => {
+      expect(
+        buildWorkoutSetInput({
+          ...base,
+          trackingType: 'strength',
+          values: { ...strengthValues, weight: '', restTime: '', notes: '' },
+        }),
+      ).toEqual({
+        ok: true,
+        data: {
+          workout_id: 'session-1',
+          exercise_id: 'bench-press',
+          set_order: 2,
+          reps: 8,
+          weight: undefined,
+          rest_time: undefined,
+          notes: undefined,
+        },
+      })
+    })
+  })
+
+  describe('comma decimals', () => {
+    it('accepts a comma as the decimal separator', () => {
+      expect(
+        buildWorkoutSetInput({
+          exerciseId: 'bench-press',
+          workoutId: 'session-1',
+          setNumber: 1,
+          trackingType: 'strength',
+          values: { ...strengthValues, weight: '62,5' },
+        }),
+      ).toMatchObject({ ok: true, data: { weight: 62.5 } })
+    })
+
+    it('still rejects non-numeric weight', () => {
+      expect(
+        buildWorkoutSetInput({
+          exerciseId: 'bench-press',
+          workoutId: 'session-1',
+          setNumber: 1,
+          trackingType: 'strength',
+          values: { ...strengthValues, weight: 'abc' },
+        }),
+      ).toMatchObject({ ok: false, error: 'invalid-weight' })
+    })
+  })
+
   it('formats rest time for display', () => {
     expect(formatSetRestTime(45)).toBe('45s')
     expect(formatSetRestTime(60)).toBe('1m')

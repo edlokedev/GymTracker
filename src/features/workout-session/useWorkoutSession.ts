@@ -330,15 +330,29 @@ export function useWorkoutSession({
   // Invalidate every server view a session/set mutation can touch. `withSets`
   // adds exercise recents (only set-touching writes change the workout_sets rows
   // that feed the recents ranking).
+  // The mounted detail query for the active session is the exception: its data
+  // is only a one-time seed (local state owns editing), so a refetch would be a
+  // wasted full-session GET per write. It is still marked stale (refetchType
+  // none) so a later visit, e.g. from History, refetches.
   const invalidateSessionViews = useCallback(
     ({ withSets }: { withSets: boolean }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutSessions.all })
+      const activeDetailKey = existingSessionId
+        ? queryKeys.workoutSessions.detail(existingSessionId)
+        : null
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workoutSessions.all,
+        predicate: (query) =>
+          !activeDetailKey || JSON.stringify(query.queryKey) !== JSON.stringify(activeDetailKey),
+      })
+      if (activeDetailKey) {
+        void queryClient.invalidateQueries({ queryKey: activeDetailKey, refetchType: 'none' })
+      }
       void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       if (withSets) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.exercises.recent() })
       }
     },
-    [queryClient],
+    [existingSessionId, queryClient],
   )
 
   // --- Session lifecycle mutations ---
@@ -401,6 +415,9 @@ export function useWorkoutSession({
       setSessionLocation(result.session.location_name || '')
       setSessionDate(result.session.date)
       setSessionStartTime(result.session.start_time)
+      // The planned (zero-set) exercises exist only locally; the server detail
+      // knows only exercises with sets, so it must never re-seed over them.
+      userEditedExercisesRef.current = true
       setExercises(plannedExercises)
       setActiveExerciseId(getActiveExerciseId(plannedExercises, null))
       // Prefill last-performance values for the template's exercises, matching
@@ -448,6 +465,16 @@ export function useWorkoutSession({
 
   const saveSession = useCallback(async () => {
     if (!session || !isSessionReady) return
+
+    // Blur fires on every field exit; skip the PATCH when nothing changed.
+    if (
+      sessionName.trim() === (session.name ?? '').trim() &&
+      sessionNotes.trim() === (session.notes ?? '').trim() &&
+      sessionLocation.trim() === (session.location_name ?? '').trim() &&
+      sessionDate === session.date
+    ) {
+      return
+    }
 
     if (!sessionDate || Number.isNaN(Date.parse(sessionDate))) {
       setCommandStatus('error')
@@ -798,7 +825,19 @@ export function useWorkoutSession({
 
   const totalSets = useMemo(() => getTotalSets(exercises), [exercises])
   const totalVolume = useMemo(() => getTotalVolume(exercises), [exercises])
-  const sessionDuration = useMemo(() => getSessionDuration(session), [session])
+  // Tick while the workout is live so the duration stat does not freeze.
+  const isSessionLive = Boolean(session) && !session?.end_time
+  const [durationNow, setDurationNow] = useState(() => new Date())
+  useEffect(() => {
+    if (!isSessionLive) return
+    setDurationNow(new Date())
+    const timer = setInterval(() => setDurationNow(new Date()), 30_000)
+    return () => clearInterval(timer)
+  }, [isSessionLive])
+  const sessionDuration = useMemo(
+    () => getSessionDuration(session, durationNow),
+    [session, durationNow],
+  )
   const resolvedActiveExerciseId = useMemo(
     () =>
       activeExerciseId && exercises.some((exercise) => exercise.exercise.id === activeExerciseId)
@@ -828,6 +867,7 @@ export function useWorkoutSession({
     isSessionStarted: Boolean(session),
     isSessionReady,
     loading,
+    isSavingSet: saveSetMutation.isPending || updateSetMutation.isPending,
     saveStatus,
     commandStatus,
     commandError,

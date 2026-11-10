@@ -46,7 +46,9 @@ function valuesFromSet(
   return {
     reps: set.reps?.toString() ?? '',
     weight: set.weight?.toString() ?? '',
-    durationMin: set.duration_seconds ? String(set.duration_seconds / 60) : '',
+    durationMin: set.duration_seconds
+      ? String(Math.round((set.duration_seconds / 60) * 100) / 100)
+      : '',
     distanceKm: set.distance_km?.toString() ?? '',
     incline: set.incline?.toString() ?? '',
     speedKmh: set.speed_kmh?.toString() ?? '',
@@ -91,6 +93,9 @@ export default function SetEntry({
   // True once the user has typed into a new entry. The last-performance prefill
   // arrives asynchronously and must not overwrite those values (issue #0027).
   const hasUserInputRef = useRef(false)
+  // A second save (double tap on the sticky bar) must not fire a second request
+  // while the first is in flight; `isSubmitting` state lags a render behind.
+  const saveInFlightRef = useRef(false)
 
   const set = (field: keyof SetEntryFormValues, value: string) => {
     hasUserInputRef.current = true
@@ -131,13 +136,14 @@ export default function SetEntry({
   }, [])
 
   const bumpNumber = (value: string, amount: number, min = 0) => {
-    const current = Number.parseFloat(value || '0')
+    const current = Number.parseFloat((value || '0').replace(',', '.'))
     const nextValue = Number.isFinite(current) ? current + amount : amount
     const clamped = Math.max(min, nextValue)
     return Number.isInteger(clamped) ? String(clamped) : String(Number(clamped.toFixed(2)))
   }
 
   const handleSave = useCallback(async () => {
+    if (saveInFlightRef.current) return
     if (isSaved && !existingSet) return
 
     const result = buildWorkoutSetInput({
@@ -146,6 +152,7 @@ export default function SetEntry({
       setNumber,
       trackingType,
       values,
+      forUpdate: Boolean(existingSet),
     })
 
     if (!result.ok) {
@@ -155,6 +162,7 @@ export default function SetEntry({
 
     try {
       setValidationMessage(null)
+      saveInFlightRef.current = true
       setIsSubmitting(true)
       const savedSet = await onSave(result.data)
       if (!savedSet) return
@@ -171,6 +179,7 @@ export default function SetEntry({
         setIsEditing(false)
       }
     } finally {
+      saveInFlightRef.current = false
       setIsSubmitting(false)
     }
   }, [
@@ -415,13 +424,11 @@ function StrengthFields({ values, set, entryId, bumpNumber, inputClass }: FieldG
         </label>
         <input
           id={`${entryId}-weight`}
-          type="number"
+          type="text"
           inputMode="decimal"
           value={values.weight}
           onChange={(e) => set('weight', e.target.value)}
           placeholder="0"
-          min="0"
-          step="0.5"
           className={inputClass()}
         />
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -460,13 +467,11 @@ function CardioFields({ values, set, entryId, bumpNumber, inputClass }: FieldGro
           </label>
           <input
             id={`${entryId}-duration-min`}
-            type="number"
+            type="text"
             inputMode="decimal"
             value={values.durationMin}
             onChange={(e) => set('durationMin', e.target.value)}
             placeholder="30"
-            min="0.5"
-            step="0.5"
             className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -497,13 +502,11 @@ function CardioFields({ values, set, entryId, bumpNumber, inputClass }: FieldGro
           </label>
           <input
             id={`${entryId}-distance`}
-            type="number"
+            type="text"
             inputMode="decimal"
             value={values.distanceKm}
             onChange={(e) => set('distanceKm', e.target.value)}
             placeholder="0"
-            min="0"
-            step="0.1"
             className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -536,13 +539,11 @@ function CardioFields({ values, set, entryId, bumpNumber, inputClass }: FieldGro
           </label>
           <input
             id={`${entryId}-incline`}
-            type="number"
+            type="text"
             inputMode="decimal"
             value={values.incline}
             onChange={(e) => set('incline', e.target.value)}
             placeholder="0"
-            min="0"
-            step="0.5"
             className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -573,13 +574,11 @@ function CardioFields({ values, set, entryId, bumpNumber, inputClass }: FieldGro
           </label>
           <input
             id={`${entryId}-speed`}
-            type="number"
+            type="text"
             inputMode="decimal"
             value={values.speedKmh}
             onChange={(e) => set('speedKmh', e.target.value)}
             placeholder="0"
-            min="0"
-            step="0.5"
             className={inputClass()}
           />
           <div className="mt-2 grid grid-cols-2 gap-2">

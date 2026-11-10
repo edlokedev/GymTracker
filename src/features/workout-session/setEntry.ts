@@ -47,7 +47,8 @@ function invalid(error: SetEntryValidationError): SetEntryValidationResult {
 }
 
 function parseNumber(value: string): number | null {
-  const trimmed = value.trim()
+  // Comma-decimal locales ("62,5") type a comma; normalise to a dot.
+  const trimmed = value.trim().replace(',', '.')
   if (!trimmed) return null
   const n = Number(trimmed)
   return Number.isFinite(n) ? n : null
@@ -79,25 +80,31 @@ export function buildWorkoutSetInput({
   setNumber,
   trackingType,
   values,
+  forUpdate = false,
 }: {
   exerciseId?: string
   workoutId?: string
   setNumber: number
   trackingType: ExerciseTrackingType
   values: SetEntryFormValues
+  // Updating an existing set: a cleared optional field is sent as null so the
+  // server clears it (undefined is dropped by JSON and leaves the old value).
+  forUpdate?: boolean
 }): SetEntryValidationResult {
   if (!exerciseId || !workoutId) {
     return invalid('missing-workout-context')
   }
 
+  const emptyValue = forUpdate ? null : undefined
+
   const base = {
     workout_id: workoutId,
     exercise_id: exerciseId,
     set_order: setNumber,
-    notes: values.notes.trim() || undefined,
+    notes: values.notes.trim() || emptyValue,
   }
 
-  let restTimeNum: number | undefined
+  let restTimeNum: number | null | undefined = emptyValue
   if (values.restTime) {
     const parsed = parseNonNegativeInt(values.restTime)
     if (parsed === null) return invalid('invalid-rest-time')
@@ -116,7 +123,7 @@ export function buildWorkoutSetInput({
       data: {
         ...base,
         reps: repsNum,
-        weight: weightNum !== null && weightNum > 0 ? weightNum : undefined,
+        weight: weightNum !== null && weightNum > 0 ? weightNum : emptyValue,
         rest_time: restTimeNum,
       },
     }
@@ -142,9 +149,9 @@ export function buildWorkoutSetInput({
       data: {
         ...base,
         duration_seconds: Math.round(durationMin * 60),
-        distance_km: distanceKm ?? undefined,
-        incline: incline ?? undefined,
-        speed_kmh: speedKmh ?? undefined,
+        distance_km: distanceKm ?? emptyValue,
+        incline: incline ?? emptyValue,
+        speed_kmh: speedKmh ?? emptyValue,
         rest_time: restTimeNum,
       },
     }
