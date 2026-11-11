@@ -13,7 +13,7 @@
 //   })
 //
 // Identity is ALWAYS derived from the Supabase session on the request.
-// Handlers receive `user` as a non-null Supabase User; the auth gate
+// Handlers receive the verified user id; the auth gate
 // guarantees that. `userId` from query string or body is never trusted.
 //
 // To short-circuit with a typed HTTP status, throw via `notFound()`,
@@ -21,7 +21,6 @@
 // ForbiddenError / BadRequestError raised by a query module bubble up.
 
 import type { createServerClient } from '@supabase/ssr'
-import type { User } from '@supabase/supabase-js'
 import type { Database } from '../supabase/database.types'
 import { getAuthenticatedUser } from '../supabase/server'
 import { mergeHeaders } from './cookies'
@@ -30,7 +29,7 @@ import { errorResponse, statusForError, successResponse } from './envelope'
 type SB = ReturnType<typeof createServerClient<Database>>
 
 export interface PrivateHandlerContext {
-  user: User
+  user: { id: string }
   supabase: SB
   request: Request
   url: URL
@@ -40,7 +39,7 @@ export interface PrivateHandlerContext {
 export type PrivateHandler<T> = (ctx: PrivateHandlerContext) => Promise<T> | T
 
 export interface AuthResolution {
-  user: User | null
+  user: { id: string } | null
   supabase: SB
   responseHeaders: Headers
 }

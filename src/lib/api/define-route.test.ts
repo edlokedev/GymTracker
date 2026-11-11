@@ -1,4 +1,3 @@
-import type { User } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
 import { makePrivateMethod } from './define-private-route'
 import { makePublicMethod } from './define-public-route'
@@ -6,7 +5,7 @@ import { badRequest, forbidden, NotFoundError } from './errors'
 
 // Minimal fake user / supabase. The handlers we test never call .from() — we
 // only verify wrapper behavior (gate, envelope, error mapping, cookies).
-const fakeUser = { id: 'u-1', email: 'x@example.test' } as unknown as User
+const fakeUser = { id: 'u-1' }
 // biome-ignore lint/suspicious/noExplicitAny: minimal stub for handler tests
 const fakeSupabase = {} as any
 

@@ -6,7 +6,6 @@
 // alongside the TanStack-wrapped ServerRoute. Tests pass that bare handler
 // in via the `handler` field.
 
-import type { User } from '@supabase/supabase-js'
 import { makePrivateMethod } from '../../src/lib/api/define-private-route'
 import { makePublicMethod } from '../../src/lib/api/define-public-route'
 
@@ -35,7 +34,7 @@ export interface RunRouteOptions {
   isPublic?: boolean
   query?: Record<string, string | string[] | undefined>
   body?: unknown
-  user?: User | null
+  user?: { id: string } | null
   // biome-ignore lint/suspicious/noExplicitAny: stub client shape
   supabase: any
 }
@@ -145,4 +144,4 @@ export async function runRoute(opts: RunRouteOptions): Promise<RunRouteResult> {
 }
 
 // Convenience for a stubbed user.
-export const fakeUser = { id: 'user-1', email: 'test@example.com' } as unknown as User
+export const fakeUser = { id: 'user-1' }

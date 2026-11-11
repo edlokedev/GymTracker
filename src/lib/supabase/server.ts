@@ -15,7 +15,7 @@ import type { Database } from './database.types'
 // paths like seed scripts or admin operations.
 //
 // Never trust a client-provided userId. Derive identity from
-// `supabase.auth.getUser()` on the request-scoped client instead.
+// `supabase.auth.getClaims()` on the request-scoped client instead.
 
 export type SupabaseServerContext = {
   supabase: ReturnType<typeof createServerClient<Database>>
@@ -109,7 +109,7 @@ export function getSupabaseServiceRoleClient() {
 // trusting a userId from the request body or query string.
 export async function getAuthenticatedUser(request: Request) {
   const { supabase, responseHeaders } = getSupabaseServerClient(request)
-  const { data, error } = await supabase.auth.getUser()
-  if (error || !data.user) return { user: null, supabase, responseHeaders }
-  return { user: data.user, supabase, responseHeaders }
+  const { data, error } = await supabase.auth.getClaims()
+  if (error || !data?.claims?.sub) return { user: null, supabase, responseHeaders }
+  return { user: { id: data.claims.sub }, supabase, responseHeaders }
 }
