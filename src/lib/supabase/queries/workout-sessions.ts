@@ -253,24 +253,30 @@ export const workoutSessionQueries = {
     })
 
     try {
-      for (const set of (sourceSets ?? []) as SetRow[]) {
+      const sets = (sourceSets ?? []) as SetRow[]
+      if (sets.length > 0) {
+        // One statement gives every row the same default created_at, and
+        // created_at is what orders exercises within a session. Stamp each
+        // row explicitly so the copy keeps the source order.
+        const baseTime = Date.now()
         const { error } = await queryClient(supabase)
           .from('workout_sets')
-          .insert({
-            workout_id: duplicatedSession.id,
-            exercise_id: set.exercise_id,
-            set_number: set.set_number,
-            weight: set.weight,
-            reps: set.reps,
-            rest_time: set.rest_time,
-            notes: set.notes,
-            duration_seconds: set.duration_seconds,
-            distance_km: set.distance_km,
-            incline: set.incline,
-            speed_kmh: set.speed_kmh,
-          })
-          .select(SET_COLUMNS)
-          .single()
+          .insert(
+            sets.map((set, index) => ({
+              created_at: new Date(baseTime + index).toISOString(),
+              workout_id: duplicatedSession.id,
+              exercise_id: set.exercise_id,
+              set_number: set.set_number,
+              weight: set.weight,
+              reps: set.reps,
+              rest_time: set.rest_time,
+              notes: set.notes,
+              duration_seconds: set.duration_seconds,
+              distance_km: set.distance_km,
+              incline: set.incline,
+              speed_kmh: set.speed_kmh,
+            })),
+          )
 
         assertPostgresOk(error)
       }
@@ -288,15 +294,16 @@ export const workoutSessionQueries = {
   // it. The shape matches WorkoutWithDetails so the React workout view can
   // render directly from it.
   async getWithDetails(supabase: SB, id: string): Promise<WorkoutWithDetails | null> {
-    const sessionRow = await workoutSessionQueries.getById(supabase, id)
+    const [sessionRow, { data: setsData, error: setsError }] = await Promise.all([
+      workoutSessionQueries.getById(supabase, id),
+      queryClient(supabase)
+        .from('workout_sets')
+        .select(SET_COLUMNS)
+        .eq('workout_id', id)
+        .order('set_number', { ascending: true })
+        .order('created_at', { ascending: true }),
+    ])
     if (!sessionRow) return null
-
-    const { data: setsData, error: setsError } = await queryClient(supabase)
-      .from('workout_sets')
-      .select(SET_COLUMNS)
-      .eq('workout_id', id)
-      .order('set_number', { ascending: true })
-      .order('created_at', { ascending: true })
     assertPostgresOk(setsError)
 
     const sets = (setsData ?? []) as SetRow[]

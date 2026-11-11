@@ -78,6 +78,12 @@ describe('GET /api/exercises/suggested', () => {
       { userId: fakeUser.id, parentRefs },
     )
 
+    const from = supabase.from.bind(supabase)
+    let requests = 0
+    supabase.from = (table: string) => {
+      requests += 1
+      return from(table)
+    }
     const res = await runRoute({
       contract: exercisesSuggestedContract,
       method: 'GET',
@@ -88,8 +94,10 @@ describe('GET /api/exercises/suggested', () => {
     })
 
     expect(res.status).toBe(200)
+    expect(requests).toBe(5)
     const parsed = exercisesSuggestedContract.methods.GET.response.parse(res.body.data)
     expect(parsed.items.map((item) => item.exercise.id)).toEqual(['ex-2', 'ex-3'])
+    expect(parsed.items.map((item) => item.score)).toEqual([100, 68])
     expect(parsed.items[0].score).toBeGreaterThan(parsed.items[1].score)
     expect(parsed.items[0].reasons).toEqual(
       expect.arrayContaining(['favorite', 'recently used', 'same primary muscle']),

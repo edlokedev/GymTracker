@@ -45,6 +45,7 @@ interface QueryState {
   // mutation state
   mode: 'select' | 'insert' | 'upsert' | 'update' | 'delete'
   insertRow: StubRow | null
+  insertRows: StubRow[] | null
   upsertConflict: string | null
   updatePatch: StubRow | null
 }
@@ -75,6 +76,7 @@ function freshState(table: string): QueryState {
     limitN: null,
     mode: 'select',
     insertRow: null,
+    insertRows: null,
     upsertConflict: null,
     updatePatch: null,
   }
@@ -256,9 +258,10 @@ export function stubSupabase(tables: StubTables, options: StubOptions = {}) {
       },
 
       // Mutations
-      insert(row: StubRow) {
+      insert(row: StubRow | StubRow[]) {
         state.mode = 'insert'
-        state.insertRow = row
+        state.insertRow = Array.isArray(row) ? null : row
+        state.insertRows = Array.isArray(row) ? row : null
         return builder
       },
       upsert(row: StubRow, opts?: { onConflict?: string }) {
@@ -281,6 +284,20 @@ export function stubSupabase(tables: StubTables, options: StubOptions = {}) {
       then(resolve: (v: any) => void, reject?: (e: any) => void) {
         try {
           const rows = data[table] ?? []
+          if (state.mode === 'insert') {
+            const pending = state.insertRows ?? (state.insertRow ? [state.insertRow] : [])
+            if (pending.some((row) => !ownsRow(table, row))) {
+              return resolve({ data: null, error: RLS_42501, count: null })
+            }
+            const inserted = pending.map((row) => ({
+              id: `id-${Math.random().toString(36).slice(2, 10)}`,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              ...row,
+            }))
+            data[table] = [...rows, ...inserted]
+            return resolve({ data: inserted, error: null, count: null })
+          }
           if (state.mode === 'delete') {
             const all = data[table] ?? []
             const matched = applyFilters(all, state)

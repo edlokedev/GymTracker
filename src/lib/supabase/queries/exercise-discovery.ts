@@ -254,30 +254,63 @@ export const exerciseDiscoveryQueries = {
     userId: string,
     params: { exerciseId?: string; muscle?: string; limit: number },
   ): Promise<SuggestedExerciseItem[]> {
-    const currentExercise = params.exerciseId
-      ? await exerciseCatalogQueries.getById(
-          supabase as ReturnType<typeof createServerClient<Database>>,
-          params.exerciseId,
+    const [currentExercise, favoritesResult, recentResult, catalogResult] = await Promise.all([
+      params.exerciseId
+        ? exerciseCatalogQueries.getById(
+            supabase as ReturnType<typeof createServerClient<Database>>,
+            params.exerciseId,
+          )
+        : Promise.resolve(null),
+      table(supabase, 'exercise_favorites').select('exercise_id').eq('user_id', userId),
+      table(supabase, 'workout_sets')
+        .select(RECENT_SELECT)
+        .eq('workout_sessions.user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      table(supabase, 'exercises')
+        .select(
+          'id, name, category_id, tracking_type, equipment, primary_muscles, secondary_muscles',
         )
-      : null
-    if (params.exerciseId && !currentExercise) notFound()
-
-    const [favorites, recent, catalogResult] = await Promise.all([
-      this.listFavorites(supabase, userId),
-      this.listRecent(supabase, userId, 25),
-      exerciseCatalogQueries.search(supabase as ReturnType<typeof createServerClient<Database>>, {
-        limit: 1000,
-        offset: 0,
-      }),
+        .is('archived_at', null)
+        .order('name', { ascending: true })
+        .range(0, 999),
     ])
-
-    return rankSuggestedExercises({
-      catalog: catalogResult.data,
+    if (params.exerciseId && !currentExercise) notFound()
+    assertPostgresOk(favoritesResult.error)
+    assertPostgresOk(recentResult.error)
+    assertPostgresOk(catalogResult.error)
+    const recentById = new Map<string, string>()
+    for (const row of (recentResult.data ?? []) as WorkoutSetRow[]) {
+      const usedAt = rowUsedAt(row)
+      if (!recentById.has(row.exercise_id) || usedAt > (recentById.get(row.exercise_id) ?? '')) {
+        recentById.set(row.exercise_id, usedAt)
+      }
+    }
+    const recentIds = [...recentById.entries()]
+      .sort((a, b) => b[1].localeCompare(a[1]))
+      .slice(0, 25)
+      .map(([id]) => id)
+    const ranked = rankSuggestedExercises({
+      catalog: (catalogResult.data ?? []) as CatalogExercise[],
       currentExercise,
       muscle: params.muscle,
-      favoriteIds: new Set(favorites.exerciseIds),
-      recentExerciseIds: new Set(recent.map((item) => item.exercise.id)),
+      favoriteIds: new Set(
+        ((favoritesResult.data ?? []) as FavoriteRow[]).map((row) => row.exercise_id),
+      ),
+      recentExerciseIds: new Set(recentIds),
       limit: params.limit,
+    })
+    const exercises = await listExercisesByIds(
+      supabase,
+      ranked.map((item) => item.exercise.id),
+      {
+        excludeArchived: true,
+      },
+    )
+    const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]))
+    return ranked.flatMap((item) => {
+      const exercise = byId.get(item.exercise.id)
+      return exercise ? [{ ...item, exercise }] : []
     })
   },
 }
