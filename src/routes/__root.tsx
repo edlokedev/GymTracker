@@ -42,8 +42,8 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
     ],
     links: [
       { rel: 'manifest', href: '/manifest.json' },
-      { rel: 'icon', href: '/gymmie-icon.png', type: 'image/png' },
-      { rel: 'shortcut icon', href: '/gymmie-icon.png' },
+      { rel: 'icon', href: '/gymmie-icon-64.png', type: 'image/png' },
+      { rel: 'shortcut icon', href: '/gymmie-icon-64.png' },
       {
         rel: 'stylesheet',
         href: appCss,
@@ -99,12 +99,14 @@ function ConditionalHeader() {
 function ConditionalAppContent({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
 
-  if (isLoading || !isAuthenticated) {
-    return <>{children}</>
-  }
-
   return (
-    <main className="bg-gray-50 pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-gray-900 md:pb-0">
+    <main
+      className={
+        !isLoading && isAuthenticated
+          ? 'bg-gray-50 pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-gray-900 md:pb-0'
+          : undefined
+      }
+    >
       {children}
     </main>
   )
