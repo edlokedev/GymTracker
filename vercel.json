@@ -3,5 +3,16 @@
   "framework": null,
   "buildCommand": "SERVER_PRESET=vercel bun run build",
   "installCommand": "bun install",
-  "outputDirectory": ".vercel/output"
+  "outputDirectory": ".vercel/output",
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
 }

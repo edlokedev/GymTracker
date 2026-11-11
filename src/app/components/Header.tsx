@@ -28,7 +28,7 @@ export default function Header() {
                 to="/"
                 className="flex items-center gap-2 text-xl font-bold text-blue-600 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400"
               >
-                <img src="/gymmie-icon.png" alt="" className="h-8 w-8 rounded-lg" />
+                <img src="/gymmie-icon-64.png" alt="" className="h-8 w-8 rounded-lg" />
                 Gymmie
               </Link>
             </div>
