@@ -10,6 +10,17 @@ import { createQueryWrapper } from '../../../test/queryWrapper'
 import { makeExerciseFixture } from './__fixtures__/exercise'
 import WorkoutSessionManager from './components/WorkoutSessionManager'
 
+const setEntryRenders = vi.hoisted(() => vi.fn())
+vi.mock('./components/SetEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./components/SetEntry')>()
+  return {
+    default: (props: Parameters<typeof actual.default>[0]) => {
+      setEntryRenders()
+      return <actual.default {...props} />
+    },
+  }
+})
+
 // WorkoutSessionManager now consumes TanStack Query via useWorkoutSession
 // (ADR-0007, Phase 4), so every render wraps in a fresh QueryClient.
 function renderManager(ui: ReactElement) {
@@ -163,6 +174,30 @@ describe('WorkoutSessionManager', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('does not render exercise cards when workout name or notes change', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        Response.json({
+          success: true,
+          data: String(input).includes('includeDetails=true') ? makeWorkoutDetails() : [],
+        }),
+      ),
+    )
+    renderManager(<WorkoutSessionManager existingSession={makeSession()} />)
+    await screen.findByRole('heading', { name: 'Bench Press' })
+    fireEvent.click(screen.getByRole('button', { name: /workout details/i }))
+    setEntryRenders.mockClear()
+    fireEvent.change(screen.getByPlaceholderText('e.g., Push Day, Legs, etc.'), {
+      target: { value: 'Push Day!' },
+    })
+    fireEvent.change(
+      screen.getByPlaceholderText('How are you feeling? Any goals for this workout?'),
+      { target: { value: 'Notes' } },
+    )
+    expect(setEntryRenders).not.toHaveBeenCalled()
   })
 
   it('starts a new workout session', async () => {
