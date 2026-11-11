@@ -1,18 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "SERVER_PRESET=vercel bun run build",
+  "buildCommand": "SERVER_PRESET=vercel bun run build && node scripts/patch-vercel-cache.js",
   "installCommand": "bun install",
-  "outputDirectory": ".vercel/output",
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
-  ]
+  "outputDirectory": ".vercel/output"
 }
