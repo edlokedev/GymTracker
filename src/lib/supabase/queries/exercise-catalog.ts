@@ -148,6 +148,11 @@ function muscleGroupFilter(muscleGroup: string): string {
   return `primary_muscles.cs.${value},secondary_muscles.cs.${value}`
 }
 
+// LIKE treats these three characters as pattern syntax, not literal text.
+function containsPattern(value: string): string {
+  return `%${value.replace(/[\\%_]/g, '\\$&')}%`
+}
+
 export const exerciseCatalogQueries = {
   async listCategories(supabase: SB): Promise<CatalogCategoryWithCount[]> {
     const { data: categories, error } = await supabase
@@ -255,6 +260,10 @@ export const exerciseCatalogQueries = {
       if (params.equipment) q = q.eq('equipment', params.equipment)
       if (params.level) q = q.eq('level', params.level)
       if (params.force) q = q.eq('force', params.force)
+      if (params.query) q = q.ilike('search_text', containsPattern(params.query))
+      if (params.primary_muscle) {
+        q = q.ilike('primary_muscles_text', containsPattern(params.primary_muscle))
+      }
 
       // Exact-match muscle_group: row's primary OR secondary jsonb array
       // contains the muscle string.
@@ -265,77 +274,12 @@ export const exerciseCatalogQueries = {
       return q.order('name', { ascending: true })
     }
 
-    // Fast path: when there's no fuzzy text query and no primary_muscle
-    // substring filter, Postgres can paginate directly with an exact count.
-    // SQLite's `query` predicate ORs across name + primary_muscles text +
-    // secondary_muscles text; we replicate that in JS below to stay portable
-    // across PostgREST versions (avoids fragile jsonb::text casts in `or()`).
-    const needsJsAggregation = Boolean(params.query || params.primary_muscle)
-
-    if (!needsJsAggregation) {
-      const q = buildBase().range(offset, offset + limit - 1)
-      const { data, error, count } = await q
-      assertPostgresOk(error)
-      const rows = (data ?? []) as unknown as RawExerciseRow[]
-      const total = count ?? 0
-      return {
-        data: rows.map(mapExerciseRow),
-        total,
-        page: Math.floor(offset / limit) + 1,
-        limit,
-        hasMore: offset + limit < total,
-      }
-    }
-
-    // Slow path: pull the filtered set (without text search) and apply
-    // text/muscle substring matching in JS to replicate SQLite semantics.
-    // Paginated to bypass the 1000-row API cap when a single facet matches
-    // more than 1000 rows (e.g. equipment=body weight returns 325 rows today
-    // but could grow).
-    const buildSlowQuery = () => {
-      let q = supabase.from('exercises').select(EXERCISE_SELECT).is('archived_at', null)
-      if (params.category_id) q = q.eq('category_id', params.category_id)
-      if (params.equipment) q = q.eq('equipment', params.equipment)
-      if (params.level) q = q.eq('level', params.level)
-      if (params.force) q = q.eq('force', params.force)
-      if (params.muscle_group) {
-        q = q.or(muscleGroupFilter(params.muscle_group))
-      }
-      return q.order('name', { ascending: true })
-    }
-
-    const all: CatalogExercise[] = []
-    const PAGE = 1000
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await buildSlowQuery().range(from, from + PAGE - 1)
-      assertPostgresOk(error)
-      const rows = (data ?? []) as unknown as RawExerciseRow[]
-      all.push(...rows.map(mapExerciseRow))
-      if (rows.length < PAGE) break
-    }
-
-    const queryLc = params.query?.toLowerCase()
-    const primaryLc = params.primary_muscle?.toLowerCase()
-
-    const filtered = all.filter((ex) => {
-      if (queryLc) {
-        const hay = [ex.name, ex.primary_muscles.join(','), ex.secondary_muscles.join(',')]
-          .join(' ')
-          .toLowerCase()
-        if (!hay.includes(queryLc)) return false
-      }
-      if (primaryLc) {
-        const hay = ex.primary_muscles.join(',').toLowerCase()
-        if (!hay.includes(primaryLc)) return false
-      }
-      return true
-    })
-
-    const total = filtered.length
-    const sliced = filtered.slice(offset, offset + limit)
-
+    const { data, error, count } = await buildBase().range(offset, offset + limit - 1)
+    assertPostgresOk(error)
+    const rows = (data ?? []) as unknown as RawExerciseRow[]
+    const total = count ?? 0
     return {
-      data: sliced,
+      data: rows.map(mapExerciseRow),
       total,
       page: Math.floor(offset / limit) + 1,
       limit,

@@ -31,6 +31,9 @@ class FakeBuilder {
   is(...a: unknown[]) {
     return this.rec('is', a)
   }
+  ilike(...a: unknown[]) {
+    return this.rec('ilike', a)
+  }
   order(...a: unknown[]) {
     return this.rec('order', a)
   }
@@ -65,7 +68,7 @@ describe('exercise catalog reads exclude archived custom exercises', () => {
     expect(hasArchivedFilter(ops)).toBe(true)
   })
 
-  it('search slow path (text query) filters archived_at is null', async () => {
+  it('search with text query filters archived_at is null', async () => {
     const { client, ops } = makeClient({ data: [] })
     await exerciseCatalogQueries.search(client as never, { query: 'row', limit: 20, offset: 0 })
     expect(hasArchivedFilter(ops)).toBe(true)

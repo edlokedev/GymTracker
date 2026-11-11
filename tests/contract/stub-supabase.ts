@@ -150,6 +150,21 @@ export function stubSupabase(tables: StubTables, options: StubOptions = {}) {
         state.filters.push((r) => readCol(r, col) === val)
         return builder
       },
+      ilike(col: string, pattern: string) {
+        let regex = '^'
+        for (let i = 0; i < pattern.length; i++) {
+          let char = pattern[i]
+          if (char === '\\' && i + 1 < pattern.length) {
+            char = pattern[++i]
+            regex += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          } else if (char === '%') regex += '.*'
+          else if (char === '_') regex += '.'
+          else regex += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        }
+        const matcher = new RegExp(`${regex}$`, 'is')
+        state.filters.push((r) => matcher.test(String(readCol(r, col) ?? '')))
+        return builder
+      },
       neq(col: string, val: unknown) {
         state.filters.push((r) => readCol(r, col) !== val)
         return builder
